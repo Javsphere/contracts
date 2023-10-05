@@ -1,0 +1,16 @@
+/node_modules
+cache/validations.json
+/.idea
+.env
+
+.DS_STORE
+build/
+node_modules/
+.vscode
+
+#Hardhat files
+cache
+artifacts
+yarn.lock
+.deps
+.openzeppelin
