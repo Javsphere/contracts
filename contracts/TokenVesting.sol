@@ -32,16 +32,16 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         bool revoked;
     }
 
-    // address of the ERC20 token
     IERC20Upgradeable public token;
+    address public adminAddress;
     uint256 public currentVestingId;
-
-    mapping(bytes32 => VestingSchedule) public vestingSchedules;
     uint256 public vestingSchedulesTotalAmount;
+    mapping(bytes32 => VestingSchedule) public vestingSchedules;
     mapping(address => uint256) public holdersVestingCount;
 
     /* ========== EVENTS ========== */
     event Initialized(address indexed executor, uint256 at);
+    event SetAdminAddress(address indexed _address);
     event VestingScheduleAdded(
         address indexed beneficiary,
         uint256 cliff,
@@ -54,27 +54,19 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     event Withdraw(address indexed to, uint256 amount);
     event Released(bytes32 indexed vestingScheduleId, address indexed to, uint256 amount);
 
-    /**
-     * @dev Reverts if the vesting schedule does not exist or has been revoked.
-     */
     modifier onlyIfVestingScheduleNotRevoked(bytes32 _vestingScheduleId) {
         require(vestingSchedules[_vestingScheduleId].initialized);
         require(!vestingSchedules[_vestingScheduleId].revoked);
         _;
     }
 
-    /**
-     * @dev This function is called for plain Ether transfers, i.e. for every call with empty calldata.
-     */
-    receive() external payable {}
-
-    /**
-     * @dev Fallback function is executed if none of the other functions match the function
-     * identifier or no data was provided with the function call.
-     */
-    fallback() external payable {}
+    modifier onlyAdmin() {
+        require(msg.sender == adminAddress || msg.sender == owner(), "TokenVesting: only admin");
+        _;
+    }
 
     function initialize(address _token) external initializer {
+        adminAddress = msg.sender;
         token = IERC20Upgradeable(_token);
         currentVestingId = 1;
 
@@ -82,6 +74,12 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         __ReentrancyGuard_init();
 
         emit Initialized(msg.sender, block.number);
+    }
+
+    function setAdminAddress(address _address) external onlyAdmin {
+        adminAddress = _address;
+
+        emit SetAdminAddress(_address);
     }
 
     /**
@@ -102,7 +100,7 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         uint128 _slicePeriodSeconds,
         bool _revocable,
         uint128 _amount
-    ) external onlyOwner {
+    ) external onlyAdmin {
         require(
             getWithdrawableAmount() >= _amount,
             "TokenVesting: cannot create vesting schedule because not sufficient tokens"
@@ -149,7 +147,7 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      */
     function revoke(
         bytes32 vestingScheduleId
-    ) external onlyOwner onlyIfVestingScheduleNotRevoked(vestingScheduleId) {
+    ) external onlyAdmin onlyIfVestingScheduleNotRevoked(vestingScheduleId) {
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
         require(vestingSchedule.revocable, "TokenVesting: vesting is not revocable");
         uint128 vestedAmount = _computeReleasableAmount(vestingSchedule);
@@ -167,7 +165,7 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      * @notice Withdraw the specified amount if possible.
      * @param amount the amount to withdraw
      */
-    function withdraw(uint256 amount) external nonReentrant onlyOwner {
+    function withdraw(uint256 amount) external nonReentrant onlyAdmin {
         require(getWithdrawableAmount() >= amount, "TokenVesting: not enough withdrawable funds");
 
         token.safeTransfer(msg.sender, amount);
@@ -206,7 +204,7 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     function computeReleasableAmount(
         bytes32 vestingScheduleId
     ) external view onlyIfVestingScheduleNotRevoked(vestingScheduleId) returns (uint256) {
-        VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
+        VestingSchedule memory vestingSchedule = vestingSchedules[vestingScheduleId];
         return _computeReleasableAmount(vestingSchedule);
     }
 
@@ -218,12 +216,12 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) external view returns (VestingSchedule memory) {
         return
             vestingSchedules[
-            _computeVestingScheduleIdForAddressAndIndex(holder, holdersVestingCount[holder] - 1)
+                _computeVestingScheduleIdForAddressAndIndex(holder, holdersVestingCount[holder] - 1)
             ];
     }
 
     /**
-   * @dev Computes the vesting schedule identifier for an address and an index.
+     * @dev Computes the vesting schedule identifier for an address and an index.
      */
     function computeVestingScheduleIdForAddressAndIndex(
         address holder,
@@ -236,7 +234,7 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Returns the amount of tokens that can be withdrawn by the owner.
      * @return the amount of tokens
      */
-    function getWithdrawableAmount() public view onlyOwner returns (uint256) {
+    function getWithdrawableAmount() public view onlyAdmin returns (uint256) {
         return token.balanceOf(address(this)) - vestingSchedulesTotalAmount;
     }
 
@@ -290,12 +288,12 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         if ((currentTime < vestingSchedule.cliff) || vestingSchedule.revoked) {
             return 0;
         }
-            // If the current time is after the vesting period, all tokens are releasable,
-            // minus the amount already released.
+        // If the current time is after the vesting period, all tokens are releasable,
+        // minus the amount already released.
         else if (currentTime >= vestingSchedule.start + vestingSchedule.duration) {
             return vestingSchedule.amountTotal - vestingSchedule.released;
         }
-            // Otherwise, some tokens are releasable.
+        // Otherwise, some tokens are releasable.
         else {
             // Compute the number of full vesting periods that have elapsed.
             uint256 timeFromStart = currentTime - vestingSchedule.start;
