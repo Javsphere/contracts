@@ -1,5 +1,5 @@
-const { ethers, upgrades } = require("hardhat");
-const PROXY = "0x0000000000000000000000000000000000000000";
+const {ethers, upgrades} = require("hardhat");
+const PROXY = "0x0B2Ae4E47bF3Eb3BD66AD7e38ff152076Ef24323";
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -11,25 +11,27 @@ async function main() {
     // console.log("Proxy imported from:", deployment.address);
 
     const impl = await upgrades.upgradeProxy(
-      PROXY,
-      Contract
+        PROXY,
+        Contract
     );
-    await impl.deployed();
+    await impl.waitForDeployment();
 
     console.log(`Upgrade Finished..`)
     console.log(`Starting Verification..`);
 
     let newImplementationAddress = await upgrades.erc1967.getImplementationAddress(PROXY);
-    try{
-        await run("verify:verify", { address: newImplementationAddress});
-    } catch(error) {
-        if(!error.message.includes("Reason: Already Verified")) {
+
+    try {
+        await run("verify:verify", {address: newImplementationAddress});
+    } catch (error) {
+        if (!error.message.includes("Reason: Already Verified")) {
             console.error(error);
             console.log(`\nVerification of  new implementation failed!`)
             console.log(`But contract was deployed at Address: ${newImplementationAddress}`)
             process.exit(1);
         }
-    };
+    }
+    ;
 
     console.log(`New implementation Address: ${newImplementationAddress}`);
     console.log(`JavlisToken contract upgraded`);

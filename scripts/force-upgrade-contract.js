@@ -7,7 +7,7 @@ async function main() {
     console.log(`Deploying from ${owner.address}`);
     const Contract = await ethers.getContractFactory("ExampleContract");
     const contract = await Contract.deploy();
-    await contract.deployed();
+    await contract.waitForDeployment();
 
     
     console.log(`ExampleContract contract deployed to: ${contract.address}`);

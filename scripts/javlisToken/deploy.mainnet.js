@@ -13,8 +13,8 @@ async function main() {
             initializer: "initialize",
         }
     );
-    await contract.deployed();
-    console.log(`JavlisToken contract deployed to: ${contract.address}`);
+    const contractAddress = await contract.getAddress()
+    console.log(`JavlisToken contract deployed to: ${contractAddress}`);
 }
 
 main()
