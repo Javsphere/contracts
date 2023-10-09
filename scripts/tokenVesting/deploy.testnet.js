@@ -8,14 +8,16 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x0000000000000000000000000000000000000000" //_token
+            "0x0B2Ae4E47bF3Eb3BD66AD7e38ff152076Ef24323" //_token
         ],
         {
             initializer: "initialize",
         }
     );
-    await contract.deployed();
-    console.log(`TokenVesting contract deployed to: ${contract.address}`);
+    await contract.waitForDeployment();
+
+    const contractAddress = await contract.getAddress()
+    console.log(`TokenVesting contract deployed to: ${contractAddress}`);
 }
 
 main()

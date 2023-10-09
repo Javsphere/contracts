@@ -14,12 +14,13 @@ async function main() {
       PROXY,
       Contract
     );
-    await impl.deployed();
+    await impl.waitForDeployment();
 
     console.log(`Upgrade Finished..`)
     console.log(`Starting Verification..`);
 
     let newImplementationAddress = await upgrades.erc1967.getImplementationAddress(PROXY);
+    
     try{
         await run("verify:verify", { address: newImplementationAddress});
     } catch(error) {

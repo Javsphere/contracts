@@ -14,8 +14,10 @@ async function main() {
             initializer: "initialize",
         }
     );
-    await contract.deployed();
-    console.log(`TokenVesting contract deployed to: ${contract.address}`);
+    await contract.waitForDeployment();
+
+    const contractAddress = await contract.getAddress()
+    console.log(`TokenVesting contract deployed to: ${contractAddress}`);
 }
 
 main()

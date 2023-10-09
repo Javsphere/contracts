@@ -1,5 +1,4 @@
 const { ethers, upgrades } = require("hardhat");
-const { delay } = require("../utils.js")
 const PROXY = "0x0000000000000000000000000000000000000000";
 
 async function main() {
@@ -7,15 +6,21 @@ async function main() {
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
     const Contract = await ethers.getContractFactory("JavlisToken");
-    await upgrades.upgradeProxy(
+
+    // const deployment = await upgrades.forceImport(PROXY, Contract);
+    // console.log("Proxy imported from:", deployment.address);
+
+    const impl = await upgrades.upgradeProxy(
       PROXY,
       Contract
     );
+    await impl.waitForDeployment();
+
     console.log(`Upgrade Finished..`)
     console.log(`Starting Verification..`);
-    await delay(5000);
 
     let newImplementationAddress = await upgrades.erc1967.getImplementationAddress(PROXY);
+
     try{
         await run("verify:verify", { address: newImplementationAddress});
     } catch(error) {
