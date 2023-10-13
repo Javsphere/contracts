@@ -54,6 +54,11 @@ describe("TokenVesting contract", () => {
             await expect(await hhTokenVesting.adminAddress()).to.equal(owner.address);
         });
 
+         it("Should set the _paused status", async () => {
+
+            await expect(await hhTokenVesting.paused()).to.equal(false);
+        });
+
         it("Should mint tokens", async () => {
             const tokenAmounts = ethers.parseEther("20")
 
@@ -65,6 +70,36 @@ describe("TokenVesting contract", () => {
     });
 
     describe("Transactions", () => {
+        it("Should revert when set pause", async () => {
+            await expect(
+                hhTokenVesting.connect(addr1).pause()
+            ).to.be.revertedWith(
+                adminError
+            );
+
+        });
+
+        it("Should set pause", async () => {
+            await hhTokenVesting.pause();
+
+            await expect(await hhTokenVesting.paused()).to.equal(true);
+        });
+
+         it("Should revert when set unpause", async () => {
+            await expect(
+                hhTokenVesting.connect(addr1).unpause()
+            ).to.be.revertedWith(
+                adminError
+            );
+
+        });
+
+        it("Should set unpause", async () => {
+            await hhTokenVesting.unpause();
+
+            await expect(await hhTokenVesting.paused()).to.equal(false);
+        });
+
         it("Should revert when set the admin address", async () => {
             await expect(
                 hhTokenVesting.connect(addr1).setAdminAddress(admin.address)

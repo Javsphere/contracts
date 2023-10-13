@@ -5,9 +5,10 @@ pragma solidity ^0.8.16;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenVesting is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     struct VestingSchedule {
@@ -71,9 +72,18 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         currentVestingId = 1;
 
         __Ownable_init();
+        __Pausable_init();
         __ReentrancyGuard_init();
 
         emit Initialized(msg.sender, block.number);
+    }
+
+    function pause() external onlyAdmin {
+        _pause();
+    }
+
+    function unpause() external onlyAdmin {
+        _unpause();
     }
 
     function setAdminAddress(address _address) external onlyAdmin {
@@ -181,7 +191,7 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     function release(
         bytes32 vestingScheduleId,
         uint128 amount
-    ) external nonReentrant onlyIfVestingScheduleNotRevoked(vestingScheduleId) {
+    ) external whenNotPaused nonReentrant onlyIfVestingScheduleNotRevoked(vestingScheduleId) {
         _release(vestingScheduleId, amount);
     }
 
@@ -216,7 +226,7 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) external view returns (VestingSchedule memory) {
         return
             vestingSchedules[
-                _computeVestingScheduleIdForAddressAndIndex(holder, holdersVestingCount[holder] - 1)
+            _computeVestingScheduleIdForAddressAndIndex(holder, holdersVestingCount[holder] - 1)
             ];
     }
 
@@ -288,12 +298,12 @@ contract TokenVesting is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         if ((currentTime < vestingSchedule.cliff) || vestingSchedule.revoked) {
             return 0;
         }
-        // If the current time is after the vesting period, all tokens are releasable,
-        // minus the amount already released.
+            // If the current time is after the vesting period, all tokens are releasable,
+            // minus the amount already released.
         else if (currentTime >= vestingSchedule.start + vestingSchedule.duration) {
             return vestingSchedule.amountTotal - vestingSchedule.released;
         }
-        // Otherwise, some tokens are releasable.
+            // Otherwise, some tokens are releasable.
         else {
             // Compute the number of full vesting periods that have elapsed.
             uint256 timeFromStart = currentTime - vestingSchedule.start;
