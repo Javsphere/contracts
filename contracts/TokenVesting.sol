@@ -7,9 +7,17 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "./access/MultiSignatureUpgradeable.sol";
 
-contract TokenVesting is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenVesting is
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    MultiSignatureUpgradeable
+{
     using SafeERC20Upgradeable for IERC20Upgradeable;
+
+    bytes32 public constant WITHDRAW = keccak256("WITHDRAW");
 
     struct VestingSchedule {
         bool initialized;
@@ -66,7 +74,11 @@ contract TokenVesting is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuar
         _;
     }
 
-    function initialize(address _token) external initializer {
+    function initialize(
+        address _token,
+        uint256 _minimumSignatures,
+        address[] memory _signers
+    ) external initializer {
         adminAddress = msg.sender;
         token = IERC20Upgradeable(_token);
         currentVestingId = 1;
@@ -74,6 +86,7 @@ contract TokenVesting is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuar
         __Ownable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
+        __MultiSignatureUpgradeable_init(_minimumSignatures, _signers);
 
         emit Initialized(msg.sender, block.number);
     }
@@ -175,7 +188,7 @@ contract TokenVesting is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuar
      * @notice Withdraw the specified amount if possible.
      * @param amount the amount to withdraw
      */
-    function withdraw(uint256 amount) external nonReentrant onlyAdmin {
+    function withdraw(uint256 amount) external nonReentrant onlyAdmin needAction(WITHDRAW) {
         require(getWithdrawableAmount() >= amount, "TokenVesting: not enough withdrawable funds");
 
         token.safeTransfer(msg.sender, amount);
@@ -226,7 +239,7 @@ contract TokenVesting is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuar
     ) external view returns (VestingSchedule memory) {
         return
             vestingSchedules[
-            _computeVestingScheduleIdForAddressAndIndex(holder, holdersVestingCount[holder] - 1)
+                _computeVestingScheduleIdForAddressAndIndex(holder, holdersVestingCount[holder] - 1)
             ];
     }
 
@@ -298,12 +311,12 @@ contract TokenVesting is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuar
         if ((currentTime < vestingSchedule.cliff) || vestingSchedule.revoked) {
             return 0;
         }
-            // If the current time is after the vesting period, all tokens are releasable,
-            // minus the amount already released.
+        // If the current time is after the vesting period, all tokens are releasable,
+        // minus the amount already released.
         else if (currentTime >= vestingSchedule.start + vestingSchedule.duration) {
             return vestingSchedule.amountTotal - vestingSchedule.released;
         }
-            // Otherwise, some tokens are releasable.
+        // Otherwise, some tokens are releasable.
         else {
             // Compute the number of full vesting periods that have elapsed.
             uint256 timeFromStart = currentTime - vestingSchedule.start;
