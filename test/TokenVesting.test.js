@@ -12,6 +12,9 @@ describe("TokenVesting contract", () => {
     let addr1;
     let addr2;
     let admin;
+    let signer1;
+    let signer2;
+    let signer3;
     let mockedJavToken;
     let adminError;
 
@@ -23,14 +26,15 @@ describe("TokenVesting contract", () => {
 
     before(async () => {
         const tokenVesting = await ethers.getContractFactory("TokenVesting");
-        [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
-        admin = addrs[4];
+        [owner, addr1, addr2, admin, signer1, signer2, signer3, ...addrs] = await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         mockedJavToken = await loadFixture(deployTokenFixture);
 
         hhTokenVesting = await tokenVesting.deploy();
         await hhTokenVesting.initialize(
-            mockedJavToken.target
+            mockedJavToken.target,
+            2,
+            [signer1.address, signer2.address, signer3.address]
         );
 
         adminError = "TokenVesting: only admin"
@@ -54,7 +58,7 @@ describe("TokenVesting contract", () => {
             await expect(await hhTokenVesting.adminAddress()).to.equal(owner.address);
         });
 
-         it("Should set the _paused status", async () => {
+        it("Should set the _paused status", async () => {
 
             await expect(await hhTokenVesting.paused()).to.equal(false);
         });
@@ -85,7 +89,7 @@ describe("TokenVesting contract", () => {
             await expect(await hhTokenVesting.paused()).to.equal(true);
         });
 
-         it("Should revert when set unpause", async () => {
+        it("Should revert when set unpause", async () => {
             await expect(
                 hhTokenVesting.connect(addr1).unpause()
             ).to.be.revertedWith(
@@ -204,15 +208,26 @@ describe("TokenVesting contract", () => {
             await expect(vestingSchedule.revoked).to.be.equal(true);
         });
 
-        it("Should revert when withdraw", async () => {
+        it("Should revert when withdraw only admin", async () => {
             await expect(
                 hhTokenVesting.connect(addr1).withdraw(1)
             ).to.be.revertedWith(adminError);
 
         });
 
+        it("Should revert when withdraw Multisign", async () => {
+            await expect(
+                hhTokenVesting.withdraw(1)
+            ).to.be.revertedWith("MultiSignatureUpgradeable: need more signatures");
+
+        });
+
         it("Should withdraw", async () => {
             const amount = ethers.parseEther("0.0005")
+            const action = await hhTokenVesting.WITHDRAW();
+
+            hhTokenVesting.connect(signer1).signAction(action);
+            hhTokenVesting.connect(signer2).signAction(action);
 
             await hhTokenVesting.withdraw(amount);
 
