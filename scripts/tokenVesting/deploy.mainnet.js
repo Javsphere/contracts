@@ -8,7 +8,13 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x0000000000000000000000000000000000000000" //_token
+            "0x0000000000000000000000000000000000000000", //_token
+            2,                                            //_minimumSignatures
+            [                                             //_signers
+                "0x0000000000000000000000000000000000000000",
+                "0x0000000000000000000000000000000000000000",
+                "0x0000000000000000000000000000000000000000"
+            ]
         ],
         {
             initializer: "initialize",

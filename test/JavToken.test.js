@@ -26,6 +26,26 @@ describe("JavlisToken contract", () => {
 
 
     });
+
+    describe("Transactions", () => {
+        it("Should revert when mint", async () => {
+            await expect(
+                hhToken.connect(addr1).mint(owner.address, ethers.parseEther("20"))
+            ).to.be.revertedWith(
+                "Ownable: caller is not the owner"
+            );
+
+        });
+
+        it("Should mint", async () => {
+            const amount = ethers.parseEther("20");
+
+            await hhToken.mint(owner.address, amount);
+
+            await expect(await hhToken.totalSupply()).to.equal(amount);
+            await expect(await hhToken.balanceOf(owner.address)).to.equal(amount);
+        });
+    });
 });
 
 

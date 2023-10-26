@@ -4,18 +4,16 @@ async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("CommunityLaunch");
+    const Contract = await ethers.getContractFactory("DutchAuctionFactory");
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x0000000000000000000000000000000000000000", //_tokenAddress
-            0,                                            //_startTokenPrice
-            0,                                            //_incPricePerBlock
+            "0x0B2Ae4E47bF3Eb3BD66AD7e38ff152076Ef24323", //_tokenAddress
             2,                                            //_minimumSignatures
             [                                             //_signers
-                "0x0000000000000000000000000000000000000000",
-                "0x0000000000000000000000000000000000000000",
-                "0x0000000000000000000000000000000000000000"
+                "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb",
+                "0x229201eeE335Bcf2aC2F3553dcAF613A70331157",
+                "0x01C4679164306967BbEd08926B50bcDE240c9f0b"
             ]
         ],
         {
@@ -25,7 +23,7 @@ async function main() {
     await contract.waitForDeployment();
 
     const contractAddress = await contract.getAddress()
-    console.log(`CommunityLaunch contract deployed to: ${contractAddress}`);
+    console.log(`DutchAuctionFactory contract deployed to: ${contractAddress}`);
 }
 
 main()
