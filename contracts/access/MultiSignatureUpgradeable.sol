@@ -10,8 +10,11 @@ abstract contract MultiSignatureUpgradeable is AccessControlUpgradeable {
     bytes32 public constant INC_MIN_SIGN = keccak256("INC_MIN_SIGN");
 
     uint256 public minimumSignatures;
+    // action -> id
     mapping(bytes32 => uint256) public actionId;
+    // action -> actionId -> signatures
     mapping(bytes32 => mapping(uint256 => uint256)) public signatures;
+    // address -> action -> actionId -> signatureUsedByAction
     mapping(address => mapping(bytes32 => mapping(uint256 => bool))) public signatureUsedByAction;
 
     /* ========== EVENTS ========== */
