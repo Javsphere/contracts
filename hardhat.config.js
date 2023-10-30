@@ -29,8 +29,8 @@ module.exports = {
             blockGasLimit: 1000000000
         },
         testnet: {
-            chainId: 1133,
-            url: "https://testnet-dmc.mydefichain.com:20551",
+            chainId: 1131,
+            url: "https://dmc.mydefichain.com/testnet",
             accounts: [process.env.OWNER_KEY],
         },
         mainnet: {
@@ -40,15 +40,15 @@ module.exports = {
     },
     etherscan: {
         apiKey: {
-            testnet: 'tt'
+            testnet: "abc"
         },
         customChains: [
             {
                 network: "testnet",
-                chainId: 1133,
+                chainId: 1131,
                 urls: {
-                    apiURL: "https://testnet-dmc.mydefichain.com:8444/api",
-                    browserURL: "https://testnet-dmc.mydefichain.com:8444"
+                    apiURL: "https://blockscout.testnet.ocean.jellyfishsdk.com/api",
+                    browserURL: "https://blockscout.testnet.ocean.jellyfishsdk.com"
                 }
             }
         ]
@@ -59,6 +59,6 @@ module.exports = {
         disambiguatePaths: false,
     },
     gasReporter: {
-        enabled: false
+        enabled: true
     }
 };
