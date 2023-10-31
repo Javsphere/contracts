@@ -6,39 +6,16 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
-contract DUSDStaking is
-    OwnableUpgradeable,
-    PausableUpgradeable,
-    EIP712Upgradeable,
-    ReentrancyGuardUpgradeable
-{
+contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    string private constant SIGNING_DOMAIN = "DUSD_STAKING";
-    string private constant SIGNATURE_VERSION = "1";
-
     /**
-     * @dev Withdraw message structure with signature
-     * @param user reward owner
-     * @param amount reward amount
-     * @param salt to make unique signatures
-     * @param signature EIP712 secp256k1 signature
-     */
-    struct WithdrawMessage {
-        address user;
-        uint256 amount;
-        uint256 salt;
-        bytes signature;
-    }
-
-    /**
-     * @notice Info for update user investment
+     * @notice Info for update user investment/withdraw info
      * @param user: user address
      * @param amount: investment amount
      */
-    struct InvestmentInfo {
+    struct UserAmountInfo {
         address user;
         uint256 amount;
     }
@@ -46,19 +23,20 @@ contract DUSDStaking is
     IERC20Upgradeable public token;
     address public adminAddress;
     address public botAddress;
-    address private serviceSigner;
 
-    mapping(bytes => bool) private signatureUsed;
     mapping(address => uint256) public userDeposit;
     mapping(address => uint256) public userInvestment;
+    mapping(address => uint256) public userRequestedWithdraw;
+    mapping(address => uint256) public userClaimableAmount;
 
     /* ========== EVENTS ========== */
     event Initialized(address indexed executor, uint256 at);
     event SetAdminAddress(address indexed _address);
     event SetBotAddress(address indexed _address);
-    event SetServiceSignerAddress(address indexed _address);
     event Deposit(address indexed _address, uint256 amount);
     event UpdateInvestment(address indexed _address, uint256 amount);
+    event UpdateClaimableAmount(address indexed _address, uint256 amount);
+    event RequestWithdraw(address indexed _address, uint256 amount);
     event Withdraw(address indexed _address, uint256 amount);
 
     modifier onlyAdmin() {
@@ -71,20 +49,14 @@ contract DUSDStaking is
         _;
     }
 
-    function initialize(
-        address _tokenAddress,
-        address _botAddress,
-        address _serviceSigner
-    ) external initializer {
+    function initialize(address _tokenAddress, address _botAddress) external initializer {
         adminAddress = msg.sender;
         token = IERC20Upgradeable(_tokenAddress);
         botAddress = _botAddress;
-        serviceSigner = _serviceSigner;
 
         __Ownable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        __EIP712_init(SIGNING_DOMAIN, SIGNATURE_VERSION);
 
         emit Initialized(msg.sender, block.number);
     }
@@ -109,12 +81,6 @@ contract DUSDStaking is
         emit SetBotAddress(_address);
     }
 
-    function setServiceSigner(address _address) external onlyAdmin {
-        serviceSigner = _address;
-
-        emit SetServiceSignerAddress(_address);
-    }
-
     /**
      * @notice Function to deposit dusd tokens
      * @param _amount the amount to deposit
@@ -129,29 +95,31 @@ contract DUSDStaking is
         emit Deposit(msg.sender, _amount);
     }
 
-    function withdraw(
-        WithdrawMessage calldata withdrawMessage
-    ) external whenNotPaused nonReentrant {
-        address signer = _recover(withdrawMessage);
+    function requestWithdraw(uint256 _amount) external whenNotPaused nonReentrant {
+        require(
+            userInvestment[msg.sender] >= _amount + userRequestedWithdraw[msg.sender],
+            "DUSDStaking: invalid amount"
+        );
+        userRequestedWithdraw[msg.sender] += _amount;
 
-        require(serviceSigner != address(0), "DUSDStaking: service address not set");
-        require(signer == serviceSigner, "DUSDStaking: unknown signer");
-        require(!signatureUsed[withdrawMessage.signature], "DUSDStaking: already withdrawn");
-        require(msg.sender == withdrawMessage.user, "DUSDStaking: wrong caller");
+        emit RequestWithdraw(msg.sender, _amount);
+    }
 
-        signatureUsed[withdrawMessage.signature] = true;
-        userInvestment[withdrawMessage.user] -= withdrawMessage.amount;
+    function withdraw() external whenNotPaused nonReentrant {
+        uint256 _amount = userClaimableAmount[msg.sender];
+        require(_amount > 0, "DUSDStaking: invalid amount");
+        userClaimableAmount[msg.sender] = 0;
 
-        token.safeTransfer(withdrawMessage.user, withdrawMessage.amount);
+        token.safeTransfer(msg.sender, _amount);
 
-        emit Withdraw(withdrawMessage.user, withdrawMessage.amount);
+        emit Withdraw(msg.sender, _amount);
     }
 
     /**
      * @notice Function to update users investments
-     * @param _investmentsInfo InvestmentInfo
+     * @param _investmentsInfo UserAmountInfo
      */
-    function updateInvestment(InvestmentInfo[] memory _investmentsInfo) external onlyBot {
+    function updateInvestment(UserAmountInfo[] memory _investmentsInfo) external onlyBot {
         for (uint256 i = 0; i < _investmentsInfo.length; ++i) {
             if (userDeposit[_investmentsInfo[i].user] > 0) {
                 uint256 investmentDeposit = userDeposit[_investmentsInfo[i].user] -
@@ -169,25 +137,21 @@ contract DUSDStaking is
     }
 
     /**
-     * @dev Hash EIP712 typed data with keccak
+     * @notice Function to update users claimable amount
+     * @param _withdrawInfo UserAmountInfo
      */
-    function _hash(WithdrawMessage calldata withdrawMessage) private view returns (bytes32) {
-        return
-            _hashTypedDataV4(
-                keccak256(
-                    abi.encode(
-                        keccak256("WithdrawMessage(address user,uint256 amount,uint256 salt)"),
-                        withdrawMessage.user,
-                        withdrawMessage.amount,
-                        withdrawMessage.salt
-                    )
-                )
-            );
-    }
+    function updateWithdraw(UserAmountInfo[] memory _withdrawInfo) external onlyBot {
+        uint256 _transferAmount;
+        for (uint256 i = 0; i < _withdrawInfo.length; ++i) {
+            userRequestedWithdraw[_withdrawInfo[i].user] -= _withdrawInfo[i].amount;
+            userClaimableAmount[_withdrawInfo[i].user] += _withdrawInfo[i].amount;
+            userInvestment[_withdrawInfo[i].user] -= _withdrawInfo[i].amount;
 
-    function _recover(WithdrawMessage calldata withdrawMessage) private view returns (address) {
-        bytes32 digest = _hash(withdrawMessage);
+            _transferAmount += _withdrawInfo[i].amount;
 
-        return ECDSAUpgradeable.recover(digest, withdrawMessage.signature);
+            emit UpdateClaimableAmount(_withdrawInfo[i].user, _withdrawInfo[i].amount);
+        }
+
+        token.safeTransferFrom(botAddress, address(this), _transferAmount);
     }
 }

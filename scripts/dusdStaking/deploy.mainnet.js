@@ -10,7 +10,6 @@ async function main() {
         [
             "0x0000000000000000000000000000000000000000", //_tokenAddress
             "0x0000000000000000000000000000000000000000", //_botAddress
-            "0x0000000000000000000000000000000000000000", //_serviceSigner
         ],
         {
             initializer: "initialize",
