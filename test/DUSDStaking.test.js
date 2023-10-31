@@ -1,18 +1,6 @@
 const {expect} = require("chai");
 const {ethers} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const EIP712Signer = require('./utils/EIP712');
-
-const SIGNING_DOMAIN = "DUSD_STAKING";
-const SIGNATURE_VERSION = "1";
-
-const WithdrawMessageType = {
-    WithdrawMessage: [
-        { name: "user", type: "address" },
-        { name: "amount", type: "uint256" },
-        { name: "salt", type: "uint256" }
-    ]
-};
 
 
 describe("DUSDStaking contract", () => {
@@ -22,9 +10,7 @@ describe("DUSDStaking contract", () => {
     let addr2;
     let addr3;
     let bot;
-    let serviceSigner;
     let erc20Token;
-    let eip712Signer;
     let adminError;
 
     async function deployTokenFixture() {
@@ -47,14 +33,8 @@ describe("DUSDStaking contract", () => {
         await hhDUSDStaking.initialize(
             erc20Token.target,
             bot.address,
-            serviceSigner.address
         );
 
-        eip712Signer = new EIP712Signer({
-            signing_domain: SIGNING_DOMAIN,
-            signature_version: SIGNATURE_VERSION,
-            contract: hhDUSDStaking
-        });
 
         adminError = "DUSDStaking: only admin"
 
@@ -148,28 +128,6 @@ describe("DUSDStaking contract", () => {
             await hhDUSDStaking.setBotAddress(bot.address);
 
             await expect(await hhDUSDStaking.botAddress()).to.equal(bot.address);
-        });
-
-        it("Should revert when set the ServiceSigner address", async () => {
-            await expect(
-                hhDUSDStaking.connect(addr1).setServiceSigner(serviceSigner.address)
-            ).to.be.revertedWith(
-                adminError
-            );
-
-        });
-
-        it("Should set the ServiceSigner address", async () => {
-            await hhDUSDStaking.setServiceSigner(serviceSigner.address);
-        });
-
-        it("Should revert when deposit balanceOf(msg.sender) <= _amount", async () => {
-            await expect(
-                hhDUSDStaking.connect(addr1).deposit(15)
-            ).to.be.revertedWith(
-                "DUSDStaking: invalid amount"
-            );
-
         });
 
         it("Should revert when deposit paused=true", async () => {
@@ -291,104 +249,94 @@ describe("DUSDStaking contract", () => {
             await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(investmentAmount);
         });
 
-        it("Should revert withdraw with claimMessage signed not by service signer", async () => {
-            const withdrawMessage = {
-                user: addr1.address,
-                amount: ethers.parseEther("1"),
-                salt: 5
-            };
-
-            const signedWithdrawMessage = await eip712Signer.signMessage(
-                withdrawMessage,
-                WithdrawMessageType,
-                addr2
+        it("Should revert when request withdraw userInvestment[msg.sender] < _amount", async () => {
+            await expect(
+                hhDUSDStaking.connect(addr3).requestWithdraw(ethers.parseEther("2"))
+            ).to.be.revertedWith(
+                "DUSDStaking: invalid amount"
             );
-
-            await expect(hhDUSDStaking.connect(addr1).withdraw(signedWithdrawMessage))
-                .to.be.revertedWith("DUSDStaking: unknown signer");
         });
 
-        it("Should revert withdraw -  front running", async function () {
-            const withdrawMessage = {
-                user: addr1.address,
-                amount: ethers.parseEther("1"),
-                salt: 10
-            };
-
-            const signedClaimMessage = await eip712Signer.signMessage(
-                withdrawMessage,
-                WithdrawMessageType,
-                serviceSigner
-            );
-
-            await expect(hhDUSDStaking.connect(addr2).withdraw(signedClaimMessage))
-                .to.be.revertedWith("DUSDStaking: wrong caller");
-        });
-
-        it("Should withdraw", async function () {
+        it("Should create request withdraw ", async () => {
             const amount = ethers.parseEther("1");
-            const investmentBefore = await hhDUSDStaking.userInvestment(addr1.address)
+            await hhDUSDStaking.connect(addr1).requestWithdraw(amount);
+
+            await expect(await hhDUSDStaking.userRequestedWithdraw(addr1.address)).to.equal(amount);
+        });
+
+        it("Should revert when updateWithdraw onlyBot", async () => {
+            const amount = ethers.parseEther("1");
+            const messageData = [
+                {
+                    user: addr1.address,
+                    amount: amount
+                },
+                {
+                    user: addr3.address,
+                    amount: amount
+                },
+            ]
+
+            await expect(
+                hhDUSDStaking.connect(addr1).updateWithdraw(messageData)
+            ).to.be.revertedWith(
+                "DUSDStaking: only bot"
+            );
+        });
+
+        it("Should updateWithdraw", async () => {
+            await erc20Token.mint(bot.address, ethers.parseEther("5"))
+            const amount = ethers.parseEther("1");
+            const contractBalanceBefore = await erc20Token.balanceOf(hhDUSDStaking.target);
+            const botBalanceBefore = await erc20Token.balanceOf(bot.address);
+            const userRequestedWithdrawBefore = await hhDUSDStaking.userRequestedWithdraw(addr1.address);
+            const userClaimableAmountBefore = await hhDUSDStaking.userClaimableAmount(addr1.address);
+            const userInvestmentBefore = await hhDUSDStaking.userInvestment(addr1.address);
+
+            const messageData = [
+                {
+                    user: addr1.address,
+                    amount: amount
+                },
+            ]
+            await erc20Token.connect(bot).approve(hhDUSDStaking.target, amount);
+            await hhDUSDStaking.connect(bot).updateWithdraw(messageData);
+
+            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(userInvestmentBefore - amount);
+            await expect(await hhDUSDStaking.userRequestedWithdraw(addr1.address)).to.equal(userRequestedWithdrawBefore - amount);
+            await expect(await hhDUSDStaking.userClaimableAmount(addr1.address)).to.equal(userClaimableAmountBefore + amount);
+            await expect(await erc20Token.balanceOf(hhDUSDStaking.target)).to.equal(contractBalanceBefore + amount);
+            await expect(await erc20Token.balanceOf(bot.address)).to.equal(botBalanceBefore - amount);
+
+
+        });
+
+        it("Should revert when withdraw _amount <= 0", async () => {
+            await expect(
+                hhDUSDStaking.connect(addr3).withdraw()
+            ).to.be.revertedWith("DUSDStaking: invalid amount");
+
+        });
+
+        it("Should withdraw", async () => {
+            const amount = await hhDUSDStaking.userClaimableAmount(addr1.address);
+            const contractBalanceBefore = await erc20Token.balanceOf(hhDUSDStaking.target);
             const userBalanceBefore = await erc20Token.balanceOf(addr1.address);
 
-            await erc20Token.mint(hhDUSDStaking.target, amount);
-
-            const contractBalance = await erc20Token.balanceOf(hhDUSDStaking.target);
-
-            const withdrawMessage = {
-                user: addr1.address,
-                amount: amount,
-                salt: 5
-            };
-
-            const signedWithdrawMessage = await eip712Signer.signMessage(
-                withdrawMessage,
-                WithdrawMessageType,
-                serviceSigner
-            );
-
-            await hhDUSDStaking.connect(addr1).withdraw(signedWithdrawMessage);
+            await hhDUSDStaking.connect(addr1).withdraw();
 
             await expect(await erc20Token.balanceOf(addr1.address)).to.equal(userBalanceBefore + amount);
-            await expect(await erc20Token.balanceOf(hhDUSDStaking.target)).to.equal(contractBalance - amount);
-            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(investmentBefore - amount);
-        });
+            await expect(await erc20Token.balanceOf(hhDUSDStaking.target)).to.equal(contractBalanceBefore - amount);
+            await expect(await hhDUSDStaking.userClaimableAmount(addr1.address)).to.equal(0);
 
-        it("Should revert withdraw for already withdrawn", async function () {
-            const withdrawMessage = {
-                user: addr1.address,
-                amount: ethers.parseEther("1"),
-                salt: 5
-            };
 
-            const signedWithdrawMessage = await eip712Signer.signMessage(
-                withdrawMessage,
-                WithdrawMessageType,
-                serviceSigner
-            );
-
-            await expect(hhDUSDStaking.connect(addr1).withdraw(signedWithdrawMessage))
-                .to.be.revertedWith("DUSDStaking: already withdrawn");
         });
 
         it("Should revert when withdraw paused=true", async () => {
             await hhDUSDStaking.pause()
-            const withdrawMessage = {
-                user: addr1.address,
-                amount: ethers.parseEther("1"),
-                salt: 5
-            };
-
-            const signedWithdrawMessage = await eip712Signer.signMessage(
-                withdrawMessage,
-                WithdrawMessageType,
-                serviceSigner
-            );
-
             await expect(
-                hhDUSDStaking.connect(addr1).withdraw(signedWithdrawMessage)
-            ).to.be.revertedWith(
-                "Pausable: paused"
-            );
+                hhDUSDStaking.connect(addr1).withdraw()
+            ).to.be.revertedWith("Pausable: paused");
 
         });
 

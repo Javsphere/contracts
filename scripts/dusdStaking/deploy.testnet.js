@@ -10,7 +10,6 @@ async function main() {
         [
             "0xFF0000000000000000000000000000000000000B", //_tokenAddress
             "0x64F67fdC8c237004794090AE541581932E9A622E", //_botAddress
-            "0x64F67fdC8c237004794090AE541581932E9A622E", //_serviceSigner
         ],
 
         {
