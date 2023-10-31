@@ -122,17 +122,13 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
     function updateInvestment(UserAmountInfo[] memory _investmentsInfo) external onlyBot {
         for (uint256 i = 0; i < _investmentsInfo.length; ++i) {
             if (userDeposit[_investmentsInfo[i].user] > 0) {
-                uint256 investmentDeposit = userDeposit[_investmentsInfo[i].user] -
-                    (_investmentsInfo[i].amount - userInvestment[_investmentsInfo[i].user]);
-                if (investmentDeposit > 0) {
-                    userDeposit[_investmentsInfo[i].user] -= investmentDeposit;
-                } else {
-                    userDeposit[_investmentsInfo[i].user] = 0;
-                }
-            }
-            userInvestment[_investmentsInfo[i].user] = _investmentsInfo[i].amount;
+                userDeposit[_investmentsInfo[i].user] -=
+                    _investmentsInfo[i].amount -
+                    userInvestment[_investmentsInfo[i].user];
+                userInvestment[_investmentsInfo[i].user] = _investmentsInfo[i].amount;
 
-            emit UpdateInvestment(_investmentsInfo[i].user, _investmentsInfo[i].amount);
+                emit UpdateInvestment(_investmentsInfo[i].user, _investmentsInfo[i].amount);
+            }
         }
     }
 
