@@ -86,7 +86,7 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
      * @param _amount the amount to deposit
      */
     function deposit(uint256 _amount) external whenNotPaused nonReentrant {
-        require(token.balanceOf(msg.sender) >= _amount, "DUSDStaking: invalid amount");
+        require(token.balanceOf(msg.sender) >= _amount, "DUSDStaking: invalid amount for deposit");
 
         userDeposit[msg.sender] += _amount;
 
@@ -98,7 +98,7 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
     function requestWithdraw(uint256 _amount) external whenNotPaused nonReentrant {
         require(
             userInvestment[msg.sender] >= _amount + userRequestedWithdraw[msg.sender],
-            "DUSDStaking: invalid amount"
+            "DUSDStaking: invalid amount for withdraw"
         );
         userRequestedWithdraw[msg.sender] += _amount;
 
@@ -107,7 +107,7 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
 
     function withdraw() external whenNotPaused nonReentrant {
         uint256 _amount = userClaimableAmount[msg.sender];
-        require(_amount > 0, "DUSDStaking: invalid amount");
+        require(_amount > 0, "DUSDStaking: invalid withdraw amount");
         userClaimableAmount[msg.sender] = 0;
 
         token.safeTransfer(msg.sender, _amount);
@@ -121,14 +121,23 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
      */
     function updateInvestment(UserAmountInfo[] memory _investmentsInfo) external onlyBot {
         for (uint256 i = 0; i < _investmentsInfo.length; ++i) {
+            require(
+                userInvestment[_investmentsInfo[i].user] <= _investmentsInfo[i].amount,
+                "DUSDStaking: invalid new investment amount on userInvestment"
+            );
             if (userDeposit[_investmentsInfo[i].user] > 0) {
+                require(
+                    userDeposit[_investmentsInfo[i].user] >=
+                        _investmentsInfo[i].amount - userInvestment[_investmentsInfo[i].user],
+                    "DUSDStaking: invalid new investment amount on userDeposit"
+                );
                 userDeposit[_investmentsInfo[i].user] -=
                     _investmentsInfo[i].amount -
                     userInvestment[_investmentsInfo[i].user];
-                userInvestment[_investmentsInfo[i].user] = _investmentsInfo[i].amount;
-
-                emit UpdateInvestment(_investmentsInfo[i].user, _investmentsInfo[i].amount);
             }
+            userInvestment[_investmentsInfo[i].user] = _investmentsInfo[i].amount;
+
+            emit UpdateInvestment(_investmentsInfo[i].user, _investmentsInfo[i].amount);
         }
     }
 
@@ -139,6 +148,10 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
     function updateWithdraw(UserAmountInfo[] memory _withdrawInfo) external onlyBot {
         uint256 _transferAmount;
         for (uint256 i = 0; i < _withdrawInfo.length; ++i) {
+            require(
+                userRequestedWithdraw[_withdrawInfo[i].user] >= _withdrawInfo[i].amount,
+                "DUSDStaking: invalid claimable amount"
+            );
             userRequestedWithdraw[_withdrawInfo[i].user] -= _withdrawInfo[i].amount;
             userClaimableAmount[_withdrawInfo[i].user] += _withdrawInfo[i].amount;
             userInvestment[_withdrawInfo[i].user] -= _withdrawInfo[i].amount;
