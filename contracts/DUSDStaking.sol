@@ -126,14 +126,16 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
                 "DUSDStaking: invalid new investment amount on userInvestment"
             );
             if (userDeposit[_investmentsInfo[i].user] > 0) {
-                require(
-                    userDeposit[_investmentsInfo[i].user] >=
-                        _investmentsInfo[i].amount - userInvestment[_investmentsInfo[i].user],
-                    "DUSDStaking: invalid new investment amount on userDeposit"
-                );
-                userDeposit[_investmentsInfo[i].user] -=
-                    _investmentsInfo[i].amount -
-                    userInvestment[_investmentsInfo[i].user];
+                if (
+                    userDeposit[_investmentsInfo[i].user] <
+                    _investmentsInfo[i].amount - userInvestment[_investmentsInfo[i].user]
+                ) {
+                    userDeposit[_investmentsInfo[i].user] = 0;
+                } else {
+                    userDeposit[_investmentsInfo[i].user] -=
+                        _investmentsInfo[i].amount -
+                        userInvestment[_investmentsInfo[i].user];
+                }
             }
             userInvestment[_investmentsInfo[i].user] = _investmentsInfo[i].amount;
 
