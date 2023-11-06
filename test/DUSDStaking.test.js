@@ -251,23 +251,22 @@ describe("DUSDStaking contract", () => {
 
         });
 
-        it("Should revert when updateInvestment - userDeposit < newUserInvestment - userInvestment", async () => {
+        it("Should updateInvestment - userDeposit < _investmentsInfo - userInvestment", async () => {
             const userDeposit = await hhDUSDStaking.userDeposit(addr1.address)
             const userInvestment = await hhDUSDStaking.userInvestment(addr1.address)
+            const newInvestmentAmount = userDeposit + userInvestment + ethers.parseEther("0.005");
 
             const messageData = [
                 {
                     user: addr1.address,
-                    amount: userDeposit + userInvestment + ethers.parseEther("1")
+                    amount: userDeposit + userInvestment + ethers.parseEther("0.005")
                 },
             ]
 
-            await expect(
-                hhDUSDStaking.connect(bot).updateInvestment(messageData)
-            ).to.be.revertedWith(
-                "DUSDStaking: invalid new investment amount on userDeposit"
-            );
+            await hhDUSDStaking.connect(bot).updateInvestment(messageData);
 
+            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(0);
+            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(newInvestmentAmount);
         });
 
         it("Should updateInvestment - deposit > 0  investment > 0  investment = deposit", async () => {
