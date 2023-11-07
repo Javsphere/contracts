@@ -34,7 +34,8 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
     event SetAdminAddress(address indexed _address);
     event SetBotAddress(address indexed _address);
     event Deposit(address indexed _address, uint256 amount);
-    event UpdateInvestment(address indexed _address, uint256 amount);
+    event UpdateInvestmentByDeposit(address indexed _address, uint256 amount);
+    event UpdateInvestmentByRewards(address indexed _address, uint256 amount);
     event UpdateClaimableAmount(address indexed _address, uint256 amount);
     event RequestWithdraw(address indexed _address, uint256 amount);
     event Withdraw(address indexed _address, uint256 amount);
@@ -118,29 +119,27 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
 
     /**
      * @notice Function to update users investments
-     * @param _investmentsInfo UserAmountInfo
+     * @param _depositInfo UserDepositInfo
+     * @param _rewardsInfo UserRewardsInfo
      */
-    function updateInvestment(UserAmountInfo[] memory _investmentsInfo) external onlyBot {
-        for (uint256 i = 0; i < _investmentsInfo.length; ++i) {
+    function updateInvestment(
+        UserAmountInfo[] memory _depositInfo,
+        UserAmountInfo[] memory _rewardsInfo
+    ) external onlyBot {
+        for (uint256 i = 0; i < _depositInfo.length; ++i) {
             require(
-                userInvestment[_investmentsInfo[i].user] <= _investmentsInfo[i].amount,
-                "DUSDStaking: invalid new investment amount on userInvestment"
+                userDeposit[_depositInfo[i].user] >= _depositInfo[i].amount,
+                "DUSDStaking: invalid deposit info"
             );
-            if (userDeposit[_investmentsInfo[i].user] > 0) {
-                if (
-                    userDeposit[_investmentsInfo[i].user] <
-                    _investmentsInfo[i].amount - userInvestment[_investmentsInfo[i].user]
-                ) {
-                    userDeposit[_investmentsInfo[i].user] = 0;
-                } else {
-                    userDeposit[_investmentsInfo[i].user] -=
-                        _investmentsInfo[i].amount -
-                        userInvestment[_investmentsInfo[i].user];
-                }
-            }
-            userInvestment[_investmentsInfo[i].user] = _investmentsInfo[i].amount;
+            userInvestment[_depositInfo[i].user] += _depositInfo[i].amount;
+            userDeposit[_depositInfo[i].user] -= _depositInfo[i].amount;
 
-            emit UpdateInvestment(_investmentsInfo[i].user, _investmentsInfo[i].amount);
+            emit UpdateInvestmentByDeposit(_depositInfo[i].user, _depositInfo[i].amount);
+        }
+        for (uint256 i = 0; i < _rewardsInfo.length; ++i) {
+            userInvestment[_rewardsInfo[i].user] += _rewardsInfo[i].amount;
+
+            emit UpdateInvestmentByRewards(_rewardsInfo[i].user, _rewardsInfo[i].amount);
         }
     }
 
