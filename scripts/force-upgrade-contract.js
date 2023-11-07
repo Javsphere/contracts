@@ -5,12 +5,12 @@ async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("ExampleContract");
+    const Contract = await ethers.getContractFactory("Contract");
     const contract = await Contract.deploy();
     await contract.waitForDeployment();
 
-    
-    console.log(`ExampleContract contract deployed to: ${contract.address}`);
+    const contractAddress = await contract.getAddress()
+    console.log(`Contract deployed to: ${contractAddress}`);
 }
 
 main()

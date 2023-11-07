@@ -36,9 +36,14 @@ npx hardhat flatten
 
 1. ProxyAdmin
 2. JavToken
+3. Remaining contracts
 
 
-.openzeppelin/unknown-1133.json
+### Testnet deployment
+1. Deploy proxyAdmin and verify it
+2. Create file and pass info about proxyAdmin
+`.openzeppelin/unknown-1131.json`
+```json
 {
   "manifestVersion": "3.2",
   "admin": {
@@ -48,3 +53,6 @@ npx hardhat flatten
   "proxies": [],
   "impls": {}
 }
+```
+3. Deploy others contract
+4. ...
