@@ -374,8 +374,6 @@ describe("DUSDStaking contract", () => {
         it("Should updateWithdraw", async () => {
             await erc20Token.mint(bot.address, ethers.parseEther("5"))
             const amount = ethers.parseEther("1");
-            const contractBalanceBefore = await erc20Token.balanceOf(hhDUSDStaking.target);
-            const botBalanceBefore = await erc20Token.balanceOf(bot.address);
             const userRequestedWithdrawBefore = await hhDUSDStaking.userRequestedWithdraw(addr1.address);
             const userClaimableAmountBefore = await hhDUSDStaking.userClaimableAmount(addr1.address);
             const userInvestmentBefore = await hhDUSDStaking.userInvestment(addr1.address);
@@ -392,10 +390,6 @@ describe("DUSDStaking contract", () => {
             await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(userInvestmentBefore - amount);
             await expect(await hhDUSDStaking.userRequestedWithdraw(addr1.address)).to.equal(userRequestedWithdrawBefore - amount);
             await expect(await hhDUSDStaking.userClaimableAmount(addr1.address)).to.equal(userClaimableAmountBefore + amount);
-            await expect(await erc20Token.balanceOf(hhDUSDStaking.target)).to.equal(contractBalanceBefore + amount);
-            await expect(await erc20Token.balanceOf(bot.address)).to.equal(botBalanceBefore - amount);
-
-
         });
 
         it("Should revert when withdraw _amount <= 0", async () => {
@@ -405,8 +399,16 @@ describe("DUSDStaking contract", () => {
 
         });
 
+        it("Should revert when withdraw _token.balanceOf < _amount", async () => {
+            await expect(
+                hhDUSDStaking.connect(addr1).withdraw()
+            ).to.be.revertedWith("DUSDStaking: not enough tokens");
+
+        });
+
         it("Should withdraw", async () => {
             const amount = await hhDUSDStaking.userClaimableAmount(addr1.address);
+            await erc20Token.mint(hhDUSDStaking.target, amount);
             const contractBalanceBefore = await erc20Token.balanceOf(hhDUSDStaking.target);
             const userBalanceBefore = await erc20Token.balanceOf(addr1.address);
 
