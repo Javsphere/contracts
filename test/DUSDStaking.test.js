@@ -158,7 +158,18 @@ describe("DUSDStaking contract", () => {
 
         it("Should revert when updateInvestment onlyBot", async () => {
             const amount = ethers.parseEther("1");
-            const messageData = [
+            const messageDepositData = [
+                {
+                    user: addr1.address,
+                    amount: amount
+                },
+                {
+                    user: addr3.address,
+                    amount: amount
+                },
+            ]
+
+            const messageRewardsData = [
                 {
                     user: addr1.address,
                     amount: amount
@@ -170,9 +181,29 @@ describe("DUSDStaking contract", () => {
             ]
 
             await expect(
-                hhDUSDStaking.connect(addr1).updateInvestment(messageData)
+                hhDUSDStaking.connect(addr1).updateInvestment(messageDepositData, messageRewardsData)
             ).to.be.revertedWith(
                 "DUSDStaking: only bot"
+            );
+
+        });
+
+        it("Should revert when updateInvestment userDeposit < _depositInfo[i].amount", async () => {
+            const amount = ethers.parseEther("1");
+            const userDeposit = await hhDUSDStaking.userDeposit(addr1.address)
+            const messageDepositData = [
+                {
+                    user: addr1.address,
+                    amount: userDeposit + amount
+                },
+            ]
+
+            const messageRewardsData = []
+
+            await expect(
+                hhDUSDStaking.connect(bot).updateInvestment(messageDepositData, messageRewardsData)
+            ).to.be.revertedWith(
+                "DUSDStaking: invalid deposit info"
             );
 
         });
@@ -180,143 +211,187 @@ describe("DUSDStaking contract", () => {
         it("Should updateInvestment - deposit > 0  investment = 0", async () => {
             const amount = ethers.parseEther("1");
             const userDepositBefore1 = await hhDUSDStaking.userDeposit(addr1.address)
-            const messageData = [
+            const messageDepositData = [
                 {
                     user: addr1.address,
                     amount: amount
                 },
             ]
+            const messageRewardsData = []
 
-            await hhDUSDStaking.connect(bot).updateInvestment(messageData);
+            await hhDUSDStaking.connect(bot).updateInvestment(messageDepositData, messageRewardsData);
 
-            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(userDepositBefore1- amount);
+            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(userDepositBefore1 - amount);
             await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(amount);
-
-        });
-
-        it("Should revert when updateInvestment - userInvestment > new userInvestmentAmount", async () => {
-            const userInvestment = await hhDUSDStaking.userInvestment(addr1.address)
-            const messageData = [
-                {
-                    user: addr1.address,
-                    amount: userInvestment - ethers.parseEther("0.005")
-                },
-            ]
-
-            await expect(
-                hhDUSDStaking.connect(bot).updateInvestment(messageData)
-            ).to.be.revertedWith(
-                "DUSDStaking: invalid new investment amount on userInvestment"
-            );
-
         });
 
         it("Should updateInvestment - reinvest, userDeposit=0", async () => {
             const amount = ethers.parseEther("1");
-            const messageData = [
+            const investmentBefore = await hhDUSDStaking.userInvestment(addr3.address);
+            const messageDepositData = []
+            const messageRewardsData = [
                 {
                     user: addr3.address,
                     amount: amount
                 },
             ]
 
-            await hhDUSDStaking.connect(bot).updateInvestment(messageData);
+            await hhDUSDStaking.connect(bot).updateInvestment(messageDepositData, messageRewardsData);
 
             await expect(await hhDUSDStaking.userDeposit(addr3.address)).to.equal(0);
-            await expect(await hhDUSDStaking.userInvestment(addr3.address)).to.equal(amount);
+            await expect(await hhDUSDStaking.userInvestment(addr3.address)).to.equal(investmentBefore + amount);
 
         });
 
-        it("Should updateInvestment - deposit > 0  investment > 0  investment < deposit", async () => {
+        it("Should updateInvestment - deposit > 0  investment > 0  investment < deposit with rewards", async () => {
             const investmentAmount = ethers.parseEther("2");
+            const rewardsAmount = ethers.parseEther("0.005");
             const depositAmount = ethers.parseEther("3");
             const amountBefore = await hhDUSDStaking.userInvestment(addr1.address);
 
             await erc20Token.mint(addr1.address, depositAmount)
             await erc20Token.connect(addr1).approve(hhDUSDStaking.target, depositAmount);
             await hhDUSDStaking.connect(addr1).deposit(depositAmount);
-            const userDeposit = await hhDUSDStaking.userDeposit(addr1.address);
+            const userDepositBefore = await hhDUSDStaking.userDeposit(addr1.address);
 
-            const messageData = [
+            const messageDepositData = [
                 {
                     user: addr1.address,
                     amount: investmentAmount
                 },
             ]
-
-            await hhDUSDStaking.connect(bot).updateInvestment(messageData);
-
-            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(userDeposit - (investmentAmount - amountBefore));
-            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(investmentAmount);
-
-        });
-
-        it("Should updateInvestment - userDeposit < _investmentsInfo - userInvestment", async () => {
-            const userDeposit = await hhDUSDStaking.userDeposit(addr1.address)
-            const userInvestment = await hhDUSDStaking.userInvestment(addr1.address)
-            const newInvestmentAmount = userDeposit + userInvestment + ethers.parseEther("0.005");
-
-            const messageData = [
+            const messageRewardsData = [
                 {
                     user: addr1.address,
-                    amount: userDeposit + userInvestment + ethers.parseEther("0.005")
+                    amount: rewardsAmount
                 },
             ]
 
-            await hhDUSDStaking.connect(bot).updateInvestment(messageData);
+            await hhDUSDStaking.connect(bot).updateInvestment(messageDepositData, messageRewardsData);
 
-            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(0);
-            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(newInvestmentAmount);
+            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(userDepositBefore - investmentAmount);
+            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(amountBefore + investmentAmount + rewardsAmount);
+
         });
 
         it("Should updateInvestment - deposit > 0  investment > 0  investment = deposit", async () => {
-            const userInvestment = await hhDUSDStaking.userInvestment(addr1.address);
-            const userDeposit = await hhDUSDStaking.userDeposit(addr1.address);
-            const depositAmount = ethers.parseEther("3");
-            const investmentAmount = userDeposit + userInvestment + depositAmount
+            const userInvestmentBefore = await hhDUSDStaking.userInvestment(addr1.address);
+            const userDepositBefore = await hhDUSDStaking.userDeposit(addr1.address);
+            const depositAmount = ethers.parseEther("1");
+            const investmentAmount = userDepositBefore + depositAmount
 
             await erc20Token.mint(addr1.address, depositAmount)
             await erc20Token.connect(addr1).approve(hhDUSDStaking.target, depositAmount);
 
             await hhDUSDStaking.connect(addr1).deposit(depositAmount);
 
-            const messageData = [
+            const messageDepositData = [
                 {
                     user: addr1.address,
                     amount: investmentAmount
                 },
             ]
+            const messageRewardsData = []
 
-            await hhDUSDStaking.connect(bot).updateInvestment(messageData);
+            await hhDUSDStaking.connect(bot).updateInvestment(messageDepositData, messageRewardsData);
 
-            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(0);
-            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(investmentAmount);
+            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(userDepositBefore + depositAmount - investmentAmount);
+            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(userInvestmentBefore + investmentAmount);
         });
 
         it("Should updateInvestment with deposit > new userInvestment ", async () => {
-            const amount = ethers.parseEther("15");
-            const newAmount = ethers.parseEther("5");
-            const userInvestmentBefore = await hhDUSDStaking.userInvestment(addr3.address);
+            const userInvestmentBefore = await hhDUSDStaking.userInvestment(addr1.address);
+            const userDepositBefore = await hhDUSDStaking.userDeposit(addr1.address);
+            const depositAmount = ethers.parseEther("1");
+            const investmentAmount = userDepositBefore;
 
-            await erc20Token.mint(addr3.address, amount);
-            await erc20Token.connect(addr3).approve(hhDUSDStaking.target, amount);
-            await hhDUSDStaking.connect(addr3).deposit(amount);
+            await erc20Token.mint(addr1.address, depositAmount)
+            await erc20Token.connect(addr1).approve(hhDUSDStaking.target, depositAmount);
 
-            const userDepositBefore = await hhDUSDStaking.userDeposit(addr3.address);
+            await hhDUSDStaking.connect(addr1).deposit(depositAmount);
 
-            const messageData = [
+            const messageDepositData = [
+                {
+                    user: addr1.address,
+                    amount: investmentAmount
+                },
+            ]
+            const messageRewardsData = []
+
+            await hhDUSDStaking.connect(bot).updateInvestment(messageDepositData, messageRewardsData);
+
+            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(userDepositBefore + depositAmount - investmentAmount);
+            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(userInvestmentBefore + investmentAmount);
+
+        });
+
+        it("Should updateInvestment with  diff users", async () => {
+            // user1 - investment = deposit
+            // user2 - investment = part of deposit
+            // user3 - only rewards
+            // user4 - investment = part of deposit, + rewards
+            const userInvestmentBefore1 = await hhDUSDStaking.userInvestment(addr1.address);
+            const userInvestmentBefore2 = await hhDUSDStaking.userInvestment(addr2.address);
+            const userInvestmentBefore3 = await hhDUSDStaking.userInvestment(addr3.address);
+            const userInvestmentBefore4 = await hhDUSDStaking.userInvestment(owner.address);
+            const rewardsAmount3 = ethers.parseEther("0.00006");
+            const depositAmount1 = ethers.parseEther("0.5");
+            const depositAmount2 = ethers.parseEther("1.7");
+            const depositAmount4 = ethers.parseEther("2");
+            const investmentAmount2 = depositAmount2 - ethers.parseEther("0.3");
+            const investmentAmount4 = depositAmount4 - ethers.parseEther("1.3");
+            const rewardsAmount4 = ethers.parseEther("0.00009");
+
+            await erc20Token.mint(addr1.address, depositAmount1)
+            await erc20Token.connect(addr1).approve(hhDUSDStaking.target, depositAmount1);
+            await hhDUSDStaking.connect(addr1).deposit(depositAmount1);
+            await erc20Token.mint(addr2.address, depositAmount2)
+            await erc20Token.connect(addr2).approve(hhDUSDStaking.target, depositAmount2);
+            await hhDUSDStaking.connect(addr2).deposit(depositAmount2);
+            await erc20Token.mint(owner.address, depositAmount4)
+            await erc20Token.connect(owner).approve(hhDUSDStaking.target, depositAmount4);
+            await hhDUSDStaking.connect(owner).deposit(depositAmount4);
+
+            const userDepositBefore1 = await hhDUSDStaking.userDeposit(addr1.address);
+            const userDepositBefore2 = await hhDUSDStaking.userDeposit(addr2.address);
+            const userDepositBefore3 = await hhDUSDStaking.userDeposit(addr3.address);
+            const userDepositBefore4 = await hhDUSDStaking.userDeposit(owner.address);
+
+            const messageDepositData = [
+                {
+                    user: addr1.address,
+                    amount: userDepositBefore1
+                },
+                {
+                    user: addr2.address,
+                    amount: investmentAmount2
+                },
+                {
+                    user: owner.address,
+                    amount: investmentAmount4
+                },
+            ]
+            const messageRewardsData = [
                 {
                     user: addr3.address,
-                    amount: newAmount
+                    amount: rewardsAmount3
+                },
+                {
+                    user: owner.address,
+                    amount: rewardsAmount4
                 },
             ]
 
-            await hhDUSDStaking.connect(bot).updateInvestment(messageData);
+            await hhDUSDStaking.connect(bot).updateInvestment(messageDepositData, messageRewardsData);
 
-
-            await expect(await hhDUSDStaking.userInvestment(addr3.address)).to.equal(newAmount);
-            await expect(await hhDUSDStaking.userDeposit(addr3.address)).to.equal(userDepositBefore - (newAmount - userInvestmentBefore));
-
+            await expect(await hhDUSDStaking.userDeposit(addr1.address)).to.equal(0);
+            await expect(await hhDUSDStaking.userDeposit(addr2.address)).to.equal(userDepositBefore2 - investmentAmount2);
+            await expect(await hhDUSDStaking.userDeposit(addr3.address)).to.equal(userDepositBefore3);
+            await expect(await hhDUSDStaking.userDeposit(owner.address)).to.equal(userDepositBefore4 - investmentAmount4);
+            await expect(await hhDUSDStaking.userInvestment(addr1.address)).to.equal(userInvestmentBefore1 + userDepositBefore1);
+            await expect(await hhDUSDStaking.userInvestment(addr2.address)).to.equal(userInvestmentBefore2 + investmentAmount2);
+            await expect(await hhDUSDStaking.userInvestment(addr3.address)).to.equal(userInvestmentBefore3 + rewardsAmount3);
+            await expect(await hhDUSDStaking.userInvestment(owner.address)).to.equal(userInvestmentBefore4 + investmentAmount4 + rewardsAmount4);
         });
 
         it("Should revert when request withdraw userInvestment[msg.sender] < _amount", async () => {
