@@ -108,6 +108,7 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
     function withdraw() external whenNotPaused nonReentrant {
         uint256 _amount = userClaimableAmount[msg.sender];
         require(_amount > 0, "DUSDStaking: invalid withdraw amount");
+        require(token.balanceOf(address(this)) >= _amount, "DUSDStaking: not enough tokens");
         userClaimableAmount[msg.sender] = 0;
 
         token.safeTransfer(msg.sender, _amount);
@@ -148,7 +149,6 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
      * @param _withdrawInfo UserAmountInfo
      */
     function updateWithdraw(UserAmountInfo[] memory _withdrawInfo) external onlyBot {
-        uint256 _transferAmount;
         for (uint256 i = 0; i < _withdrawInfo.length; ++i) {
             require(
                 userRequestedWithdraw[_withdrawInfo[i].user] >= _withdrawInfo[i].amount,
@@ -158,11 +158,7 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
             userClaimableAmount[_withdrawInfo[i].user] += _withdrawInfo[i].amount;
             userInvestment[_withdrawInfo[i].user] -= _withdrawInfo[i].amount;
 
-            _transferAmount += _withdrawInfo[i].amount;
-
             emit UpdateClaimableAmount(_withdrawInfo[i].user, _withdrawInfo[i].amount);
         }
-
-        token.safeTransferFrom(botAddress, address(this), _transferAmount);
     }
 }
