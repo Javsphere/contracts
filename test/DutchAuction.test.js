@@ -10,7 +10,7 @@ describe("DutchAuction contract", () => {
     let addr2;
     let admin;
     let nonZeroAddress;
-    let mockedJavToken;
+    let erc20Token;
     let startDate;
     let endDate;
     let startPrice;
@@ -23,16 +23,20 @@ describe("DutchAuction contract", () => {
     }
 
     async function deployTokenFixture() {
-        const javToken = await ethers.deployContract("JavlisToken");
-        await javToken.initialize();
-        return javToken
+        const erc20ContractFactory = await ethers.getContractFactory("ERC20Mock");
+        erc20Token = await erc20ContractFactory.deploy(
+            "MockERC20",
+            "MOCK",
+        );
+        await erc20Token.waitForDeployment();
+        return erc20Token
     }
 
     before(async () => {
         const dutchAuction = await ethers.getContractFactory("DutchAuction");
         [owner, addr1, addr2, admin, ...addrs] = await ethers.getSigners();
         nonZeroAddress = ethers.Wallet.createRandom().address;
-        mockedJavToken = await helpers.loadFixture(deployTokenFixture);
+        erc20Token = await helpers.loadFixture(deployTokenFixture);
 
         startDate = await helpers.time.latest() + 10;
         endDate = startDate + 100000;
@@ -43,7 +47,7 @@ describe("DutchAuction contract", () => {
 
         await hhDutchAuction.initDutchAuction(
             owner.address,
-            mockedJavToken.target,
+            erc20Token.target,
             startDate,
             endDate,
             startPrice,
@@ -63,7 +67,7 @@ describe("DutchAuction contract", () => {
 
         it("Should set the right token address", async () => {
 
-            await expect(await hhDutchAuction.auctionToken()).to.equal(mockedJavToken.target);
+            await expect(await hhDutchAuction.auctionToken()).to.equal(erc20Token.target);
         });
 
         it("Should set the right startDate", async () => {
@@ -95,8 +99,8 @@ describe("DutchAuction contract", () => {
         it("Should mint tokens", async () => {
             const tokenAmounts = ethers.parseEther("25")
 
-            await mockedJavToken.mint(hhDutchAuction.target, tokenAmounts);
-            await expect(await mockedJavToken.balanceOf(hhDutchAuction.target)).to.equal(tokenAmounts);
+            await erc20Token.mint(hhDutchAuction.target, tokenAmounts);
+            await expect(await erc20Token.balanceOf(hhDutchAuction.target)).to.equal(tokenAmounts);
         });
 
     });
@@ -126,7 +130,7 @@ describe("DutchAuction contract", () => {
             await expect(
                 await hhDutchAuction.totalTokens()
             ).to.equal(
-                await mockedJavToken.balanceOf(hhDutchAuction.target)
+                await erc20Token.balanceOf(hhDutchAuction.target)
             );
         });
 
@@ -254,12 +258,12 @@ describe("DutchAuction contract", () => {
 
             await hhDutchAuction.connect(addr1).claim();
 
-            await expect(await mockedJavToken.balanceOf(addr1.address)).to.equal(amount);
+            await expect(await erc20Token.balanceOf(addr1.address)).to.equal(amount);
         });
 
         it("Should revert when withdraw adminError", async () => {
             await expect(
-                hhDutchAuction.connect(addr1).withdraw(mockedJavToken.target, ethers.parseEther("0.0005"))
+                hhDutchAuction.connect(addr1).withdraw(erc20Token.target, ethers.parseEther("0.0005"))
             ).to.be.revertedWith(
                 adminError
             );
@@ -269,7 +273,7 @@ describe("DutchAuction contract", () => {
         it("Should revert when withdraw Invalid amount", async () => {
 
             await expect(
-                hhDutchAuction.withdraw(mockedJavToken.target, ethers.parseEther("100"))
+                hhDutchAuction.withdraw(erc20Token.target, ethers.parseEther("100"))
             ).to.be.revertedWith(
                 "DutchAuction: Invalid amount"
             );
@@ -278,9 +282,9 @@ describe("DutchAuction contract", () => {
         it("Should withdraw", async () => {
             const amount = ethers.parseEther("0.05")
 
-            await hhDutchAuction.withdraw(mockedJavToken.target, amount)
+            await hhDutchAuction.withdraw(erc20Token.target, amount)
 
-            await expect(await mockedJavToken.balanceOf(owner.address)).to.equal(amount);
+            await expect(await erc20Token.balanceOf(owner.address)).to.equal(amount);
         });
 
         it("Should claim  - _isAuctionSuccessful = false", async () => {
@@ -291,7 +295,7 @@ describe("DutchAuction contract", () => {
 
             await hhAuction.initDutchAuction(
                 owner.address,
-                mockedJavToken.target,
+                erc20Token.target,
                 _startDate,
                 _endDate,
                 startPrice,
@@ -300,7 +304,7 @@ describe("DutchAuction contract", () => {
 
 
             const tokenAmounts = ethers.parseEther("5")
-            await mockedJavToken.mint(hhAuction.target, tokenAmounts);
+            await erc20Token.mint(hhAuction.target, tokenAmounts);
             await hhAuction.setTotalTokens();
             await hhAuction.connect(addr2).placeBid(
                 {

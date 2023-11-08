@@ -1,5 +1,5 @@
 const {expect} = require("chai");
-const {ethers} = require("hardhat");
+const {ethers, upgrades} = require("hardhat");
 
 
 describe("JavlisToken contract", () => {
@@ -10,10 +10,15 @@ describe("JavlisToken contract", () => {
         const token = await ethers.getContractFactory("JavlisToken");
         [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
+        hhToken = await upgrades.deployProxy(
+            token,
+            [
+            ],
 
-        hhToken = await token.deploy();
-        await hhToken.initialize();
-
+            {
+                initializer: "initialize",
+            }
+        );
 
     });
 
@@ -31,8 +36,8 @@ describe("JavlisToken contract", () => {
         it("Should revert when mint", async () => {
             await expect(
                 hhToken.connect(addr1).mint(owner.address, ethers.parseEther("20"))
-            ).to.be.revertedWith(
-                "Ownable: caller is not the owner"
+            ).to.be.revertedWithCustomError(
+                hhToken, "OwnableUnauthorizedAccount"
             );
 
         });

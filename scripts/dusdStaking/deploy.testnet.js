@@ -14,6 +14,10 @@ async function main() {
 
         {
             initializer: "initialize",
+            kind: 'uups',
+            txOverrides: {
+                gasLimit: ethers.parseUnits("0.03", "gwei")
+            }
         }
     );
     await contract.waitForDeployment();

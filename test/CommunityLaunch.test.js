@@ -1,5 +1,5 @@
 const {expect} = require("chai");
-const {ethers} = require("hardhat")
+const {ethers, upgrades} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 
@@ -12,7 +12,7 @@ describe("CommunityLaunch contract", () => {
     let signer1;
     let signer2;
     let signer3;
-    let mockedJavToken;
+    let erc20Token;
     let adminError;
     let saleActiveError;
     let startTokenPrice;
@@ -20,27 +20,36 @@ describe("CommunityLaunch contract", () => {
     let startBlock;
 
     async function deployTokenFixture() {
-        const javToken = await ethers.deployContract("JavlisToken");
-        await javToken.initialize();
-        return javToken
+        const erc20ContractFactory = await ethers.getContractFactory("ERC20Mock");
+        erc20Token = await erc20ContractFactory.deploy(
+            "MockERC20",
+            "MOCK",
+        );
+        await erc20Token.waitForDeployment();
+        return erc20Token
     }
 
     before(async () => {
         const communityLaunch = await ethers.getContractFactory("CommunityLaunch");
         [owner, addr1, addr2, admin, signer1, signer2, signer3, ...addrs] = await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
-        mockedJavToken = await helpers.loadFixture(deployTokenFixture);
+        erc20Token = await helpers.loadFixture(deployTokenFixture);
         startTokenPrice = ethers.parseEther("0.02")
         incPricePerBlock = ethers.parseEther("0.0000002")
 
+        hhCommunityLaunch = await upgrades.deployProxy(
+            communityLaunch,
+            [
+                await erc20Token.getAddress(),
+                startTokenPrice,
+                incPricePerBlock,
+                2,
+                [signer1.address, signer2.address, signer3.address]
+            ],
 
-        hhCommunityLaunch = await communityLaunch.deploy();
-        await hhCommunityLaunch.initialize(
-            mockedJavToken.target,
-            startTokenPrice,
-            incPricePerBlock,
-            2,
-            [signer1.address, signer2.address, signer3.address]
+            {
+                initializer: "initialize",
+            }
         );
 
         adminError = "CommunityLaunch: only admin"
@@ -57,7 +66,7 @@ describe("CommunityLaunch contract", () => {
 
         it("Should set the right token address", async () => {
 
-            await expect(await hhCommunityLaunch.token()).to.equal(mockedJavToken.target);
+            await expect(await hhCommunityLaunch.token()).to.equal(erc20Token.target);
         });
 
         it("Should set the right admin address", async () => {
@@ -83,8 +92,8 @@ describe("CommunityLaunch contract", () => {
         it("Should mint tokens", async () => {
             const tokenAmounts = ethers.parseEther("20")
 
-            await mockedJavToken.mint(hhCommunityLaunch.target, tokenAmounts);
-            await expect(await mockedJavToken.balanceOf(hhCommunityLaunch.target)).to.equal(tokenAmounts);
+            await erc20Token.mint(hhCommunityLaunch.target, tokenAmounts);
+            await expect(await erc20Token.balanceOf(hhCommunityLaunch.target)).to.equal(tokenAmounts);
         });
 
 
@@ -230,15 +239,15 @@ describe("CommunityLaunch contract", () => {
                 }
             );
 
-            await expect(await mockedJavToken.balanceOf(addr1.address)).to.be.equal(amount);
+            await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(amount);
             await expect(await ethers.provider.getBalance(hhCommunityLaunch.target)).to.be.equal(buyNativeAmount);
-            await expect(await mockedJavToken.balanceOf(hhCommunityLaunch.target)).to.be.equal(mintedTokens - amount);
+            await expect(await erc20Token.balanceOf(hhCommunityLaunch.target)).to.be.equal(mintedTokens - amount);
             await expect(await hhCommunityLaunch.tokensBalance()).to.be.equal(mintedTokens - amount);
         });
 
         it("Should revert when withdraw adminError", async () => {
             await expect(
-                hhCommunityLaunch.connect(addr1).withdraw(mockedJavToken.target, ethers.parseEther("0.0005"))
+                hhCommunityLaunch.connect(addr1).withdraw(erc20Token.target, ethers.parseEther("0.0005"))
             ).to.be.revertedWith(
                 adminError
             );
@@ -246,7 +255,7 @@ describe("CommunityLaunch contract", () => {
 
         it("Should revert when withdraw Multisign", async () => {
             await expect(
-                hhCommunityLaunch.withdraw(mockedJavToken.target, ethers.parseEther("0.0005"))
+                hhCommunityLaunch.withdraw(erc20Token.target, ethers.parseEther("0.0005"))
             ).to.be.revertedWith(
                 "MultiSignatureUpgradeable: need more signatures"
             );
@@ -259,7 +268,7 @@ describe("CommunityLaunch contract", () => {
             hhCommunityLaunch.connect(signer2).signAction(action);
 
             await expect(
-                hhCommunityLaunch.withdraw(mockedJavToken.target, ethers.parseEther("100"))
+                hhCommunityLaunch.withdraw(erc20Token.target, ethers.parseEther("100"))
             ).to.be.revertedWith(
                 "CommunityLaunch: Invalid amount"
             );
@@ -268,9 +277,9 @@ describe("CommunityLaunch contract", () => {
         it("Should withdraw", async () => {
             const amount = ethers.parseEther("0.05")
 
-            await hhCommunityLaunch.withdraw(mockedJavToken.target, amount)
+            await hhCommunityLaunch.withdraw(erc20Token.target, amount)
 
-            await expect(await mockedJavToken.balanceOf(owner.address)).to.equal(amount);
+            await expect(await erc20Token.balanceOf(owner.address)).to.equal(amount);
         });
     });
 });

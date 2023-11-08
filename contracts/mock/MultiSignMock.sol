@@ -9,7 +9,7 @@ contract MultiSignMock is OwnableUpgradeable, MultiSignatureUpgradeable {
         uint256 _minimumSignatures,
         address[] memory _signers
     ) external initializer {
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __MultiSignatureUpgradeable_init(_minimumSignatures, _signers);
     }
 }

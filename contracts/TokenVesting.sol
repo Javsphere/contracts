@@ -2,20 +2,22 @@
 
 pragma solidity ^0.8.16;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./access/MultiSignatureUpgradeable.sol";
 
 contract TokenVesting is
     OwnableUpgradeable,
     PausableUpgradeable,
     ReentrancyGuardUpgradeable,
-    MultiSignatureUpgradeable
+    MultiSignatureUpgradeable,
+    UUPSUpgradeable
 {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeERC20 for IERC20;
 
     bytes32 public constant WITHDRAW = keccak256("WITHDRAW");
 
@@ -41,7 +43,7 @@ contract TokenVesting is
         bool revoked;
     }
 
-    IERC20Upgradeable public token;
+    IERC20 public token;
     address public adminAddress;
     uint256 public currentVestingId;
     uint256 public vestingSchedulesTotalAmount;
@@ -74,16 +76,23 @@ contract TokenVesting is
         _;
     }
 
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address _token,
         uint256 _minimumSignatures,
         address[] memory _signers
     ) external initializer {
         adminAddress = msg.sender;
-        token = IERC20Upgradeable(_token);
+        token = IERC20(_token);
         currentVestingId = 1;
 
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __Pausable_init();
         __ReentrancyGuard_init();
         __MultiSignatureUpgradeable_init(_minimumSignatures, _signers);
@@ -331,4 +340,11 @@ contract TokenVesting is
             return vestedAmount - vestingSchedule.released;
         }
     }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[43] private ____gap;
 }

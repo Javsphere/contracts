@@ -1,5 +1,5 @@
 const {expect} = require("chai");
-const {ethers} = require("hardhat")
+const {ethers, upgrades} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 
@@ -29,11 +29,18 @@ describe("DUSDStaking contract", () => {
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await helpers.loadFixture(deployTokenFixture);
 
-        hhDUSDStaking = await dusdStaking.deploy();
-        await hhDUSDStaking.initialize(
-            erc20Token.target,
-            bot.address,
+        hhDUSDStaking = await upgrades.deployProxy(
+            dusdStaking,
+            [
+                erc20Token.target,
+                bot.address
+            ],
+
+            {
+                initializer: "initialize",
+            }
         );
+
 
 
         adminError = "DUSDStaking: only admin"
@@ -135,8 +142,8 @@ describe("DUSDStaking contract", () => {
 
             await expect(
                 hhDUSDStaking.connect(addr1).deposit(15)
-            ).to.be.revertedWith(
-                "Pausable: paused"
+            ).to.be.revertedWithCustomError(
+                hhDUSDStaking, "EnforcedPause"
             );
             await hhDUSDStaking.unpause();
 
@@ -500,7 +507,9 @@ describe("DUSDStaking contract", () => {
             await hhDUSDStaking.pause()
             await expect(
                 hhDUSDStaking.connect(addr1).withdraw()
-            ).to.be.revertedWith("Pausable: paused");
+            ).to.be.revertedWithCustomError(
+                hhDUSDStaking, "EnforcedPause"
+            );
 
         });
 

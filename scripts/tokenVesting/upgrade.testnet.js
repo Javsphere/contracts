@@ -11,8 +11,15 @@ async function main() {
     // console.log("Proxy imported from:", deployment.address);
 
     const impl = await upgrades.upgradeProxy(
-      PROXY,
-      Contract
+        PROXY,
+        Contract,
+        {
+            kind: 'uups',
+            redeployImplementation: "always",
+            txOverrides: {
+                gasLimit: ethers.parseUnits("0.03", "gwei")
+            }
+        }
     );
     await impl.waitForDeployment();
 

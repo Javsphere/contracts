@@ -2,13 +2,20 @@
 
 pragma solidity ^0.8.16;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+contract DUSDStaking is
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    UUPSUpgradeable
+{
+    using SafeERC20 for IERC20;
 
     /**
      * @notice Info for update user investment/withdraw info
@@ -20,7 +27,7 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
         uint256 amount;
     }
 
-    IERC20Upgradeable public token;
+    IERC20 public token;
     address public adminAddress;
     address public botAddress;
 
@@ -50,14 +57,22 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
         _;
     }
 
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address _tokenAddress, address _botAddress) external initializer {
         adminAddress = msg.sender;
-        token = IERC20Upgradeable(_tokenAddress);
+        token = IERC20(_tokenAddress);
         botAddress = _botAddress;
 
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
         __Pausable_init();
+        __UUPSUpgradeable_init();
 
         emit Initialized(msg.sender, block.number);
     }
@@ -160,4 +175,11 @@ contract DUSDStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
             emit UpdateClaimableAmount(_withdrawInfo[i].user, _withdrawInfo[i].amount);
         }
     }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[43] private ____gap;
 }

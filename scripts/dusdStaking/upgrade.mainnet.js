@@ -7,12 +7,16 @@ async function main() {
     console.log(`Deploying from ${owner.address}`);
     const Contract = await ethers.getContractFactory("DUSDStaking");
 
-    // const deployment = await upgrades.forceImport(PROXY, Contract);
-    // console.log("Proxy imported from:", deployment.address);
-
     const impl = await upgrades.upgradeProxy(
-      PROXY,
-      Contract
+        PROXY,
+        Contract,
+        {
+            kind: 'uups',
+            redeployImplementation: "always",
+            txOverrides: {
+                gasLimit: ethers.parseUnits("0.03", "gwei")
+            }
+        }
     );
     await impl.waitForDeployment();
 

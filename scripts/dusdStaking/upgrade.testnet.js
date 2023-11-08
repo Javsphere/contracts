@@ -1,5 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0x91Ce55CaFD0Fcd12445A82eD12e8aa6975d6e8a4";
+const PROXY = "0xdB476F0C4Bc8Ced2F5d02af84fce5B1FF84039fe";
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -7,12 +7,16 @@ async function main() {
     console.log(`Deploying from ${owner.address}`);
     const Contract = await ethers.getContractFactory("DUSDStaking");
 
-    // const deployment = await upgrades.forceImport(PROXY, Contract);
-    // console.log("Proxy imported from:", deployment.address);
-
     const impl = await upgrades.upgradeProxy(
       PROXY,
-      Contract
+      Contract,
+        {
+            kind: 'uups',
+            redeployImplementation: "always",
+            txOverrides: {
+                gasLimit: ethers.parseUnits("0.03", "gwei")
+            }
+        }
     );
     await impl.waitForDeployment();
 
@@ -20,7 +24,7 @@ async function main() {
     console.log(`Starting Verification..`);
 
     let newImplementationAddress = await upgrades.erc1967.getImplementationAddress(PROXY);
-    
+
     try{
         await run("verify:verify", { address: newImplementationAddress});
     } catch(error) {

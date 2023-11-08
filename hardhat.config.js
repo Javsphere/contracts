@@ -47,10 +47,8 @@ module.exports = {
                 network: "testnet",
                 chainId: 1131,
                 urls: {
-                    apiURL: "https://teststnet3-dmc.mydefichain.com:8445/api",
-                    // apiURL: "https://blockscout.testnet.ocean.jellyfishsdk.com/api",
-                    browserURL: "https://testnet3-dmc.mydefichain.com:8445"
-                    // browserURL: "https://blockscout.testnet.ocean.jellyfishsdk.com"
+                    apiURL: "https://blockscout.testnet.ocean.jellyfishsdk.com/api",
+                    browserURL: "https://blockscout.testnet.ocean.jellyfishsdk.com"
                 }
             }
         ]
