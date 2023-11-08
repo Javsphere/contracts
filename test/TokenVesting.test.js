@@ -1,5 +1,5 @@
 const {expect} = require("chai");
-const {ethers} = require("hardhat")
+const {ethers, upgrades} = require("hardhat")
 const {
     loadFixture,
     time
@@ -15,26 +15,35 @@ describe("TokenVesting contract", () => {
     let signer1;
     let signer2;
     let signer3;
-    let mockedJavToken;
+    let erc20Token;
     let adminError;
 
     async function deployTokenFixture() {
-        const javToken = await ethers.deployContract("JavlisToken");
-        await javToken.initialize();
-        return javToken
+        const erc20ContractFactory = await ethers.getContractFactory("ERC20Mock");
+        erc20Token = await erc20ContractFactory.deploy(
+            "MockERC20",
+            "MOCK",
+        );
+        await erc20Token.waitForDeployment();
+        return erc20Token
     }
 
     before(async () => {
         const tokenVesting = await ethers.getContractFactory("TokenVesting");
         [owner, addr1, addr2, admin, signer1, signer2, signer3, ...addrs] = await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
-        mockedJavToken = await loadFixture(deployTokenFixture);
+        erc20Token = await loadFixture(deployTokenFixture);
 
-        hhTokenVesting = await tokenVesting.deploy();
-        await hhTokenVesting.initialize(
-            mockedJavToken.target,
-            2,
-            [signer1.address, signer2.address, signer3.address]
+        hhTokenVesting = await upgrades.deployProxy(
+            tokenVesting,
+            [
+                erc20Token.target,
+                2,
+                [signer1.address, signer2.address, signer3.address]
+            ],
+            {
+                initializer: "initialize",
+            }
         );
 
         adminError = "TokenVesting: only admin"
@@ -50,7 +59,7 @@ describe("TokenVesting contract", () => {
 
         it("Should set the right token address", async () => {
 
-            await expect(await hhTokenVesting.token()).to.equal(mockedJavToken.target);
+            await expect(await hhTokenVesting.token()).to.equal(erc20Token.target);
         });
 
         it("Should set the right admin address", async () => {
@@ -66,8 +75,8 @@ describe("TokenVesting contract", () => {
         it("Should mint tokens", async () => {
             const tokenAmounts = ethers.parseEther("20")
 
-            await mockedJavToken.mint(hhTokenVesting.target, tokenAmounts);
-            await expect(await mockedJavToken.balanceOf(hhTokenVesting.target)).to.equal(tokenAmounts);
+            await erc20Token.mint(hhTokenVesting.target, tokenAmounts);
+            await expect(await erc20Token.balanceOf(hhTokenVesting.target)).to.equal(tokenAmounts);
         });
 
 
@@ -231,7 +240,7 @@ describe("TokenVesting contract", () => {
 
             await hhTokenVesting.withdraw(amount);
 
-            await expect(await mockedJavToken.balanceOf(owner.address)).to.be.equal(amount);
+            await expect(await erc20Token.balanceOf(owner.address)).to.be.equal(amount);
         });
 
         it("Should release", async () => {
@@ -244,7 +253,7 @@ describe("TokenVesting contract", () => {
             const vestingSchedule = await hhTokenVesting.getVestingScheduleByAddressAndIndex(beneficiary, index);
 
             await expect(vestingSchedule.released).to.be.equal(releaseAmount);
-            await expect(await mockedJavToken.balanceOf(addr1.address)).to.be.equal(releaseAmount);
+            await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(releaseAmount);
         });
 
         it("Should compute vesting schedule id for address and index", async () => {
@@ -385,7 +394,7 @@ describe("TokenVesting contract", () => {
 
         it("Should get right withdrawable amount", async () => {
             const vestingSchedulesTotalAmount = await hhTokenVesting.vestingSchedulesTotalAmount()
-            const totalAmount = await mockedJavToken.balanceOf(hhTokenVesting.target)
+            const totalAmount = await erc20Token.balanceOf(hhTokenVesting.target)
 
             await expect(await hhTokenVesting.getWithdrawableAmount()).to.be.equal(totalAmount - vestingSchedulesTotalAmount);
 

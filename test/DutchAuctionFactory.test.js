@@ -1,5 +1,5 @@
 const {expect} = require("chai");
-const {ethers} = require("hardhat")
+const {ethers, upgrades} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const {address} = require("hardhat/internal/core/config/config-validation");
 
@@ -21,12 +21,17 @@ describe("DutchAuctionFactory contract", () => {
         [owner, addr1, admin, signer1, signer2, signer3, ...addrs] = await ethers.getSigners();
         tokenAddress = ethers.Wallet.createRandom().address;
 
+        hhDAuctionF = await upgrades.deployProxy(
+            dutchAuctionFactory,
+            [
+                tokenAddress,
+                2,
+                [signer1.address, signer2.address, signer3.address]
+            ],
 
-        hhDAuctionF = await dutchAuctionFactory.deploy();
-        await hhDAuctionF.initialize(
-            tokenAddress,
-            2,
-            [signer1.address, signer2.address, signer3.address]
+            {
+                initializer: "initialize",
+            }
         );
 
         adminError = "DutchAuctionFactory: only admin"
