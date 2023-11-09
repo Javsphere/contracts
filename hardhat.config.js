@@ -30,7 +30,8 @@ module.exports = {
         },
         testnet: {
             chainId: 1131,
-            url: "https://dmc.mydefichain.com/testnet",
+            // url: "https://dmc.mydefichain.com/testnet",
+            url: "https://eth.testnet.ocean.jellyfishsdk.com/",
             accounts: [process.env.OWNER_KEY],
         },
         mainnet: {

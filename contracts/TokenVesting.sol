@@ -43,6 +43,23 @@ contract TokenVesting is
         bool revoked;
     }
 
+    struct InitialVestingSchedule {
+        // address of the beneficiary to whom vested tokens are transferred
+        address beneficiary;
+        // start time of the vesting period
+        uint128 start;
+        // duration in seconds of the cliff in which tokens will begin to vest
+        uint128 cliff;
+        // duration in seconds of the period in which the tokens will vest
+        uint128 duration;
+        // duration of a slice period for the vesting in seconds
+        uint128 slicePeriodSeconds;
+        // whether the vesting is revocable or not
+        bool revocable;
+        // total amount of tokens to be released at the end of the vesting
+        uint128 amount;
+    }
+
     IERC20 public token;
     address public adminAddress;
     uint256 public currentVestingId;
@@ -59,7 +76,8 @@ contract TokenVesting is
         uint256 start,
         uint256 duration,
         uint256 slicePeriodSeconds,
-        uint256 amountTotal
+        uint256 amountTotal,
+        bool revocable
     );
     event Revoked(bytes32 indexed vestingScheduleId, uint256 amount);
     event Withdraw(address indexed to, uint256 amount);
@@ -116,61 +134,57 @@ contract TokenVesting is
 
     /**
      * @notice Creates a new vesting schedule for a beneficiary.
-     * @param _beneficiary address of the beneficiary to whom vested tokens are transferred
-     * @param _start start time of the vesting period
-     * @param _cliff duration in seconds of the cliff in which tokens will begin to vest
-     * @param _duration duration in seconds of the period in which the tokens will vest
-     * @param _slicePeriodSeconds duration of a slice period for the vesting in seconds
-     * @param _revocable whether the vesting is revocable or not
-     * @param _amount total amount of tokens to be released at the end of the vesting
+     * @param _vestingInfo array of vesting information
      */
-    function createVestingSchedule(
-        address _beneficiary,
-        uint128 _start,
-        uint128 _cliff,
-        uint128 _duration,
-        uint128 _slicePeriodSeconds,
-        bool _revocable,
-        uint128 _amount
+    function createVestingSchedules(
+        InitialVestingSchedule[] memory _vestingInfo
     ) external onlyAdmin {
-        require(
-            getWithdrawableAmount() >= _amount,
-            "TokenVesting: cannot create vesting schedule because not sufficient tokens"
-        );
-        require(_duration > 0, "TokenVesting: duration must be > 0");
-        require(_amount > 0, "TokenVesting: amount must be > 0");
-        require(_slicePeriodSeconds >= 1, "TokenVesting: slicePeriodSeconds must be >= 1");
-        require(_duration >= _cliff, "TokenVesting: duration must be >= cliff");
-        bytes32 vestingScheduleId = _computeVestingScheduleIdForAddressAndIndex(
-            _beneficiary,
-            holdersVestingCount[_beneficiary]
-        );
-        uint128 cliff = _start + _cliff;
-        vestingSchedules[vestingScheduleId] = VestingSchedule(
-            true,
-            _beneficiary,
-            cliff,
-            _start,
-            _duration,
-            _slicePeriodSeconds,
-            _revocable,
-            _amount,
-            0,
-            false
-        );
-        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount + _amount;
-        currentVestingId++;
-        uint256 currentVestingCount = holdersVestingCount[_beneficiary];
-        holdersVestingCount[_beneficiary] = currentVestingCount + 1;
+        for (uint256 i = 0; i < _vestingInfo.length; ++i) {
+            require(
+                getWithdrawableAmount() >= _vestingInfo[i].amount,
+                "TokenVesting: cannot create vesting schedule because not sufficient tokens"
+            );
+            require(_vestingInfo[i].duration > 0, "TokenVesting: duration must be > 0");
+            require(_vestingInfo[i].amount > 0, "TokenVesting: amount must be > 0");
+            require(
+                _vestingInfo[i].slicePeriodSeconds > 0,
+                "TokenVesting: slicePeriodSeconds must be > 0"
+            );
+            require(
+                _vestingInfo[i].duration >= _vestingInfo[i].cliff,
+                "TokenVesting: duration must be >= cliff"
+            );
+            bytes32 vestingScheduleId = _computeVestingScheduleIdForAddressAndIndex(
+                _vestingInfo[i].beneficiary,
+                holdersVestingCount[_vestingInfo[i].beneficiary]
+            );
+            uint128 cliff = _vestingInfo[i].start + _vestingInfo[i].cliff;
+            vestingSchedules[vestingScheduleId] = VestingSchedule(
+                true,
+                _vestingInfo[i].beneficiary,
+                cliff,
+                _vestingInfo[i].start,
+                _vestingInfo[i].duration,
+                _vestingInfo[i].slicePeriodSeconds,
+                _vestingInfo[i].revocable,
+                _vestingInfo[i].amount,
+                0,
+                false
+            );
+            vestingSchedulesTotalAmount = vestingSchedulesTotalAmount + _vestingInfo[i].amount;
+            currentVestingId++;
+            holdersVestingCount[_vestingInfo[i].beneficiary] += 1;
 
-        emit VestingScheduleAdded(
-            _beneficiary,
-            cliff,
-            _start,
-            _duration,
-            _slicePeriodSeconds,
-            _amount
-        );
+            emit VestingScheduleAdded(
+                _vestingInfo[i].beneficiary,
+                cliff,
+                _vestingInfo[i].start,
+                _vestingInfo[i].duration,
+                _vestingInfo[i].slicePeriodSeconds,
+                _vestingInfo[i].amount,
+                _vestingInfo[i].revocable
+            );
+        }
     }
 
     /**

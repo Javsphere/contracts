@@ -129,18 +129,112 @@ describe("TokenVesting contract", () => {
         });
 
 
-        it("Should revert when revoke", async () => {
+        it("Should revert when create vesting schedule - not admin", async () => {
+            const vestingInfo = [
+                {
+                    beneficiary: "0x0000000000000000000000000000000000000000",
+                    start: 1,
+                    cliff: 1,
+                    duration: 1,
+                    slicePeriodSeconds: 1,
+                    revocable: true,
+                    amount: 1,
+                }
+            ]
             await expect(
-                hhTokenVesting.connect(addr1).createVestingSchedule(
-                    "0x0000000000000000000000000000000000000000",
-                    1,
-                    1,
-                    1,
-                    1,
-                    true,
-                    1,
-                )
+                hhTokenVesting.connect(addr1).createVestingSchedules(vestingInfo)
             ).to.be.revertedWith(adminError);
+
+        });
+
+        it("Should revert when create vesting schedule - balance < amount", async () => {
+            const amount = await erc20Token.balanceOf(hhTokenVesting.target) + ethers.parseEther("1")
+            const vestingInfo = [
+                {
+                    beneficiary: "0x0000000000000000000000000000000000000000",
+                    start: 1,
+                    cliff: 1,
+                    duration: 1,
+                    slicePeriodSeconds: 1,
+                    revocable: true,
+                    amount: amount,
+                }
+            ]
+            await expect(
+                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo)
+            ).to.be.revertedWith("TokenVesting: cannot create vesting schedule because not sufficient tokens");
+
+        });
+
+        it("Should revert when create vesting schedule - duration <= 0", async () => {
+            const vestingInfo = [
+                {
+                    beneficiary: "0x0000000000000000000000000000000000000000",
+                    start: 1,
+                    cliff: 1,
+                    duration: 0,
+                    slicePeriodSeconds: 1,
+                    revocable: true,
+                    amount: 1,
+                }
+            ]
+            await expect(
+                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo)
+            ).to.be.revertedWith("TokenVesting: duration must be > 0");
+
+        });
+
+        it("Should revert when create vesting schedule - amount <= 0", async () => {
+            const vestingInfo = [
+                {
+                    beneficiary: "0x0000000000000000000000000000000000000000",
+                    start: 1,
+                    cliff: 1,
+                    duration: 1,
+                    slicePeriodSeconds: 1,
+                    revocable: true,
+                    amount: 0,
+                }
+            ]
+            await expect(
+                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo)
+            ).to.be.revertedWith("TokenVesting: amount must be > 0");
+
+        });
+
+        it("Should revert when create vesting schedule - slicePeriodSeconds <= 0", async () => {
+            const vestingInfo = [
+                {
+                    beneficiary: "0x0000000000000000000000000000000000000000",
+                    start: 1,
+                    cliff: 1,
+                    duration: 1,
+                    slicePeriodSeconds: 0,
+                    revocable: true,
+                    amount: 1,
+                }
+            ]
+            await expect(
+                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo)
+            ).to.be.revertedWith("TokenVesting: slicePeriodSeconds must be > 0");
+
+        });
+
+        it("Should revert when create vesting schedule - duration < cliff", async () => {
+            const vestingInfo = [
+                {
+                    beneficiary: "0x0000000000000000000000000000000000000000",
+                    start: 1,
+                    cliff: 2,
+                    duration: 1,
+                    slicePeriodSeconds: 1,
+                    revocable: true,
+                    amount: 1,
+                }
+            ]
+            await expect(
+                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo)
+            ).to.be.revertedWith("TokenVesting: duration must be >= cliff");
 
         });
 
@@ -154,16 +248,19 @@ describe("TokenVesting contract", () => {
             const amount = ethers.parseEther("0.0005")
 
             const currentVestingId = await hhTokenVesting.currentVestingId()
+            const vestingInfo = [
+                {
+                    beneficiary: beneficiary,
+                    start: start,
+                    cliff: cliff,
+                    duration: duration,
+                    slicePeriodSeconds: slicePeriodSeconds,
+                    revocable: revocable,
+                    amount: amount,
+                }
+            ]
 
-            await hhTokenVesting.createVestingSchedule(
-                beneficiary,
-                start,
-                cliff,
-                duration,
-                slicePeriodSeconds,
-                revocable,
-                amount
-            );
+            await hhTokenVesting.createVestingSchedules(vestingInfo);
 
             const vestingScheduleForHolder = await hhTokenVesting.getLastVestingScheduleForHolder(beneficiary);
 
@@ -188,6 +285,39 @@ describe("TokenVesting contract", () => {
 
         });
 
+        it("Should revert when revoke - vesting is not revocable", async () => {
+            const beneficiary = addr1.address
+            const start = await time.latest();
+            const cliff = 2
+            const duration = 3
+            const slicePeriodSeconds = 1
+            const revocable = false
+            const amount = ethers.parseEther("0.0005")
+
+            const currentVestingId = await hhTokenVesting.currentVestingId()
+            const vestingInfo = [
+                {
+                    beneficiary: beneficiary,
+                    start: start,
+                    cliff: cliff,
+                    duration: duration,
+                    slicePeriodSeconds: slicePeriodSeconds,
+                    revocable: revocable,
+                    amount: amount,
+                }
+            ]
+
+            await hhTokenVesting.createVestingSchedules(vestingInfo);
+            const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
+            const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(beneficiary, index);
+
+            await expect(
+                hhTokenVesting.connect(admin).revoke(
+                    scheduleId
+                )).to.be.revertedWith("TokenVesting: vesting is not revocable");
+
+        });
+
         it("Should revoke", async () => {
             const beneficiary = addr2.address;
             const start = await time.latest();
@@ -197,15 +327,19 @@ describe("TokenVesting contract", () => {
             const revocable = true
             const amount = ethers.parseEther("0.0005")
 
-            await hhTokenVesting.createVestingSchedule(
-                beneficiary,
-                start,
-                cliff,
-                duration,
-                slicePeriodSeconds,
-                revocable,
-                amount
-            );
+            const vestingInfo = [
+                {
+                    beneficiary: beneficiary,
+                    start: start,
+                    cliff: cliff,
+                    duration: duration,
+                    slicePeriodSeconds: slicePeriodSeconds,
+                    revocable: revocable,
+                    amount: amount,
+                }
+            ]
+
+            await hhTokenVesting.createVestingSchedules(vestingInfo);
 
             const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(beneficiary, index);
@@ -215,6 +349,17 @@ describe("TokenVesting contract", () => {
             const vestingSchedule = await hhTokenVesting.getVestingScheduleByAddressAndIndex(beneficiary, index);
 
             await expect(vestingSchedule.revoked).to.be.equal(true);
+        });
+
+        it("Should revert when revoke - already revoked", async () => {
+            const beneficiary = addr2.address;
+            const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
+            const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(beneficiary, index);
+
+            await expect(
+                hhTokenVesting.connect(admin).revoke(
+                    scheduleId
+                )).to.be.reverted;
         });
 
         it("Should revert when withdraw only admin", async () => {
@@ -231,16 +376,62 @@ describe("TokenVesting contract", () => {
 
         });
 
-        it("Should withdraw", async () => {
-            const amount = ethers.parseEther("0.0005")
+        it("Should revert when withdraw - not enough withdrawable funds", async () => {
             const action = await hhTokenVesting.WITHDRAW();
+            const amount = await hhTokenVesting.getWithdrawableAmount() + ethers.parseEther("0.0005")
 
             hhTokenVesting.connect(signer1).signAction(action);
             hhTokenVesting.connect(signer2).signAction(action);
 
+            await expect(
+                hhTokenVesting.connect(admin).withdraw(amount)
+            ).to.be.revertedWith("TokenVesting: not enough withdrawable funds");
+
+        });
+
+        it("Should withdraw", async () => {
+            const amount = ethers.parseEther("0.0005")
+
+
             await hhTokenVesting.withdraw(amount);
 
             await expect(await erc20Token.balanceOf(owner.address)).to.be.equal(amount);
+        });
+
+        it("Should revoke when release - not contract owner", async () => {
+            const beneficiary = addr1.address
+            const releaseAmount = ethers.parseEther("0.0005")
+            const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
+            const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(beneficiary, index);
+
+            await expect(
+                hhTokenVesting.connect(addr2).release(scheduleId, releaseAmount)
+            ).to.be.revertedWith("TokenVesting: only beneficiary and owner can release vested tokens");
+
+        });
+
+        it("Should revoke when release - not contract beneficiary", async () => {
+            const beneficiary = addr1.address
+            const releaseAmount = ethers.parseEther("0.0005")
+            const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
+            const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(beneficiary, index);
+
+            await expect(
+                hhTokenVesting.connect(addr2).release(scheduleId, releaseAmount)
+            ).to.be.revertedWith("TokenVesting: only beneficiary and owner can release vested tokens");
+
+        });
+
+        it("Should revoke when release - vestedAmount < amount", async () => {
+            const beneficiary = addr1.address
+            const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
+            const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(beneficiary, index);
+            const releaseAmount = await hhTokenVesting.computeReleasableAmount(scheduleId)+ ethers.parseEther("0.0005")
+
+            await expect(
+                hhTokenVesting.connect(addr1).release(scheduleId, releaseAmount)
+            ).to.be.revertedWith("TokenVesting: cannot release tokens, not enough vested tokens");
+
         });
 
         it("Should release", async () => {
@@ -272,15 +463,19 @@ describe("TokenVesting contract", () => {
             const revocable = true
             const amount = ethers.parseEther("0.0005")
 
-            await hhTokenVesting.createVestingSchedule(
-                beneficiary,
-                start,
-                cliff,
-                duration,
-                slicePeriodSeconds,
-                revocable,
-                amount
-            );
+            const vestingInfo = [
+                {
+                    beneficiary: beneficiary,
+                    start: start,
+                    cliff: cliff,
+                    duration: duration,
+                    slicePeriodSeconds: slicePeriodSeconds,
+                    revocable: revocable,
+                    amount: amount,
+                }
+            ]
+
+            await hhTokenVesting.createVestingSchedules(vestingInfo);
 
             const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(beneficiary, index)
@@ -306,15 +501,19 @@ describe("TokenVesting contract", () => {
             const revocable = true
             const amount = ethers.parseEther("0.0005")
 
-            await hhTokenVesting.createVestingSchedule(
-                beneficiary,
-                start,
-                cliff,
-                duration,
-                slicePeriodSeconds,
-                revocable,
-                amount
-            );
+            const vestingInfo = [
+                {
+                    beneficiary: beneficiary,
+                    start: start,
+                    cliff: cliff,
+                    duration: duration,
+                    slicePeriodSeconds: slicePeriodSeconds,
+                    revocable: revocable,
+                    amount: amount,
+                }
+            ]
+
+            await hhTokenVesting.createVestingSchedules(vestingInfo);
 
             const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(beneficiary, index)
@@ -338,15 +537,19 @@ describe("TokenVesting contract", () => {
             const slicePeriodSeconds = 2
             const amount = ethers.parseEther("0.0005")
 
-            await hhTokenVesting.createVestingSchedule(
-                beneficiary,
-                start,
-                cliff,
-                duration,
-                slicePeriodSeconds,
-                true,
-                amount
-            );
+            const vestingInfo = [
+                {
+                    beneficiary: beneficiary,
+                    start: start,
+                    cliff: cliff,
+                    duration: duration,
+                    slicePeriodSeconds: slicePeriodSeconds,
+                    revocable: true,
+                    amount: amount,
+                }
+            ]
+
+            await hhTokenVesting.createVestingSchedules(vestingInfo);
 
             const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(beneficiary, index)
@@ -369,7 +572,6 @@ describe("TokenVesting contract", () => {
             const beneficiary = addr1.address
             const duration = 3
             const slicePeriodSeconds = 1
-            const revocable = true
             const amount = ethers.parseEther("0.0005")
 
             const vestingScheduleForHolder = await hhTokenVesting.getLastVestingScheduleForHolder(beneficiary);
@@ -378,7 +580,7 @@ describe("TokenVesting contract", () => {
             await expect(vestingScheduleForHolder.beneficiary).to.be.equal(beneficiary);
             await expect(vestingScheduleForHolder.duration).to.be.equal(duration);
             await expect(vestingScheduleForHolder.slicePeriodSeconds).to.be.equal(slicePeriodSeconds);
-            await expect(vestingScheduleForHolder.revocable).to.be.equal(revocable);
+            await expect(vestingScheduleForHolder.revocable).to.be.equal(false);
             await expect(vestingScheduleForHolder.amountTotal).to.be.equal(amount);
             await expect(vestingScheduleForHolder.released).to.be.equal(amount);
             await expect(vestingScheduleForHolder.revoked).to.be.equal(false);
@@ -404,7 +606,6 @@ describe("TokenVesting contract", () => {
             const beneficiary = addr1.address
             const duration = 3
             const slicePeriodSeconds = 1
-            const revocable = true
             const amount = ethers.parseEther("0.0005")
 
             const index = await hhTokenVesting.holdersVestingCount(beneficiary) - BigInt(1);
@@ -415,7 +616,7 @@ describe("TokenVesting contract", () => {
             await expect(vestingScheduleForHolder.beneficiary).to.be.equal(beneficiary);
             await expect(vestingScheduleForHolder.duration).to.be.equal(duration);
             await expect(vestingScheduleForHolder.slicePeriodSeconds).to.be.equal(slicePeriodSeconds);
-            await expect(vestingScheduleForHolder.revocable).to.be.equal(revocable);
+            await expect(vestingScheduleForHolder.revocable).to.be.equal(false);
             await expect(vestingScheduleForHolder.amountTotal).to.be.equal(amount);
             await expect(vestingScheduleForHolder.released).to.be.equal(amount);
             await expect(vestingScheduleForHolder.revoked).to.be.equal(false);
