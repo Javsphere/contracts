@@ -38,6 +38,7 @@ abstract contract MultiSignatureUpgradeable is AccessControlUpgradeable {
         for (uint256 i = 0; i < _signers.length; ++i) {
             _grantRole(0x00, _signers[i]);
         }
+        __AccessControl_init();
     }
 
     /**
