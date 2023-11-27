@@ -17,6 +17,7 @@ contract MultiSigWallet {
     event OwnerAddition(address indexed owner);
     event OwnerRemoval(address indexed owner);
     event RequirementChange(uint256 required);
+    event SubmitTransaction(uint256 indexed transactionId);
 
     /*
      *  views
@@ -44,42 +45,51 @@ contract MultiSigWallet {
      *  Modifiers
      */
     modifier onlyWallet() {
-        require(msg.sender == address(this));
+        require(msg.sender == address(this), "MultiSigWallet: only wallet");
         _;
     }
 
     modifier ownerDoesNotExist(address owner) {
-        require(!isOwner[owner]);
+        require(!isOwner[owner], "MultiSigWallet: owner already exist");
         _;
     }
 
     modifier ownerExists(address owner) {
-        require(isOwner[owner]);
+        require(isOwner[owner], "MultiSigWallet: owner does not exist");
         _;
     }
 
     modifier transactionExists(uint256 transactionId) {
-        require(transactions[transactionId].to != address(0));
+        require(
+            transactions[transactionId].to != address(0),
+            "MultiSigWallet: transaction does not exist"
+        );
         _;
     }
 
     modifier confirmed(uint256 transactionId, address owner) {
-        require(confirmations[transactionId][owner]);
+        require(confirmations[transactionId][owner], "MultiSigWallet: transaction not confirmed");
         _;
     }
 
     modifier notConfirmed(uint256 transactionId, address owner) {
-        require(!confirmations[transactionId][owner]);
+        require(
+            !confirmations[transactionId][owner],
+            "MultiSigWallet: transaction already confirmed"
+        );
         _;
     }
 
     modifier notExecuted(uint256 transactionId) {
-        require(!transactions[transactionId].executed);
+        require(
+            !transactions[transactionId].executed,
+            "MultiSigWallet: confirmed already executed"
+        );
         _;
     }
 
     modifier notNull(address _address) {
-        require(_address != address(0));
+        require(_address != address(0), "MultiSigWallet: value is null");
         _;
     }
 
@@ -88,10 +98,15 @@ contract MultiSigWallet {
             ownerCount <= MAX_OWNER_COUNT &&
                 _required <= ownerCount &&
                 _required != 0 &&
-                ownerCount != 0
+                ownerCount != 0,
+            "MultiSigWallet: invalid required number or owners count"
         );
         _;
     }
+
+    receive() external payable {}
+
+    fallback() external payable {}
 
     /*
      * Public functions
@@ -104,7 +119,10 @@ contract MultiSigWallet {
         uint256 _required
     ) validRequirement(_owners.length, _required) {
         for (uint256 i = 0; i < _owners.length; i++) {
-            require(!isOwner[_owners[i]] && _owners[i] != address(0));
+            require(
+                !isOwner[_owners[i]] && _owners[i] != address(0),
+                "MultiSigWallet: owner exist or null"
+            );
             isOwner[_owners[i]] = true;
         }
         owners = _owners;
@@ -163,9 +181,10 @@ contract MultiSigWallet {
         address to,
         uint256 value,
         bytes memory data
-    ) external returns (uint256) {
+    ) external ownerExists(msg.sender) returns (uint256) {
         uint256 transactionId = addTransaction(to, value, data);
         confirmTransaction(transactionId);
+        emit SubmitTransaction(transactionId);
         return transactionId;
     }
 
@@ -181,7 +200,6 @@ contract MultiSigWallet {
     {
         confirmations[transactionId][msg.sender] = true;
         emit Confirmation(msg.sender, transactionId);
-        executeTransaction(transactionId);
     }
 
     /// @dev Allows an owner to revoke a confirmation for a transaction.
@@ -203,34 +221,21 @@ contract MultiSigWallet {
     function executeTransaction(
         uint256 transactionId
     )
-        public
+        external
         ownerExists(msg.sender)
         confirmed(transactionId, msg.sender)
         notExecuted(transactionId)
     {
-        if (_isConfirmed(transactionId)) {
-            Transaction storage txn = transactions[transactionId];
-            txn.executed = true;
-            (bool success, ) = txn.to.call{value: txn.value}(txn.data);
-            if (success) {
-                emit Execution(transactionId);
-            } else {
-                txn.executed = false;
-                emit ExecutionFailure(transactionId);
-            }
+        require(_isConfirmed(transactionId), "MultiSigWallet: transaction not confirmed");
+        Transaction storage txn = transactions[transactionId];
+        txn.executed = true;
+        (bool success, ) = txn.to.call{value: txn.value}(txn.data);
+        if (success) {
+            emit Execution(transactionId);
+        } else {
+            txn.executed = false;
+            emit ExecutionFailure(transactionId);
         }
-    }
-
-    /// @dev Returns the confirmation status of a transaction.
-    /// @param transactionId Transaction ID.
-    /// @return Confirmation status.
-    function _isConfirmed(uint256 transactionId) private view returns (bool) {
-        uint256 count = 0;
-        for (uint256 i = 0; i < owners.length; i++) {
-            if (confirmations[transactionId][owners[i]]) count++;
-            if (count == required) return true;
-        }
-        return false;
     }
 
     /*
@@ -332,5 +337,17 @@ contract MultiSigWallet {
         for (i = from; i < to; i++) _transactionIds[i - from] = transactionIdsTemp[i];
 
         return _transactionIds;
+    }
+
+    /// @dev Returns the confirmation status of a transaction.
+    /// @param transactionId Transaction ID.
+    /// @return Confirmation status.
+    function _isConfirmed(uint256 transactionId) private view returns (bool) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < owners.length; i++) {
+            if (confirmations[transactionId][owners[i]]) count++;
+            if (count == required) return true;
+        }
+        return false;
     }
 }
