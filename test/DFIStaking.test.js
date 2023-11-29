@@ -1,6 +1,7 @@
 const {expect} = require("chai");
 const {ethers, upgrades} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const {ADMIN_ERROR} = require("./common/constanst");
 
 
 describe("DFIStaking contract", () => {
@@ -12,7 +13,6 @@ describe("DFIStaking contract", () => {
     let bot;
     let minDepAmount
     let erc20Token;
-    let adminError;
 
     async function getSpentGas(tx) {
         const receipt = await tx.wait();
@@ -56,7 +56,6 @@ describe("DFIStaking contract", () => {
 
 
 
-        adminError = "DFIStaking: only admin"
 
     });
 
@@ -99,7 +98,7 @@ describe("DFIStaking contract", () => {
             await expect(
                 hhDFIStaking.connect(addr1).pause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -114,7 +113,7 @@ describe("DFIStaking contract", () => {
             await expect(
                 hhDFIStaking.connect(addr1).unpause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -129,7 +128,7 @@ describe("DFIStaking contract", () => {
             await expect(
                 hhDFIStaking.connect(addr1).setAdminAddress(owner.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -144,7 +143,7 @@ describe("DFIStaking contract", () => {
             await expect(
                 hhDFIStaking.connect(addr1).setBotAddress(bot.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -159,7 +158,7 @@ describe("DFIStaking contract", () => {
             await expect(
                 hhDFIStaking.connect(addr1).setTokenAddress(bot.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -174,7 +173,7 @@ describe("DFIStaking contract", () => {
             await expect(
                 hhDFIStaking.connect(addr1).setMinimumDepositAmount(minDepAmount)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });

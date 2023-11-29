@@ -9,14 +9,10 @@ async function main() {
         Contract,
         [
             "0x0000000000000000000000000000000000000000", //_tokenAddress
+            "0x0000000000000000000000000000000000000000", //_multiSignWallet
             0,                                            //_startTokenPrice
             0,                                            //_incPricePerBlock
-            2,                                            //_minimumSignatures
-            [                                             //_signers
-                "0x0000000000000000000000000000000000000000",
-                "0x0000000000000000000000000000000000000000",
-                "0x0000000000000000000000000000000000000000"
-            ]
+
         ],
         {
             initializer: "initialize",

@@ -2,6 +2,7 @@ const {expect} = require("chai");
 const {ethers, upgrades} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const {min} = require("hardhat/internal/util/bigint");
+const {ADMIN_ERROR} = require("./common/constanst");
 
 
 describe("JavStakeX contract", () => {
@@ -12,7 +13,6 @@ describe("JavStakeX contract", () => {
     let addr3;
     let bot;
     let erc20Token;
-    let adminError;
 
     async function deployTokenFixture() {
         const erc20ContractFactory = await ethers.getContractFactory("ERC20Mock");
@@ -39,8 +39,6 @@ describe("JavStakeX contract", () => {
             }
         );
 
-
-        adminError = "BaseUpgradable: only admin"
 
     });
 
@@ -69,7 +67,7 @@ describe("JavStakeX contract", () => {
             await expect(
                 hhJavStakeX.connect(addr1).pause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -84,7 +82,7 @@ describe("JavStakeX contract", () => {
             await expect(
                 hhJavStakeX.connect(addr1).unpause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -99,7 +97,7 @@ describe("JavStakeX contract", () => {
             await expect(
                 hhJavStakeX.connect(addr1).setAdminAddress(owner.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -130,7 +128,7 @@ describe("JavStakeX contract", () => {
             await expect(
                 hhJavStakeX.connect(addr1).addPool(erc20Token.target, erc20Token.target, ethers.parseEther("1"))
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -259,7 +257,7 @@ describe("JavStakeX contract", () => {
             const poolInfo = await hhJavStakeX.poolInfo(pid);
             const userInfo = await hhJavStakeX.userInfo(pid, addr1.address);
 
-            const userRewards = (userInfo.shares * poolInfo.rewardsPerShare/ ethers.parseEther("1")) - userInfo.rewardDebt;
+            const userRewards = (userInfo.shares * poolInfo.rewardsPerShare / ethers.parseEther("1")) - userInfo.rewardDebt;
 
             await expect(await hhJavStakeX.pendingReward(pid, addr1.address)).to.be.equal(userRewards);
         });
