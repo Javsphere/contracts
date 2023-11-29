@@ -1,6 +1,7 @@
 const {expect} = require("chai");
 const {ethers, upgrades} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const {ADMIN_ERROR} = require("./common/constanst");
 
 
 describe("JavMarket contract", () => {
@@ -11,7 +12,6 @@ describe("JavMarket contract", () => {
     let addr3;
     let bot;
     let erc20Token;
-    let adminError;
     let nonZeroAddress;
 
     async function deployTokenFixture() {
@@ -42,8 +42,6 @@ describe("JavMarket contract", () => {
             }
         );
 
-
-        adminError = "JavMarket: only admin"
 
     });
 
@@ -81,7 +79,7 @@ describe("JavMarket contract", () => {
             await expect(
                 hhJavMarket.connect(addr1).pause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -96,7 +94,7 @@ describe("JavMarket contract", () => {
             await expect(
                 hhJavMarket.connect(addr1).unpause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -111,7 +109,7 @@ describe("JavMarket contract", () => {
             await expect(
                 hhJavMarket.connect(addr1).setAdminAddress(owner.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -126,7 +124,7 @@ describe("JavMarket contract", () => {
             await expect(
                 hhJavMarket.connect(addr1).setBotAddress(bot.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -141,7 +139,7 @@ describe("JavMarket contract", () => {
             await expect(
                 hhJavMarket.connect(addr1).addToken(nonZeroAddress)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -160,7 +158,7 @@ describe("JavMarket contract", () => {
             await expect(
                 hhJavMarket.connect(addr1).removeToken(15)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });

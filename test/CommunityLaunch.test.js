@@ -1,6 +1,7 @@
 const {expect} = require("chai");
 const {ethers, upgrades} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const {ADMIN_ERROR} = require("./common/constanst");
 
 
 describe("CommunityLaunch contract", () => {
@@ -9,11 +10,8 @@ describe("CommunityLaunch contract", () => {
     let addr1;
     let addr2;
     let admin;
-    let signer1;
-    let signer2;
-    let signer3;
+    let multiSignWallet;
     let erc20Token;
-    let adminError;
     let saleActiveError;
     let startTokenPrice;
     let incPricePerBlock;
@@ -31,7 +29,7 @@ describe("CommunityLaunch contract", () => {
 
     before(async () => {
         const communityLaunch = await ethers.getContractFactory("CommunityLaunch");
-        [owner, addr1, addr2, admin, signer1, signer2, signer3, ...addrs] = await ethers.getSigners();
+        [owner, addr1, addr2, admin, multiSignWallet, ...addrs] = await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await helpers.loadFixture(deployTokenFixture);
         startTokenPrice = ethers.parseEther("0.02")
@@ -41,10 +39,9 @@ describe("CommunityLaunch contract", () => {
             communityLaunch,
             [
                 await erc20Token.getAddress(),
+                multiSignWallet.address,
                 startTokenPrice,
                 incPricePerBlock,
-                2,
-                [signer1.address, signer2.address, signer3.address]
             ],
 
             {
@@ -52,7 +49,6 @@ describe("CommunityLaunch contract", () => {
             }
         );
 
-        adminError = "CommunityLaunch: only admin"
         saleActiveError = "CommunityLaunch: contract is not available right now"
 
     });
@@ -67,6 +63,11 @@ describe("CommunityLaunch contract", () => {
         it("Should set the right token address", async () => {
 
             await expect(await hhCommunityLaunch.token()).to.equal(erc20Token.target);
+        });
+
+        it("Should set the right multi sign wallet address", async () => {
+
+            await expect(await hhCommunityLaunch.multiSignWallet()).to.equal(multiSignWallet.address);
         });
 
         it("Should set the right admin address", async () => {
@@ -104,7 +105,7 @@ describe("CommunityLaunch contract", () => {
             await expect(
                 hhCommunityLaunch.connect(addr1).setAdminAddress(admin.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -115,11 +116,26 @@ describe("CommunityLaunch contract", () => {
             await expect(await hhCommunityLaunch.adminAddress()).to.equal(admin.address);
         });
 
+        it("Should revert when set the multi sign wallet address", async () => {
+            await expect(
+                hhCommunityLaunch.connect(addr1).setMultiSignWalletAddress(admin.address)
+            ).to.be.revertedWith(
+                ADMIN_ERROR
+            );
+
+        });
+
+        it("Should set the multi sign wallet address", async () => {
+            await hhCommunityLaunch.setMultiSignWalletAddress(multiSignWallet.address);
+
+            await expect(await hhCommunityLaunch.multiSignWallet()).to.equal(multiSignWallet.address);
+        });
+
         it("Should revert when set setSaleActive", async () => {
             await expect(
                 hhCommunityLaunch.connect(addr1).setSaleActive(true)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -134,7 +150,7 @@ describe("CommunityLaunch contract", () => {
             await expect(
                 hhCommunityLaunch.connect(addr1).setStartTokenPrice(ethers.parseEther("0.0005"))
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -150,7 +166,7 @@ describe("CommunityLaunch contract", () => {
             await expect(
                 hhCommunityLaunch.connect(addr1).setStartBlock(1)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -166,7 +182,7 @@ describe("CommunityLaunch contract", () => {
             await expect(
                 hhCommunityLaunch.connect(addr1).setIncPricePerBlock(1)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -245,30 +261,17 @@ describe("CommunityLaunch contract", () => {
             await expect(await hhCommunityLaunch.tokensBalance()).to.be.equal(mintedTokens - amount);
         });
 
-        it("Should revert when withdraw adminError", async () => {
+        it("Should revert when withdraw ADMIN_ERROR", async () => {
             await expect(
-                hhCommunityLaunch.connect(addr1).withdraw(erc20Token.target, ethers.parseEther("0.0005"))
+                hhCommunityLaunch.connect(addr1).withdraw(erc20Token.target, addr1.address, ethers.parseEther("0.0005"))
             ).to.be.revertedWith(
-                adminError
-            );
-        });
-
-        it("Should revert when withdraw Multisign", async () => {
-            await expect(
-                hhCommunityLaunch.withdraw(erc20Token.target, ethers.parseEther("0.0005"))
-            ).to.be.revertedWith(
-                "MultiSignatureUpgradeable: need more signatures"
+                "CommunityLaunch: only multi sign wallet"
             );
         });
 
         it("Should revert when withdraw Invalid amount", async () => {
-            const action = await hhCommunityLaunch.WITHDRAW();
-
-            hhCommunityLaunch.connect(signer1).signAction(action);
-            hhCommunityLaunch.connect(signer2).signAction(action);
-
             await expect(
-                hhCommunityLaunch.withdraw(erc20Token.target, ethers.parseEther("100"))
+                hhCommunityLaunch.connect(multiSignWallet).withdraw(erc20Token.target, addr1.address, ethers.parseEther("100"))
             ).to.be.revertedWith(
                 "CommunityLaunch: Invalid amount"
             );
@@ -276,10 +279,11 @@ describe("CommunityLaunch contract", () => {
 
         it("Should withdraw", async () => {
             const amount = ethers.parseEther("0.05")
+            const balanceBefore = await erc20Token.balanceOf(addr1.address);
 
-            await hhCommunityLaunch.withdraw(erc20Token.target, amount)
+            await hhCommunityLaunch.connect(multiSignWallet).withdraw(erc20Token.target, addr1.address, amount)
 
-            await expect(await erc20Token.balanceOf(owner.address)).to.equal(amount);
+            await expect(await erc20Token.balanceOf(addr1.address)).to.equal(amount + balanceBefore);
         });
     });
 });

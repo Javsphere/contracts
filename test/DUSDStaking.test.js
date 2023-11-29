@@ -1,6 +1,7 @@
 const {expect} = require("chai");
 const {ethers, upgrades} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const {ADMIN_ERROR} = require("./common/constanst");
 
 
 describe("DUSDStaking contract", () => {
@@ -11,7 +12,6 @@ describe("DUSDStaking contract", () => {
     let addr3;
     let bot;
     let erc20Token;
-    let adminError;
 
     async function deployTokenFixture() {
         const erc20ContractFactory = await ethers.getContractFactory("ERC20Mock");
@@ -41,9 +41,6 @@ describe("DUSDStaking contract", () => {
             }
         );
 
-
-
-        adminError = "DUSDStaking: only admin"
 
     });
 
@@ -81,7 +78,7 @@ describe("DUSDStaking contract", () => {
             await expect(
                 hhDUSDStaking.connect(addr1).pause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -96,7 +93,7 @@ describe("DUSDStaking contract", () => {
             await expect(
                 hhDUSDStaking.connect(addr1).unpause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -111,7 +108,7 @@ describe("DUSDStaking contract", () => {
             await expect(
                 hhDUSDStaking.connect(addr1).setAdminAddress(owner.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -126,7 +123,7 @@ describe("DUSDStaking contract", () => {
             await expect(
                 hhDUSDStaking.connect(addr1).setBotAddress(bot.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });

@@ -9,12 +9,7 @@ async function main() {
         Contract,
         [
             "0x31C4Afcef7277801f460A4d04B5966286a28A295", //_tokenAddress
-            2,                                            //_minimumSignatures
-            [                                             //_signers
-                "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb",
-                "0x229201eeE335Bcf2aC2F3553dcAF613A70331157",
-                "0x01C4679164306967BbEd08926B50bcDE240c9f0b"
-            ]
+            "0x0000000000000000000000000000000000000000", //_multiSignWallet
         ],
         {
             initializer: "initialize",

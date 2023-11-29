@@ -1,6 +1,7 @@
 const {expect} = require("chai");
 const {ethers, upgrades} = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const {ADMIN_ERROR} = require("./common/constanst");
 
 
 describe("JavNetwork contract", () => {
@@ -10,7 +11,6 @@ describe("JavNetwork contract", () => {
     let addr2;
     let addr3;
     let bot;
-    let adminError;
 
 
     before(async () => {
@@ -28,8 +28,6 @@ describe("JavNetwork contract", () => {
             }
         );
 
-
-        adminError = "JavNetwork: only admin"
 
     });
 
@@ -63,7 +61,7 @@ describe("JavNetwork contract", () => {
             await expect(
                 hhJavNetwork.connect(addr1).pause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -78,7 +76,7 @@ describe("JavNetwork contract", () => {
             await expect(
                 hhJavNetwork.connect(addr1).unpause()
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -93,7 +91,7 @@ describe("JavNetwork contract", () => {
             await expect(
                 hhJavNetwork.connect(addr1).setAdminAddress(owner.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -108,7 +106,7 @@ describe("JavNetwork contract", () => {
             await expect(
                 hhJavNetwork.connect(addr1).setBotAddress(bot.address)
             ).to.be.revertedWith(
-                adminError
+                ADMIN_ERROR
             );
 
         });
@@ -129,7 +127,7 @@ describe("JavNetwork contract", () => {
         });
 
         it("Should saveCID ", async () => {
-            const key ="test_key";
+            const key = "test_key";
             const value = "frwklghniu23erhtfn24eionweofefg3ewrt234";
 
             await hhJavNetwork.connect(bot).saveCID(key, value);

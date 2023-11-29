@@ -3,18 +3,11 @@
 pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./base/BaseUpgradable.sol";
 
-contract DUSDStaking is
-    OwnableUpgradeable,
-    PausableUpgradeable,
-    ReentrancyGuardUpgradeable,
-    UUPSUpgradeable
-{
+contract DUSDStaking is BaseUpgradable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
     /**
@@ -28,7 +21,6 @@ contract DUSDStaking is
     }
 
     IERC20 public token;
-    address public adminAddress;
     address public botAddress;
 
     mapping(address => uint256) public userDeposit;
@@ -37,8 +29,6 @@ contract DUSDStaking is
     mapping(address => uint256) public userClaimableAmount;
 
     /* ========== EVENTS ========== */
-    event Initialized(address indexed executor, uint256 at);
-    event SetAdminAddress(address indexed _address);
     event SetBotAddress(address indexed _address);
     event Deposit(address indexed _address, uint256 amount);
     event UpdateInvestmentByDeposit(address indexed _address, uint256 amount);
@@ -47,17 +37,10 @@ contract DUSDStaking is
     event RequestWithdraw(address indexed _address, uint256 amount);
     event Withdraw(address indexed _address, uint256 amount);
 
-    modifier onlyAdmin() {
-        require(msg.sender == adminAddress || msg.sender == owner(), "DUSDStaking: only admin");
-        _;
-    }
-
     modifier onlyBot() {
         require(msg.sender == botAddress, "DUSDStaking: only bot");
         _;
     }
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -65,30 +48,13 @@ contract DUSDStaking is
     }
 
     function initialize(address _tokenAddress, address _botAddress) external initializer {
-        adminAddress = msg.sender;
         token = IERC20(_tokenAddress);
         botAddress = _botAddress;
 
-        __Ownable_init(msg.sender);
+        __Base_init();
         __ReentrancyGuard_init();
-        __Pausable_init();
-        __UUPSUpgradeable_init();
 
         emit Initialized(msg.sender, block.number);
-    }
-
-    function pause() external onlyAdmin {
-        _pause();
-    }
-
-    function unpause() external onlyAdmin {
-        _unpause();
-    }
-
-    function setAdminAddress(address _address) external onlyAdmin {
-        adminAddress = _address;
-
-        emit SetAdminAddress(_address);
     }
 
     function setBotAddress(address _address) external onlyAdmin {
@@ -175,11 +141,4 @@ contract DUSDStaking is
             emit UpdateClaimableAmount(_withdrawInfo[i].user, _withdrawInfo[i].amount);
         }
     }
-
-    /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
-     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-     */
-    uint256[43] private ____gap;
 }
