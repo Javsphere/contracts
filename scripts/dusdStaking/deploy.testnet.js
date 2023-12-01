@@ -9,7 +9,7 @@ async function main() {
         Contract,
         [
             "0xFF0000000000000000000000000000000000000B", //_tokenAddress
-            "0x2A9f89782B7d3c14a6D5b253c2E059e3572716dc", //_botAddress
+            "0x55e762e808745C2fa6FbC751653e14A8B9e7aDd4", //_botAddress
         ],
 
         {
