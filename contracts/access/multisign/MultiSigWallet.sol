@@ -12,7 +12,6 @@ contract MultiSigWallet {
     event Revocation(address indexed sender, uint256 indexed transactionId);
     event Submission(uint256 indexed transactionId);
     event Execution(uint256 indexed transactionId);
-    event ExecutionFailure(uint256 indexed transactionId);
     event Deposit(address indexed sender, uint256 value);
     event OwnerAddition(address indexed owner);
     event OwnerRemoval(address indexed owner);
@@ -228,14 +227,10 @@ contract MultiSigWallet {
     {
         require(_isConfirmed(transactionId), "MultiSigWallet: transaction not confirmed");
         Transaction storage txn = transactions[transactionId];
-        txn.executed = true;
         (bool success, ) = txn.to.call{value: txn.value}(txn.data);
-        if (success) {
-            emit Execution(transactionId);
-        } else {
-            txn.executed = false;
-            emit ExecutionFailure(transactionId);
-        }
+        require(success, "MultiSigWallet: contract call failed");
+        txn.executed = true;
+        emit Execution(transactionId);
     }
 
     /*
