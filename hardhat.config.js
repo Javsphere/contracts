@@ -35,13 +35,16 @@ module.exports = {
             accounts: [process.env.OWNER_KEY],
         },
         mainnet: {
-            url: "",
+            chainId: 1130,
+            // url: "https://dmc.mydefichain.com/mainnet",
+            url: "https://eth.mainnet.ocean.jellyfishsdk.com/",
             accounts: [process.env.OWNER_KEY],
         },
     },
     etherscan: {
         apiKey: {
-            testnet: "abc"
+            testnet: "abc",
+            mainnet: "abc"
         },
         customChains: [
             {
@@ -50,6 +53,14 @@ module.exports = {
                 urls: {
                     apiURL: "https://blockscout.testnet.ocean.jellyfishsdk.com/api",
                     browserURL: "https://blockscout.testnet.ocean.jellyfishsdk.com"
+                }
+            },
+            {
+                network: "mainnet",
+                chainId: 1130,
+                urls: {
+                    apiURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com/api",
+                    browserURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com"
                 }
             }
         ]
