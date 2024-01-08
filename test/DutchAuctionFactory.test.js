@@ -1,9 +1,8 @@
-const {expect} = require("chai");
-const {ethers, upgrades} = require("hardhat")
+const { expect } = require("chai");
+const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const {address} = require("hardhat/internal/core/config/config-validation");
-const {ADMIN_ERROR} = require("./common/constanst");
-
+const { address } = require("hardhat/internal/core/config/config-validation");
+const { ADMIN_ERROR } = require("./common/constanst");
 
 describe("DutchAuctionFactory contract", () => {
     let hhDAuctionF;
@@ -13,59 +12,44 @@ describe("DutchAuctionFactory contract", () => {
     let admin;
     let multiSignWallet;
 
-
     before(async () => {
         const dutchAuctionFactory = await ethers.getContractFactory("DutchAuctionFactory");
-        [owner, addr1, admin, multiSignWallet,  ...addrs] = await ethers.getSigners();
+        [owner, addr1, admin, multiSignWallet, ...addrs] = await ethers.getSigners();
         tokenAddress = ethers.Wallet.createRandom().address;
 
         hhDAuctionF = await upgrades.deployProxy(
             dutchAuctionFactory,
-            [
-                tokenAddress,
-                multiSignWallet.address,
-            ],
+            [tokenAddress, multiSignWallet.address],
 
             {
                 initializer: "initialize",
-            }
+            },
         );
-
-
     });
 
     describe("Deployment", () => {
-
         it("Should set the right owner address", async () => {
-
             await expect(await hhDAuctionF.owner()).to.equal(owner.address);
         });
 
         it("Should set the right token address", async () => {
-
             await expect(await hhDAuctionF.tokenAddress()).to.equal(tokenAddress);
         });
 
         it("Should set the right admin address", async () => {
-
             await expect(await hhDAuctionF.adminAddress()).to.equal(owner.address);
         });
 
         it("Should set the right multi sign wallet address", async () => {
-
             await expect(await hhDAuctionF.multiSignWallet()).to.equal(multiSignWallet.address);
         });
-
     });
 
     describe("Transactions", () => {
         it("Should revert when set the admin address", async () => {
             await expect(
-                hhDAuctionF.connect(addr1).setAdminAddress(admin.address)
-            ).to.be.revertedWith(
-                ADMIN_ERROR
-            );
-
+                hhDAuctionF.connect(addr1).setAdminAddress(admin.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should set the admin address", async () => {
@@ -76,11 +60,8 @@ describe("DutchAuctionFactory contract", () => {
 
         it("Should revert when set the token address", async () => {
             await expect(
-                hhDAuctionF.connect(addr1).setTokenAddress(admin.address)
-            ).to.be.revertedWith(
-                ADMIN_ERROR
-            );
-
+                hhDAuctionF.connect(addr1).setTokenAddress(admin.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should set the token address", async () => {
@@ -91,11 +72,8 @@ describe("DutchAuctionFactory contract", () => {
 
         it("Should revert when set the multi sign wallet address", async () => {
             await expect(
-                hhDAuctionF.connect(addr1).setMultiSignWalletAddress(admin.address)
-            ).to.be.revertedWith(
-                ADMIN_ERROR
-            );
-
+                hhDAuctionF.connect(addr1).setMultiSignWalletAddress(admin.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should set the multi sign wallet address", async () => {
@@ -105,14 +83,10 @@ describe("DutchAuctionFactory contract", () => {
         });
 
         it("Should revert deploy multisign error", async () => {
-            await expect(
-                hhDAuctionF.connect(addr1).deploy(1, 2, 3, 4)
-            ).to.be.revertedWith(
-                "DutchAuctionFactory: only multi sign wallet"
+            await expect(hhDAuctionF.connect(addr1).deploy(1, 2, 3, 4)).to.be.revertedWith(
+                "DutchAuctionFactory: only multi sign wallet",
             );
-
         });
-
 
         it("Should deploy", async () => {
             await helpers.mine(1);
@@ -142,6 +116,5 @@ describe("DutchAuctionFactory contract", () => {
             await expect(await hhDAuctionF.getAuctionAt(0)).to.equal(auctions[0]);
             await expect(await hhDAuctionF.getAuctionAt(1)).to.equal(auctions[1]);
         });
-
     });
 });

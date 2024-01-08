@@ -1,4 +1,4 @@
-const {ethers, upgrades} = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -10,21 +10,20 @@ async function main() {
         [
             "0x0000000000000000000000000000000000000000", //_tokenAddress
             "0x0000000000000000000000000000000000000000", //_multiSignWallet
-            0,                                            //_startTokenPrice
-            0,                                            //_incPricePerBlock
-
+            0, //_startTokenPrice
+            0, //_incPricePerBlock
         ],
         {
             initializer: "initialize",
-            kind: 'uups',
+            kind: "uups",
             txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei")
-            }
-        }
+                gasLimit: ethers.parseUnits("0.03", "gwei"),
+            },
+        },
     );
     await contract.waitForDeployment();
 
-    const contractAddress = await contract.getAddress()
+    const contractAddress = await contract.getAddress();
     console.log(`CommunityLaunch contract deployed to: ${contractAddress}`);
 }
 

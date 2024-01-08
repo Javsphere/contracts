@@ -1,11 +1,11 @@
 require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-verify");
-require('@openzeppelin/hardhat-upgrades');
-require("@nomicfoundation/hardhat-chai-matchers")
+require("@openzeppelin/hardhat-upgrades");
+require("@nomicfoundation/hardhat-chai-matchers");
 require("@nomiclabs/hardhat-solhint");
 require("hardhat-contract-sizer");
-require('solidity-docgen');
+require("solidity-docgen");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -26,7 +26,7 @@ module.exports = {
     networks: {
         hardhat: {
             chainId: 31337,
-            blockGasLimit: 1000000000
+            blockGasLimit: 1000000000,
         },
         testnet: {
             chainId: 1131,
@@ -44,7 +44,7 @@ module.exports = {
     etherscan: {
         apiKey: {
             testnet: "abc",
-            mainnet: "abc"
+            mainnet: "abc",
         },
         customChains: [
             {
@@ -52,18 +52,18 @@ module.exports = {
                 chainId: 1131,
                 urls: {
                     apiURL: "https://blockscout.testnet.ocean.jellyfishsdk.com/api",
-                    browserURL: "https://blockscout.testnet.ocean.jellyfishsdk.com"
-                }
+                    browserURL: "https://blockscout.testnet.ocean.jellyfishsdk.com",
+                },
             },
             {
                 network: "mainnet",
                 chainId: 1130,
                 urls: {
                     apiURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com/api",
-                    browserURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com"
-                }
-            }
-        ]
+                    browserURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com",
+                },
+            },
+        ],
     },
     contractSizer: {
         alphaSort: true,
@@ -71,6 +71,6 @@ module.exports = {
         disambiguatePaths: false,
     },
     gasReporter: {
-        enabled: true
-    }
+        enabled: true,
+    },
 };

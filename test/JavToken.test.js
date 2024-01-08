@@ -1,6 +1,5 @@
-const {expect} = require("chai");
-const {ethers, upgrades} = require("hardhat");
-
+const { expect } = require("chai");
+const { ethers, upgrades } = require("hardhat");
 
 describe("JavlisToken contract", () => {
     let hhToken;
@@ -12,34 +11,25 @@ describe("JavlisToken contract", () => {
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         hhToken = await upgrades.deployProxy(
             token,
-            [
-            ],
+            [],
 
             {
                 initializer: "initialize",
-            }
+            },
         );
-
     });
 
     describe("Deployment", () => {
-
         it("Should set the right owner address", async () => {
-
             await expect(await hhToken.owner()).to.equal(owner.address);
         });
-
-
     });
 
     describe("Transactions", () => {
         it("Should revert when mint", async () => {
             await expect(
-                hhToken.connect(addr1).mint(owner.address, ethers.parseEther("20"))
-            ).to.be.revertedWithCustomError(
-                hhToken, "OwnableUnauthorizedAccount"
-            );
-
+                hhToken.connect(addr1).mint(owner.address, ethers.parseEther("20")),
+            ).to.be.revertedWithCustomError(hhToken, "OwnableUnauthorizedAccount");
         });
 
         it("Should mint", async () => {
@@ -52,5 +42,3 @@ describe("JavlisToken contract", () => {
         });
     });
 });
-
-

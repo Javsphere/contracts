@@ -1,5 +1,5 @@
 class EIP712Signer {
-    constructor({signing_domain, signature_version, contract}) {
+    constructor({ signing_domain, signature_version, contract }) {
         this.signing_domain = signing_domain;
         this.signature_version = signature_version;
         this.contract = contract;
@@ -12,13 +12,12 @@ class EIP712Signer {
 
         return {
             ...message,
-            signature
+            signature,
         };
     }
 
-
     async _signingDomain() {
-        if (this._domain != void (0)) {
+        if (this._domain != void 0) {
             return this._domain;
         }
 
@@ -26,7 +25,7 @@ class EIP712Signer {
             name: this.signing_domain,
             version: this.signature_version,
             verifyingContract: this.contract.target,
-            chainId: 31337
+            chainId: 31337,
         };
 
         return this._domain;

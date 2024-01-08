@@ -1,4 +1,4 @@
-const {ethers, upgrades} = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -13,15 +13,15 @@ async function main() {
         ],
         {
             initializer: "initialize",
-            kind: 'uups',
+            kind: "uups",
             txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei")
-            }
-        }
+                gasLimit: ethers.parseUnits("0.03", "gwei"),
+            },
+        },
     );
     await contract.waitForDeployment();
 
-    const contractAddress = await contract.getAddress()
+    const contractAddress = await contract.getAddress();
     console.log(`DUSDStaking contract deployed to: ${contractAddress}`);
 }
 
