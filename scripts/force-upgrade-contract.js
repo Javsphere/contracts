@@ -9,7 +9,7 @@ async function main() {
     const contract = await Contract.deploy();
     await contract.waitForDeployment();
 
-    const contractAddress = await contract.getAddress()
+    const contractAddress = await contract.getAddress();
     console.log(`Contract deployed to: ${contractAddress}`);
 }
 

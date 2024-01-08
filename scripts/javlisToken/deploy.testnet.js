@@ -1,25 +1,20 @@
-const {ethers, upgrades} = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
     const Contract = await ethers.getContractFactory("JavlisToken");
-    const contract = await upgrades.deployProxy(
-        Contract,
-        [
-        ],
-        {
-            initializer: "initialize",
-            kind: 'uups',
-            txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei")
-            }
-        }
-    );
+    const contract = await upgrades.deployProxy(Contract, [], {
+        initializer: "initialize",
+        kind: "uups",
+        txOverrides: {
+            gasLimit: ethers.parseUnits("0.03", "gwei"),
+        },
+    });
     await contract.waitForDeployment();
 
-    const contractAddress = await contract.getAddress()
+    const contractAddress = await contract.getAddress();
     console.log(`JavlisToken contract deployed to: ${contractAddress}`);
 }
 

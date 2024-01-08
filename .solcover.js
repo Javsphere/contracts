@@ -1,3 +1,3 @@
 module.exports = {
-  skipFiles: ['proxy/ProxyAdmin.sol']
+    skipFiles: ["mock", "interfaces"],
 };

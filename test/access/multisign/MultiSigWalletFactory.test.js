@@ -1,7 +1,6 @@
-const {expect} = require("chai");
-const {ethers, upgrades} = require("hardhat")
+const { expect } = require("chai");
+const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-
 
 describe("MultiSigWalletFactory contract", () => {
     let hhMultiSigWalletFactory;
@@ -11,7 +10,6 @@ describe("MultiSigWalletFactory contract", () => {
     let addr3;
     let bot;
     let adminError;
-
 
     before(async () => {
         const multiSigWalletFactory = await ethers.getContractFactory("MultiSigWalletFactory");
@@ -24,43 +22,31 @@ describe("MultiSigWalletFactory contract", () => {
 
             {
                 initializer: "initialize",
-            }
+            },
         );
 
-
-        adminError = "BaseUpgradable: only admin"
-
+        adminError = "BaseUpgradable: only admin";
     });
 
     describe("Deployment", () => {
-
         it("Should set the right owner address", async () => {
-
             await expect(await hhMultiSigWalletFactory.owner()).to.equal(owner.address);
         });
 
-
         it("Should set the right admin address", async () => {
-
             await expect(await hhMultiSigWalletFactory.adminAddress()).to.equal(owner.address);
         });
 
-
         it("Should set the _paused status", async () => {
-
             await expect(await hhMultiSigWalletFactory.paused()).to.equal(false);
         });
-
     });
 
     describe("Transactions", () => {
         it("Should revert when set pause", async () => {
-            await expect(
-                hhMultiSigWalletFactory.connect(addr1).pause()
-            ).to.be.revertedWith(
-                adminError
+            await expect(hhMultiSigWalletFactory.connect(addr1).pause()).to.be.revertedWith(
+                adminError,
             );
-
         });
 
         it("Should set pause", async () => {
@@ -70,12 +56,9 @@ describe("MultiSigWalletFactory contract", () => {
         });
 
         it("Should revert when set unpause", async () => {
-            await expect(
-                hhMultiSigWalletFactory.connect(addr1).unpause()
-            ).to.be.revertedWith(
-                adminError
+            await expect(hhMultiSigWalletFactory.connect(addr1).unpause()).to.be.revertedWith(
+                adminError,
             );
-
         });
 
         it("Should set unpause", async () => {
@@ -86,11 +69,8 @@ describe("MultiSigWalletFactory contract", () => {
 
         it("Should revert when set the admin address", async () => {
             await expect(
-                hhMultiSigWalletFactory.connect(addr1).setAdminAddress(owner.address)
-            ).to.be.revertedWith(
-                adminError
-            );
-
+                hhMultiSigWalletFactory.connect(addr1).setAdminAddress(owner.address),
+            ).to.be.revertedWith(adminError);
         });
 
         it("Should set the admin address", async () => {
@@ -101,27 +81,28 @@ describe("MultiSigWalletFactory contract", () => {
 
         it("Should revert when create wallet", async () => {
             await expect(
-                hhMultiSigWalletFactory.connect(addr1).create([owner.address], 1)
-            ).to.be.revertedWith(
-                adminError
-            );
+                hhMultiSigWalletFactory.connect(addr1).create([owner.address], 1),
+            ).to.be.revertedWith(adminError);
         });
 
         it("Should create wallet", async () => {
-            const owners = [addr1.address, addr2.address]
+            const owners = [addr1.address, addr2.address];
             const required = 2;
 
             await hhMultiSigWalletFactory.create(owners, required);
 
-            await expect(await hhMultiSigWalletFactory.getInstantiationCount(owner.address)).to.be.equal(1);
+            await expect(
+                await hhMultiSigWalletFactory.getInstantiationCount(owner.address),
+            ).to.be.equal(1);
         });
 
         it("Should getInstantiationCount", async () => {
-            await expect(await hhMultiSigWalletFactory.getInstantiationCount(owner.address)).to.be.equal(1);
-            await expect(await hhMultiSigWalletFactory.getInstantiationCount(addr2.address)).to.be.equal(0);
+            await expect(
+                await hhMultiSigWalletFactory.getInstantiationCount(owner.address),
+            ).to.be.equal(1);
+            await expect(
+                await hhMultiSigWalletFactory.getInstantiationCount(addr2.address),
+            ).to.be.equal(0);
         });
-
     });
 });
-
-

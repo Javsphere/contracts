@@ -1,7 +1,16 @@
 {
+  "trailingComma": "all",
+  "endOfLine": "auto",
   "overrides": [
     {
       "files": "*.sol",
+      "options": {
+        "printWidth": 100,
+        "tabWidth": 4
+      }
+    },
+    {
+      "files": "*.js",
       "options": {
         "printWidth": 100,
         "tabWidth": 4
