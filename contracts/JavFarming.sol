@@ -369,13 +369,6 @@ contract JavFarming is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
     }
 
     /**
-     * @notice Function to get pool count
-     */
-    function poolLength() external view returns (uint256) {
-        return poolInfo.length;
-    }
-
-    /**
      * @notice View function to see total pending rewards on frontend
      * @param _user: user address for which reward must be calculated
      * @return total Return reward for user
