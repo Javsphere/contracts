@@ -349,8 +349,8 @@ describe("JavFarming contract", () => {
             await expect(poolInfo[3]).to.be.equal(accRewardPerShare);
         });
 
-        it("Should poolLength", async () => {
-            await expect(await hhJavFarming.poolLength()).to.be.equal(2);
+        it("Should getPoolLength", async () => {
+            await expect(await hhJavFarming.getPoolLength()).to.be.equal(2);
         });
 
         it("Should revert when setAllocationPoint", async () => {
