@@ -148,7 +148,7 @@ describe("JavMarket contract", () => {
 
         it("Should buy token", async () => {
             const amount = await ethers.parseEther("1");
-            const id = 1;
+            const id = "test";
             const feeAmount = (amount * BigInt(fee)) / BigInt(1000);
             const contractBalanceBefore = await erc20Token.balanceOf(hhJavMarket.target);
 
@@ -161,24 +161,88 @@ describe("JavMarket contract", () => {
             await expect(await erc20Token.balanceOf(hhJavMarket.target)).to.equal(
                 contractBalanceBefore + amount - feeAmount,
             );
-            await expect(await hhJavMarket.totalAmountByToken(id)).to.equal(amount - feeAmount);
-            await expect(await hhJavMarket.totalOrdersByToken(id)).to.equal(1);
             await expect(await hhJavMarket.totalOrders()).to.equal(1);
             await expect(await hhJavMarket.totalAmount()).to.equal(amount - feeAmount);
         });
 
-        it("Should revert when emitOrderExecuted", async () => {
-            await expect(
-                hhJavMarket.connect(addr1).emitOrderExecuted(1, addr1.address, 1, 2, 3, true, 1),
-            ).to.be.revertedWith("JavMarket: only bot");
+        it("Should revert when emitOrderExecuted - not bot", async () => {
+            const info = [
+                {
+                    userAddress: addr1.address,
+                    id: 1,
+                    tokenId: 1,
+                    buyingType: 1,
+                    amount: 2,
+                    price: 3,
+                    receiveAmount: 0,
+                    isBuy: true,
+                    tokenName: "test",
+                },
+            ];
+
+            await expect(hhJavMarket.connect(addr1).emitOrderExecuted(info)).to.be.revertedWith(
+                "JavMarket: only bot",
+            );
+        });
+
+        it("Should revert when emitOrderExecuted - invalid order id", async () => {
+            const info = [
+                {
+                    userAddress: addr1.address,
+                    id: 500,
+                    tokenId: 1,
+                    buyingType: 1,
+                    amount: 2,
+                    price: 3,
+                    receiveAmount: 0,
+                    isBuy: true,
+                    tokenName: "test",
+                },
+            ];
+
+            await expect(hhJavMarket.connect(bot).emitOrderExecuted(info)).to.be.revertedWith(
+                "JavMarket: order already executed or not created",
+            );
         });
 
         it("Should emitOrderExecuted", async () => {
-            await expect(
-                hhJavMarket.connect(bot).emitOrderExecuted(1, addr1.address, 1, 2, 3, true, 1),
-            )
+            const userAddress = addr1.address;
+            const id = 1;
+            const tokenId = "1";
+            const buyingType = 1;
+            const amount = 100;
+            const price = 3;
+            const receiveAmount = 30;
+            const isBuy = true;
+            const tokenName = "test";
+            const info = [
+                {
+                    userAddress: userAddress,
+                    id: id,
+                    tokenId: tokenId,
+                    buyingType: buyingType,
+                    amount: amount,
+                    price: price,
+                    receiveAmount: receiveAmount,
+                    isBuy: isBuy,
+                    tokenName: tokenName,
+                },
+            ];
+
+            await expect(hhJavMarket.connect(bot).emitOrderExecuted(info))
                 .to.emit(hhJavMarket, "OrderExecuted")
-                .withArgs(1, addr1.address, 1, 2, 3, true, 1, 1);
+                .withArgs(
+                    id,
+                    userAddress,
+                    amount,
+                    receiveAmount,
+                    tokenId,
+                    buyingType,
+                    isBuy,
+                    price,
+                    tokenName,
+                    1,
+                );
         });
 
         it("Should revert when withdraw - only bot error", async () => {
