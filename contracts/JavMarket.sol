@@ -112,6 +112,13 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     /**
+     * @notice Function to get open orders id
+     */
+    function getOpenOrders() external view returns (uint256[] memory) {
+        return _openOrders.values();
+    }
+
+    /**
      * @notice Function to buy diff tokens
      * @param _amount: Amount for buy
      * @param _tokenId: Token id for buy
