@@ -11,6 +11,7 @@ import "./base/BaseUpgradable.sol";
 contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     enum OrderStatus {
         CREATED,
@@ -21,6 +22,7 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
      * @notice Info for update orders
      * @param userAddress: user address
      * @param id: order id
+     * @param tradeTokenId: input token id
      * @param tokenId:  Token id for buy
      * @param tokenName: Token name
      * @param buyingType: Buying type (Instant - 1 Limit - 2)
@@ -34,6 +36,7 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
         string tokenId;
         string tokenName;
         uint128 id;
+        uint128 tradeTokenId;
         uint8 buyingType;
         uint256 amount;
         uint256 price;
@@ -42,8 +45,8 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     EnumerableSet.UintSet private _openOrders;
+    EnumerableSet.AddressSet private _tokens;
 
-    IERC20 public dusdToken;
     address public botAddress;
     address public treasuryAddress;
     uint256 public totalOrders;
@@ -52,12 +55,15 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
 
     /* ========== EVENTS ========== */
     event SetBotAddress(address indexed _address);
+    event AddToken(address indexed _address);
+    event RemoveToken(address indexed _address);
     event SetTreasuryAddress(address indexed _address);
     event Withdraw(address indexed _to, uint256 _amount);
     event SetFee(uint256 indexed _fee);
     event OrderExecuted(
         uint256 indexed _id,
         address indexed _address,
+        uint256 _inputTokenId,
         uint256 _amount,
         uint256 _receiveAmount,
         string _tokenId,
@@ -73,21 +79,29 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
         _;
     }
 
+    modifier validTokenId(uint256 _tokenId) {
+        require(_tokens.length() > _tokenId, "JavMarket: invalid token id");
+        _;
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
     function initialize(
-        address _tokenAddress,
+        address[] memory _tokensAddresses,
         address _botAddress,
         address _treasuryAddress,
         uint256 _fee
     ) external initializer {
         botAddress = _botAddress;
         treasuryAddress = _treasuryAddress;
-        dusdToken = IERC20(_tokenAddress);
         fee = _fee;
+
+        for (uint256 i = 0; i < _tokensAddresses.length; ++i) {
+            _tokens.add(_tokensAddresses[i]);
+        }
 
         __Base_init();
         __ReentrancyGuard_init();
@@ -111,6 +125,22 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit SetFee(_fee);
     }
 
+    function addToken(address _address) external onlyAdmin {
+        _tokens.add(_address);
+
+        emit AddToken(_address);
+    }
+
+    function removeToken(address _address) external onlyAdmin {
+        _tokens.remove(_address);
+
+        emit RemoveToken(_address);
+    }
+
+    function getTokens() external view returns (address[] memory) {
+        return _tokens.values();
+    }
+
     /**
      * @notice Function to get open orders id
      */
@@ -120,6 +150,7 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
 
     /**
      * @notice Function to buy diff tokens
+     * @param _tradeTokenId: input token id
      * @param _amount: Amount for buy
      * @param _tokenId: Token id for buy
      * @param _buyingType: Buying type
@@ -128,28 +159,31 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
      * @param _isBuy: Is buy direction flag (Buy, Sell)
      * @param _price: Price, ( user only limit order)
      */
-    function buyToken(
+    function tradeToken(
+        uint256 _tradeTokenId,
         uint256 _amount,
         string calldata _tokenId,
         uint8 _buyingType,
         bool _isBuy,
         uint256 _price
-    ) external whenNotPaused nonReentrant {
-        require(dusdToken.balanceOf(msg.sender) >= _amount, "JavMarket: invalid amount");
+    ) external whenNotPaused nonReentrant validTokenId(_tradeTokenId) {
+        IERC20 token = IERC20(_tokens.at(_tradeTokenId));
+        require(token.balanceOf(msg.sender) >= _amount, "JavMarket: invalid amount");
         uint256 feeAmount = (_amount * fee) / 1000;
         uint256 amount = _amount - feeAmount;
 
         totalAmount += amount;
         totalOrders++;
 
-        dusdToken.safeTransferFrom(msg.sender, treasuryAddress, feeAmount);
-        dusdToken.safeTransferFrom(msg.sender, address(this), amount);
+        token.safeTransferFrom(msg.sender, treasuryAddress, feeAmount);
+        token.safeTransferFrom(msg.sender, address(this), amount);
 
         _openOrders.add(totalOrders);
 
         emit OrderExecuted(
             totalOrders,
             msg.sender,
+            _tradeTokenId,
             amount,
             0,
             _tokenId,
@@ -176,6 +210,7 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
             emit OrderExecuted(
                 _orderExecutedInfo[i].id,
                 _orderExecutedInfo[i].userAddress,
+                _orderExecutedInfo[i].tradeTokenId,
                 _orderExecutedInfo[i].amount,
                 _orderExecutedInfo[i].receiveAmount,
                 _orderExecutedInfo[i].tokenId,
@@ -189,13 +224,14 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     /**
-     * @notice Function to withdraw dusd tokens from contract by bot
+     * @notice Function to withdraw tokens from contract by bot
      * @param _amount: amount
      */
-    function withdraw(uint256 _amount) external onlyBot {
-        require(dusdToken.balanceOf(address(this)) >= _amount, "JavMarket: invalid amount");
+    function withdraw(uint256 _tokenId, uint256 _amount) external validTokenId(_tokenId) onlyBot {
+        IERC20 token = IERC20(_tokens.at(_tokenId));
+        require(token.balanceOf(address(this)) >= _amount, "JavMarket: invalid amount");
 
-        dusdToken.safeTransfer(botAddress, _amount);
+        token.safeTransfer(botAddress, _amount);
 
         emit Withdraw(botAddress, _amount);
     }
