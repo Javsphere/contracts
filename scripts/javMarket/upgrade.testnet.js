@@ -1,5 +1,6 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0x64681329CA8dFe2790a37D9Eb462C28150fbCE5F";
+const {delay} = require("../utils");
+const PROXY = "0x29834291861958014e1b7b57e5f312a3d0117bE2";
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -15,6 +16,8 @@ async function main() {
         },
     });
     await impl.waitForDeployment();
+
+    await delay(5000)
 
     console.log(`Upgrade Finished..`);
     console.log(`Starting Verification..`);

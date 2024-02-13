@@ -25,7 +25,7 @@ describe("JavMarket contract", () => {
 
         hhJavMarket = await upgrades.deployProxy(
             javMarket,
-            [erc20Token.target, bot.address, treasury.address, fee],
+            [[erc20Token.target], bot.address, treasury.address, fee],
 
             {
                 initializer: "initialize",
@@ -39,7 +39,7 @@ describe("JavMarket contract", () => {
         });
 
         it("Should set the right token", async () => {
-            await expect(await hhJavMarket.dusdToken()).to.equal(erc20Token.target);
+            await expect((await hhJavMarket.getTokens())[0]).to.equal(erc20Token.target);
         });
 
         it("Should set the right admin address", async () => {
@@ -135,13 +135,13 @@ describe("JavMarket contract", () => {
             await hhJavMarket.pause();
 
             await expect(
-                hhJavMarket.connect(addr1).buyToken(15, 1, 1, true, 1),
+                hhJavMarket.connect(addr1).tradeToken(0, 15, 1, 1, true, 1),
             ).to.be.revertedWithCustomError(hhJavMarket, "EnforcedPause");
             await hhJavMarket.unpause();
         });
 
         it("Should revert when buy balanceOf < _amount", async () => {
-            await expect(hhJavMarket.connect(addr1).buyToken(15, 1, 1, true, 1)).to.be.revertedWith(
+            await expect(hhJavMarket.connect(addr1).tradeToken(0, 15, 1, 1, true, 1)).to.be.revertedWith(
                 "JavMarket: invalid amount",
             );
         });
@@ -155,7 +155,7 @@ describe("JavMarket contract", () => {
             await erc20Token.mint(addr1.address, amount);
             await erc20Token.connect(addr1).approve(hhJavMarket.target, amount);
 
-            await hhJavMarket.connect(addr1).buyToken(amount, id, 1, true, 1);
+            await hhJavMarket.connect(addr1).tradeToken(0, amount, id, 1, true, 1);
 
             await expect(await erc20Token.balanceOf(treasury.address)).to.equal(feeAmount);
             await expect(await erc20Token.balanceOf(hhJavMarket.target)).to.equal(
@@ -170,6 +170,7 @@ describe("JavMarket contract", () => {
                 {
                     userAddress: addr1.address,
                     id: 1,
+                    tradeTokenId: 0,
                     tokenId: 1,
                     buyingType: 1,
                     amount: 2,
@@ -190,6 +191,7 @@ describe("JavMarket contract", () => {
                 {
                     userAddress: addr1.address,
                     id: 500,
+                    tradeTokenId: 0,
                     tokenId: 1,
                     buyingType: 1,
                     amount: 2,
@@ -219,6 +221,7 @@ describe("JavMarket contract", () => {
                 {
                     userAddress: userAddress,
                     id: id,
+                    tradeTokenId: 0,
                     tokenId: tokenId,
                     buyingType: buyingType,
                     amount: amount,
@@ -234,6 +237,7 @@ describe("JavMarket contract", () => {
                 .withArgs(
                     id,
                     userAddress,
+                    0,
                     amount,
                     receiveAmount,
                     tokenId,
@@ -246,14 +250,14 @@ describe("JavMarket contract", () => {
         });
 
         it("Should revert when withdraw - only bot error", async () => {
-            await expect(hhJavMarket.connect(addr1).withdraw(1)).to.be.revertedWith(
+            await expect(hhJavMarket.connect(addr1).withdraw(0, 1)).to.be.revertedWith(
                 "JavMarket: only bot",
             );
         });
 
         it("Should revert when withdraw - invalid amount", async () => {
             await expect(
-                hhJavMarket.connect(bot).withdraw(ethers.parseEther("5")),
+                hhJavMarket.connect(bot).withdraw(0, ethers.parseEther("5")),
             ).to.be.revertedWith("JavMarket: invalid amount");
         });
 
@@ -261,7 +265,7 @@ describe("JavMarket contract", () => {
             const contractBalanceBefore = await erc20Token.balanceOf(hhJavMarket.target);
             const botBalanceBefore = await erc20Token.balanceOf(bot.address);
 
-            await hhJavMarket.connect(bot).withdraw(contractBalanceBefore);
+            await hhJavMarket.connect(bot).withdraw(0, contractBalanceBefore);
 
             await expect(await erc20Token.balanceOf(hhJavMarket.target)).to.be.equal(0);
             await expect(await erc20Token.balanceOf(bot.address)).to.be.equal(
