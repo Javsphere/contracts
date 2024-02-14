@@ -63,7 +63,6 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
     event OrderExecuted(
         uint256 indexed _id,
         address indexed _address,
-        uint256 _inputTokenId,
         uint256 _amount,
         uint256 _receiveAmount,
         string _tokenId,
@@ -183,7 +182,6 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit OrderExecuted(
             totalOrders,
             msg.sender,
-            _tradeTokenId,
             amount,
             0,
             _tokenId,
@@ -210,7 +208,6 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
             emit OrderExecuted(
                 _orderExecutedInfo[i].id,
                 _orderExecutedInfo[i].userAddress,
-                _orderExecutedInfo[i].tradeTokenId,
                 _orderExecutedInfo[i].amount,
                 _orderExecutedInfo[i].receiveAmount,
                 _orderExecutedInfo[i].tokenId,
