@@ -237,7 +237,6 @@ describe("JavMarket contract", () => {
                 .withArgs(
                     id,
                     userAddress,
-                    0,
                     amount,
                     receiveAmount,
                     tokenId,
