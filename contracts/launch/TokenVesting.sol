@@ -3,12 +3,15 @@
 pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./base/BaseUpgradable.sol";
+import "../base/BaseUpgradable.sol";
+import "../interfaces/ITokenVesting.sol";
 
-contract TokenVesting is BaseUpgradable, ReentrancyGuardUpgradeable {
+contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     struct VestingSchedule {
         bool initialized;
@@ -32,32 +35,15 @@ contract TokenVesting is BaseUpgradable, ReentrancyGuardUpgradeable {
         bool revoked;
     }
 
-    struct InitialVestingSchedule {
-        // address of the beneficiary to whom vested tokens are transferred
-        address beneficiary;
-        // start time of the vesting period
-        uint128 start;
-        // duration in seconds of the cliff in which tokens will begin to vest
-        uint128 cliff;
-        // duration in seconds of the period in which the tokens will vest
-        uint128 duration;
-        // duration of a slice period for the vesting in seconds
-        uint128 slicePeriodSeconds;
-        // whether the vesting is revocable or not
-        bool revocable;
-        // total amount of tokens to be released at the end of the vesting
-        uint128 amount;
-    }
+    EnumerableSet.AddressSet private _allowedAddresses;
 
     IERC20 public token;
-    address public multiSignWallet;
     uint256 public currentVestingId;
     uint256 public vestingSchedulesTotalAmount;
     mapping(bytes32 => VestingSchedule) public vestingSchedules;
     mapping(address => uint256) public holdersVestingCount;
 
     /* ========== EVENTS ========== */
-    event SetMultiSignWalletAddress(address indexed _address);
     event VestingScheduleAdded(
         address indexed beneficiary,
         uint256 cliff,
@@ -70,6 +56,8 @@ contract TokenVesting is BaseUpgradable, ReentrancyGuardUpgradeable {
     event Revoked(bytes32 indexed vestingScheduleId, uint256 amount);
     event Withdraw(address indexed to, uint256 amount);
     event Released(bytes32 indexed vestingScheduleId, address indexed to, uint256 amount);
+    event AddAllowedAddress(address indexed _address);
+    event RemoveAllowedAddress(address indexed _address);
 
     modifier onlyIfVestingScheduleNotRevoked(bytes32 _vestingScheduleId) {
         require(vestingSchedules[_vestingScheduleId].initialized);
@@ -77,8 +65,8 @@ contract TokenVesting is BaseUpgradable, ReentrancyGuardUpgradeable {
         _;
     }
 
-    modifier onlyMultiSign() {
-        require(msg.sender == multiSignWallet, "TokenVesting: only multi sign wallet");
+    modifier onlyAllowedAddresses(address _sender) {
+        require(_allowedAddresses.contains(_sender), "TokenVesting: only allowed addresses");
         _;
     }
 
@@ -87,72 +75,74 @@ contract TokenVesting is BaseUpgradable, ReentrancyGuardUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(address _token, address _multiSignWallet) external initializer {
+    function initialize(address _token) external initializer {
         token = IERC20(_token);
-        multiSignWallet = _multiSignWallet;
         currentVestingId = 1;
+
+        _allowedAddresses.add(msg.sender);
 
         __Base_init();
         __ReentrancyGuard_init();
     }
 
-    function setMultiSignWalletAddress(address _address) external onlyAdmin {
-        multiSignWallet = _address;
+    function addAllowedAddress(address _address) external onlyAdmin {
+        _allowedAddresses.add(_address);
 
-        emit SetMultiSignWalletAddress(_address);
+        emit AddAllowedAddress(_address);
+    }
+
+    function removeAllowedAddress(address _address) external onlyAdmin {
+        _allowedAddresses.remove(_address);
+
+        emit RemoveAllowedAddress(_address);
     }
 
     /**
-     * @notice Creates a new vesting schedule for a beneficiary.
+     * @notice Creates a new vesting schedule
+     * @param _beneficiary  beneficiary
+     * @param _start start time of the vesting period
+     * @param _cliff duration in seconds of the cliff in which tokens will begin to vest
+     * @param _duration duration of a slice period for the vesting in seconds
+     * @param _slicePeriodSeconds duration of a slice period for the vesting in seconds
+     * @param _revocable whether the vesting is revocable or not
+     * @param _amount total amount of tokens to be released at the end of the vesting
+     */
+    function createVestingSchedule(
+        address _beneficiary,
+        uint128 _start,
+        uint128 _cliff,
+        uint128 _duration,
+        uint128 _slicePeriodSeconds,
+        bool _revocable,
+        uint128 _amount
+    ) external onlyAllowedAddresses(msg.sender) {
+        _createVestingSchedule(
+            _beneficiary,
+            _start,
+            _cliff,
+            _duration,
+            _slicePeriodSeconds,
+            _revocable,
+            _amount
+        );
+    }
+
+    /**
+     * @notice Creates a new vesting schedules
      * @param _vestingInfo array of vesting information
      */
-    function createVestingSchedules(
+    function createVestingScheduleBatch(
         InitialVestingSchedule[] memory _vestingInfo
-    ) external onlyAdmin {
+    ) external onlyAllowedAddresses(msg.sender) {
         for (uint256 i = 0; i < _vestingInfo.length; ++i) {
-            require(
-                getWithdrawableAmount() >= _vestingInfo[i].amount,
-                "TokenVesting: cannot create vesting schedule because not sufficient tokens"
-            );
-            require(_vestingInfo[i].duration > 0, "TokenVesting: duration must be > 0");
-            require(_vestingInfo[i].amount > 0, "TokenVesting: amount must be > 0");
-            require(
-                _vestingInfo[i].slicePeriodSeconds > 0,
-                "TokenVesting: slicePeriodSeconds must be > 0"
-            );
-            require(
-                _vestingInfo[i].duration >= _vestingInfo[i].cliff,
-                "TokenVesting: duration must be >= cliff"
-            );
-            bytes32 vestingScheduleId = _computeVestingScheduleIdForAddressAndIndex(
+            _createVestingSchedule(
                 _vestingInfo[i].beneficiary,
-                holdersVestingCount[_vestingInfo[i].beneficiary]
-            );
-            uint128 cliff = _vestingInfo[i].start + _vestingInfo[i].cliff;
-            vestingSchedules[vestingScheduleId] = VestingSchedule(
-                true,
-                _vestingInfo[i].beneficiary,
-                cliff,
                 _vestingInfo[i].start,
+                _vestingInfo[i].cliff,
                 _vestingInfo[i].duration,
                 _vestingInfo[i].slicePeriodSeconds,
                 _vestingInfo[i].revocable,
-                _vestingInfo[i].amount,
-                0,
-                false
-            );
-            vestingSchedulesTotalAmount = vestingSchedulesTotalAmount + _vestingInfo[i].amount;
-            currentVestingId++;
-            holdersVestingCount[_vestingInfo[i].beneficiary] += 1;
-
-            emit VestingScheduleAdded(
-                _vestingInfo[i].beneficiary,
-                cliff,
-                _vestingInfo[i].start,
-                _vestingInfo[i].duration,
-                _vestingInfo[i].slicePeriodSeconds,
-                _vestingInfo[i].amount,
-                _vestingInfo[i].revocable
+                _vestingInfo[i].amount
             );
         }
     }
@@ -181,7 +171,7 @@ contract TokenVesting is BaseUpgradable, ReentrancyGuardUpgradeable {
      * @notice Withdraw the specified amount if possible.
      * @param amount the amount to withdraw
      */
-    function withdraw(address to, uint256 amount) external nonReentrant onlyMultiSign {
+    function withdraw(address to, uint256 amount) external nonReentrant onlyAdmin {
         require(getWithdrawableAmount() >= amount, "TokenVesting: not enough withdrawable funds");
 
         token.safeTransfer(to, amount);
@@ -199,6 +189,13 @@ contract TokenVesting is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint128 amount
     ) external whenNotPaused nonReentrant onlyIfVestingScheduleNotRevoked(vestingScheduleId) {
         _release(vestingScheduleId, amount);
+    }
+
+    /**
+     * @notice Function to get allowed addresses
+     */
+    function getAllowedAddresses() external view returns (address[] memory) {
+        return _allowedAddresses.values();
     }
 
     /**
@@ -252,6 +249,55 @@ contract TokenVesting is BaseUpgradable, ReentrancyGuardUpgradeable {
      */
     function getWithdrawableAmount() public view returns (uint256) {
         return token.balanceOf(address(this)) - vestingSchedulesTotalAmount;
+    }
+
+    function _createVestingSchedule(
+        address _beneficiary,
+        uint128 _start,
+        uint128 _cliff,
+        uint128 _duration,
+        uint128 _slicePeriodSeconds,
+        bool _revocable,
+        uint128 _amount
+    ) private {
+        require(
+            getWithdrawableAmount() >= _amount,
+            "TokenVesting: cannot create vesting schedule because not sufficient tokens"
+        );
+        require(_duration > 0, "TokenVesting: duration must be > 0");
+        require(_amount > 0, "TokenVesting: amount must be > 0");
+        require(_slicePeriodSeconds > 0, "TokenVesting: slicePeriodSeconds must be > 0");
+        require(_duration >= _cliff, "TokenVesting: duration must be >= cliff");
+        bytes32 vestingScheduleId = _computeVestingScheduleIdForAddressAndIndex(
+            _beneficiary,
+            holdersVestingCount[_beneficiary]
+        );
+        uint128 cliff = _start + _cliff;
+        vestingSchedules[vestingScheduleId] = VestingSchedule(
+            true,
+            _beneficiary,
+            cliff,
+            _start,
+            _duration,
+            _slicePeriodSeconds,
+            _revocable,
+            _amount,
+            0,
+            false
+        );
+        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount + _amount;
+        currentVestingId++;
+        holdersVestingCount[_beneficiary] += 1;
+
+        emit VestingScheduleAdded(
+            _beneficiary,
+            cliff,
+            _start,
+            _duration,
+            _slicePeriodSeconds,
+            _amount,
+            _revocable
+        );
     }
 
     /**
