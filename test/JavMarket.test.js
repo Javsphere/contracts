@@ -141,9 +141,9 @@ describe("JavMarket contract", () => {
         });
 
         it("Should revert when buy balanceOf < _amount", async () => {
-            await expect(hhJavMarket.connect(addr1).tradeToken(0, 15, 1, 1, true, 1)).to.be.revertedWith(
-                "JavMarket: invalid amount",
-            );
+            await expect(
+                hhJavMarket.connect(addr1).tradeToken(0, 15, 1, 1, true, 1),
+            ).to.be.revertedWith("JavMarket: invalid amount");
         });
 
         it("Should buy token", async () => {

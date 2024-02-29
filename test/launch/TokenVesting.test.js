@@ -1,8 +1,8 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const { loadFixture, time } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { ADMIN_ERROR } = require("./common/constanst");
-const { deployTokenFixture } = require("./common/mocks");
+const { ADMIN_ERROR } = require("../common/constanst");
+const { deployTokenFixture } = require("../common/mocks");
 
 describe("TokenVesting contract", () => {
     let hhTokenVesting;
@@ -19,13 +19,9 @@ describe("TokenVesting contract", () => {
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await loadFixture(deployTokenFixture);
 
-        hhTokenVesting = await upgrades.deployProxy(
-            tokenVesting,
-            [erc20Token.target, multiSignWallet.address],
-            {
-                initializer: "initialize",
-            },
-        );
+        hhTokenVesting = await upgrades.deployProxy(tokenVesting, [erc20Token.target], {
+            initializer: "initialize",
+        });
     });
 
     describe("Deployment", () => {
@@ -39,10 +35,6 @@ describe("TokenVesting contract", () => {
 
         it("Should set the right admin address", async () => {
             await expect(await hhTokenVesting.adminAddress()).to.equal(owner.address);
-        });
-
-        it("Should set the right multi sign wallet address", async () => {
-            await expect(await hhTokenVesting.multiSignWallet()).to.equal(multiSignWallet.address);
         });
 
         it("Should set the _paused status", async () => {
@@ -90,19 +82,32 @@ describe("TokenVesting contract", () => {
             await expect(await hhTokenVesting.adminAddress()).to.equal(admin.address);
         });
 
-        it("Should revert when set the multi sign wallet address", async () => {
+        it("Should revert when addAllowedAddress", async () => {
             await expect(
-                hhTokenVesting.connect(addr1).setMultiSignWalletAddress(admin.address),
+                hhTokenVesting.connect(addr1).addAllowedAddress(admin.address),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
-        it("Should set the multi sign wallet address", async () => {
-            await hhTokenVesting.setMultiSignWalletAddress(multiSignWallet.address);
+        it("Should addAllowedAddress", async () => {
+            await hhTokenVesting.addAllowedAddress(admin.address);
 
-            await expect(await hhTokenVesting.multiSignWallet()).to.equal(multiSignWallet.address);
+            const allowedAddresses = await hhTokenVesting.getAllowedAddresses()
+
+            await expect(allowedAddresses[1]).to.be.equal(admin.address)
         });
 
-        it("Should revert when create vesting schedule - not admin", async () => {
+        it("Should revert when removeAllowedAddress", async () => {
+            await expect(
+                hhTokenVesting.connect(addr1).removeAllowedAddress(admin.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should removeAllowedAddress", async () => {
+            await hhTokenVesting.addAllowedAddress(addr1.address);
+            await hhTokenVesting.removeAllowedAddress(addr1.address);
+        });
+
+        it("Should revert when create vesting schedule batch - not allowed address", async () => {
             const vestingInfo = [
                 {
                     beneficiary: "0x0000000000000000000000000000000000000000",
@@ -115,8 +120,14 @@ describe("TokenVesting contract", () => {
                 },
             ];
             await expect(
-                hhTokenVesting.connect(addr1).createVestingSchedules(vestingInfo),
-            ).to.be.revertedWith(ADMIN_ERROR);
+                hhTokenVesting.connect(addr1).createVestingScheduleBatch(vestingInfo),
+            ).to.be.revertedWith("TokenVesting: only allowed addresses");
+        });
+
+        it("Should revert when create vesting schedule - not allowed address", async () => {
+            await expect(
+                hhTokenVesting.connect(addr1).createVestingSchedule("0x0000000000000000000000000000000000000000", 1, 1, 1, 1, true, 1),
+            ).to.be.revertedWith("TokenVesting: only allowed addresses");
         });
 
         it("Should revert when create vesting schedule - balance < amount", async () => {
@@ -134,7 +145,7 @@ describe("TokenVesting contract", () => {
                 },
             ];
             await expect(
-                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo),
+                hhTokenVesting.connect(admin).createVestingScheduleBatch(vestingInfo),
             ).to.be.revertedWith(
                 "TokenVesting: cannot create vesting schedule because not sufficient tokens",
             );
@@ -153,7 +164,7 @@ describe("TokenVesting contract", () => {
                 },
             ];
             await expect(
-                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo),
+                hhTokenVesting.connect(admin).createVestingScheduleBatch(vestingInfo),
             ).to.be.revertedWith("TokenVesting: duration must be > 0");
         });
 
@@ -170,7 +181,7 @@ describe("TokenVesting contract", () => {
                 },
             ];
             await expect(
-                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo),
+                hhTokenVesting.connect(admin).createVestingScheduleBatch(vestingInfo),
             ).to.be.revertedWith("TokenVesting: amount must be > 0");
         });
 
@@ -187,7 +198,7 @@ describe("TokenVesting contract", () => {
                 },
             ];
             await expect(
-                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo),
+                hhTokenVesting.connect(admin).createVestingScheduleBatch(vestingInfo),
             ).to.be.revertedWith("TokenVesting: slicePeriodSeconds must be > 0");
         });
 
@@ -204,11 +215,11 @@ describe("TokenVesting contract", () => {
                 },
             ];
             await expect(
-                hhTokenVesting.connect(admin).createVestingSchedules(vestingInfo),
+                hhTokenVesting.connect(admin).createVestingScheduleBatch(vestingInfo),
             ).to.be.revertedWith("TokenVesting: duration must be >= cliff");
         });
 
-        it("Should create vesting schedule", async () => {
+        it("Should create vesting schedule batch", async () => {
             const beneficiary = addr1.address;
             const start = await time.latest();
             const cliff = 2;
@@ -230,7 +241,41 @@ describe("TokenVesting contract", () => {
                 },
             ];
 
-            await hhTokenVesting.createVestingSchedules(vestingInfo);
+            await hhTokenVesting.createVestingScheduleBatch(vestingInfo);
+
+            const vestingScheduleForHolder = await hhTokenVesting.getLastVestingScheduleForHolder(
+                beneficiary,
+            );
+
+            await expect(await hhTokenVesting.currentVestingId()).to.be.equal(
+                currentVestingId + BigInt(1),
+            );
+            await expect(vestingScheduleForHolder.initialized).to.be.equal(true);
+            await expect(vestingScheduleForHolder.beneficiary).to.be.equal(beneficiary);
+            await expect(vestingScheduleForHolder.cliff).to.be.equal(cliff + start);
+            await expect(vestingScheduleForHolder.duration).to.be.equal(duration);
+            await expect(vestingScheduleForHolder.slicePeriodSeconds).to.be.equal(
+                slicePeriodSeconds,
+            );
+            await expect(vestingScheduleForHolder.revocable).to.be.equal(revocable);
+            await expect(vestingScheduleForHolder.amountTotal).to.be.equal(amount);
+            await expect(vestingScheduleForHolder.released).to.be.equal(0);
+            await expect(vestingScheduleForHolder.revoked).to.be.equal(false);
+        });
+
+
+        it("Should create vesting schedule", async () => {
+            const beneficiary = addr1.address;
+            const start = await time.latest();
+            const cliff = 2;
+            const duration = 3;
+            const slicePeriodSeconds = 1;
+            const revocable = true;
+            const amount = ethers.parseEther("0.0005");
+
+            const currentVestingId = await hhTokenVesting.currentVestingId();
+
+            await hhTokenVesting.createVestingSchedule(beneficiary, start, cliff, duration, slicePeriodSeconds, revocable, amount);
 
             const vestingScheduleForHolder = await hhTokenVesting.getLastVestingScheduleForHolder(
                 beneficiary,
@@ -282,7 +327,7 @@ describe("TokenVesting contract", () => {
                 },
             ];
 
-            await hhTokenVesting.createVestingSchedules(vestingInfo);
+            await hhTokenVesting.createVestingScheduleBatch(vestingInfo);
             const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
                 beneficiary,
@@ -315,7 +360,7 @@ describe("TokenVesting contract", () => {
                 },
             ];
 
-            await hhTokenVesting.createVestingSchedules(vestingInfo);
+            await hhTokenVesting.createVestingScheduleBatch(vestingInfo);
 
             const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
@@ -344,10 +389,10 @@ describe("TokenVesting contract", () => {
             await expect(hhTokenVesting.connect(admin).revoke(scheduleId)).to.be.reverted;
         });
 
-        it("Should revert when withdraw only Multisign", async () => {
+        it("Should revert when withdraw only admin", async () => {
             await expect(
                 hhTokenVesting.connect(addr1).withdraw(addr1.address, 1),
-            ).to.be.revertedWith("TokenVesting: only multi sign wallet");
+            ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should revert when withdraw - not enough withdrawable funds", async () => {
@@ -355,14 +400,14 @@ describe("TokenVesting contract", () => {
                 (await hhTokenVesting.getWithdrawableAmount()) + ethers.parseEther("0.0005");
 
             await expect(
-                hhTokenVesting.connect(multiSignWallet).withdraw(addr1.address, amount),
+                hhTokenVesting.connect(admin).withdraw(addr1.address, amount),
             ).to.be.revertedWith("TokenVesting: not enough withdrawable funds");
         });
 
         it("Should withdraw", async () => {
             const amount = ethers.parseEther("0.0005");
 
-            await hhTokenVesting.connect(multiSignWallet).withdraw(owner.address, amount);
+            await hhTokenVesting.connect(admin).withdraw(owner.address, amount);
 
             await expect(await erc20Token.balanceOf(owner.address)).to.be.equal(amount);
         });
@@ -464,7 +509,7 @@ describe("TokenVesting contract", () => {
                 },
             ];
 
-            await hhTokenVesting.createVestingSchedules(vestingInfo);
+            await hhTokenVesting.createVestingScheduleBatch(vestingInfo);
 
             const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
@@ -508,7 +553,7 @@ describe("TokenVesting contract", () => {
                 },
             ];
 
-            await hhTokenVesting.createVestingSchedules(vestingInfo);
+            await hhTokenVesting.createVestingScheduleBatch(vestingInfo);
 
             const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
@@ -551,7 +596,7 @@ describe("TokenVesting contract", () => {
                 },
             ];
 
-            await hhTokenVesting.createVestingSchedules(vestingInfo);
+            await hhTokenVesting.createVestingScheduleBatch(vestingInfo);
 
             const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
