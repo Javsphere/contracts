@@ -25,7 +25,7 @@ async function main() {
     let newImplementationAddress = await upgrades.erc1967.getImplementationAddress(PROXY);
 
     try {
-        await run("verify:verify", { address: newImplementationAddress });
+        await run("verify:verify", { address: PROXY });
     } catch (error) {
         if (!error.message.includes("Reason: Already Verified")) {
             console.error(error);

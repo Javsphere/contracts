@@ -5,35 +5,36 @@ pragma solidity ^0.8.16;
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./base/BaseUpgradable.sol";
+import "../interfaces/ITokenVesting.sol";
+import "../interfaces/IVanillaPair.sol";
+import "../base/BaseUpgradable.sol";
 
-contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
+contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
-    IERC20 public token;
     bool public isSaleActive;
-    address public multiSignWallet;
+    address public usdtAddress;
+    address public pairAddress;
 
-    uint256 public startTokenPrice; // price in native tokens. E.g
+    uint256 public availableTokens; // availableTokens * 1e18
+    uint256 public startTokenPrice; // price in usd. E.g
     uint256 public startBlock;
     uint256 public incPricePerBlock;
 
     /* ========== EVENTS ========== */
-    event SetMultiSignWalletAddress(address indexed _address);
+    event SetUSDTAddress(address indexed _address);
+    event SetPairAddress(address indexed _address);
     event SetSaleActive(bool indexed activeSale);
     event SetStartTokenPrice(uint256 indexed startBlock);
     event SetStartBlock(uint256 indexed price);
+    event SetAvailableTokens(uint256 indexed availableTokens);
     event SetIncPricePerBlock(uint256 indexed incPricePerBlock);
     event TokensPurchased(address indexed _address, uint256 amount);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
+    event WithdrawEth(address indexed to, uint256 amount);
 
     modifier onlyActive() {
         require(isSaleActive, "CommunityLaunch: contract is not available right now");
-        _;
-    }
-
-    modifier onlyMultiSign() {
-        require(msg.sender == multiSignWallet, "CommunityLaunch: only multi sign wallet");
         _;
     }
 
@@ -43,14 +44,17 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     function initialize(
-        address _tokenAddress,
-        address _multiSignWallet,
+        address _usdtAddress,
+        address _pairAddress,
+        uint256 _availableTokens,
         uint256 _startTokenPrice,
         uint256 _incPricePerBlock
     ) external initializer {
-        token = IERC20(_tokenAddress);
-        multiSignWallet = _multiSignWallet;
+        usdtAddress = _usdtAddress;
+        pairAddress = _pairAddress;
+
         isSaleActive = false;
+        availableTokens = _availableTokens;
         startTokenPrice = _startTokenPrice;
         incPricePerBlock = _incPricePerBlock;
 
@@ -58,10 +62,16 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         __ReentrancyGuard_init();
     }
 
-    function setMultiSignWalletAddress(address _address) external onlyAdmin {
-        multiSignWallet = _address;
+    function setUSDTAddress(address _address) external onlyAdmin {
+        usdtAddress = _address;
 
-        emit SetMultiSignWalletAddress(_address);
+        emit SetUSDTAddress(_address);
+    }
+
+    function setPairAddress(address _address) external onlyAdmin {
+        pairAddress = _address;
+
+        emit SetPairAddress(_address);
     }
 
     function setSaleActive(bool _status) external onlyAdmin {
@@ -82,6 +92,12 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit SetStartBlock(_startBlock);
     }
 
+    function setAvailableTokens(uint256 _availableTokens) external onlyAdmin {
+        availableTokens = _availableTokens;
+
+        emit SetAvailableTokens(_availableTokens);
+    }
+
     function setIncPricePerBlock(uint256 _incPricePerBlock) external onlyAdmin {
         incPricePerBlock = _incPricePerBlock;
 
@@ -99,23 +115,38 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
      * @notice Functon to get tokens balance
      */
     function tokensBalance() external view returns (uint256) {
-        return token.balanceOf(address(this));
+        return availableTokens;
     }
 
     /**
      * @notice Functon to buy JAV tokens with native tokens
      */
-    function buy() external payable onlyActive nonReentrant {
+    function buy(uint256 _amountIn) external payable onlyActive nonReentrant {
         require(block.number >= startBlock, "CommunityLaunch: Need wait startBlock");
-        uint256 _amount = msg.value / _tokenPrice();
         require(
-            token.balanceOf(address(this)) >= _amount,
-            "CommunityLaunch: Invalid amount for purchase"
+            _amountIn == 0 || msg.value == 0,
+            "CommunityLaunch: Cannot pass both DFI and ERC-20 assets"
         );
 
-        token.safeTransfer(msg.sender, _amount);
+        uint256 usdAmount = 0;
 
-        emit TokensPurchased(msg.sender, _amount);
+        if (_amountIn != 0) {
+            require(
+                IERC20(usdtAddress).balanceOf(msg.sender) >= _amountIn,
+                "CommunityLaunch: invalid amount"
+            );
+            IERC20(usdtAddress).safeTransferFrom(msg.sender, address(this), _amountIn);
+            usdAmount = _amountIn;
+        } else {
+            usdAmount = _getTokenPrice(msg.value);
+        }
+
+        uint256 _tokensAmount = (usdAmount * 1e18) / _tokenPrice();
+        require(availableTokens >= _tokensAmount, "CommunityLaunch: Invalid amount for purchase");
+
+        availableTokens -= _tokensAmount;
+
+        emit TokensPurchased(msg.sender, _tokensAmount);
     }
 
     /**
@@ -124,7 +155,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
      * @param _to recipient address
      * @param _amount amount
      */
-    function withdraw(address _token, address _to, uint256 _amount) external onlyMultiSign {
+    function withdraw(address _token, address _to, uint256 _amount) external onlyAdmin {
         require(
             IERC20(_token).balanceOf(address(this)) >= _amount,
             "CommunityLaunch: Invalid amount"
@@ -134,10 +165,32 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit Withdraw(_token, _to, _amount);
     }
 
+    /**
+     * @notice Functon to withdraw amount eth
+     * @param _to recipient address
+     * @param _amount amount
+     */
+    function withdrawEth(address payable _to, uint256 _amount) external onlyAdmin {
+        require(address(this).balance >= _amount, "CommunityLaunch: Invalid amount");
+
+        _to.transfer(_amount);
+
+        emit WithdrawEth(_to, _amount);
+    }
+
     function _tokenPrice() private view returns (uint256) {
         if (block.number < startBlock) {
             return startTokenPrice;
         }
         return ((block.number - startBlock) * incPricePerBlock) + startTokenPrice;
+    }
+
+    function _getTokenPrice(uint256 _amount) private view returns (uint256) {
+        (uint reserve0, uint reserve1, ) = IVanillaPair(pairAddress).getReserves();
+        if (IVanillaPair(pairAddress).token0() == usdtAddress) {
+            return (_amount * reserve0) / reserve1;
+        } else {
+            return (_amount * reserve1) / reserve0;
+        }
     }
 }
