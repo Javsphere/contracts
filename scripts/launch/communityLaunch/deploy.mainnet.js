@@ -9,7 +9,9 @@ async function main() {
         Contract,
         [
             "0x0000000000000000000000000000000000000000", //_tokenAddress
-            "0x0000000000000000000000000000000000000000", //_multiSignWallet
+            "0x0000000000000000000000000000000000000000", //_usdtAddress
+            "0x0000000000000000000000000000000000000000", //_pairAddress
+            "0x0000000000000000000000000000000000000000", //_vesting
             0, //_startTokenPrice
             0, //_incPricePerBlock
         ],

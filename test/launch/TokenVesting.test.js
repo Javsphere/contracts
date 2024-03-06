@@ -91,9 +91,9 @@ describe("TokenVesting contract", () => {
         it("Should addAllowedAddress", async () => {
             await hhTokenVesting.addAllowedAddress(admin.address);
 
-            const allowedAddresses = await hhTokenVesting.getAllowedAddresses()
+            const allowedAddresses = await hhTokenVesting.getAllowedAddresses();
 
-            await expect(allowedAddresses[1]).to.be.equal(admin.address)
+            await expect(allowedAddresses[1]).to.be.equal(admin.address);
         });
 
         it("Should revert when removeAllowedAddress", async () => {
@@ -126,7 +126,17 @@ describe("TokenVesting contract", () => {
 
         it("Should revert when create vesting schedule - not allowed address", async () => {
             await expect(
-                hhTokenVesting.connect(addr1).createVestingSchedule("0x0000000000000000000000000000000000000000", 1, 1, 1, 1, true, 1),
+                hhTokenVesting
+                    .connect(addr1)
+                    .createVestingSchedule(
+                        "0x0000000000000000000000000000000000000000",
+                        1,
+                        1,
+                        1,
+                        1,
+                        true,
+                        1,
+                    ),
             ).to.be.revertedWith("TokenVesting: only allowed addresses");
         });
 
@@ -263,7 +273,6 @@ describe("TokenVesting contract", () => {
             await expect(vestingScheduleForHolder.revoked).to.be.equal(false);
         });
 
-
         it("Should create vesting schedule", async () => {
             const beneficiary = addr1.address;
             const start = await time.latest();
@@ -275,7 +284,15 @@ describe("TokenVesting contract", () => {
 
             const currentVestingId = await hhTokenVesting.currentVestingId();
 
-            await hhTokenVesting.createVestingSchedule(beneficiary, start, cliff, duration, slicePeriodSeconds, revocable, amount);
+            await hhTokenVesting.createVestingSchedule(
+                beneficiary,
+                start,
+                cliff,
+                duration,
+                slicePeriodSeconds,
+                revocable,
+                amount,
+            );
 
             const vestingScheduleForHolder = await hhTokenVesting.getLastVestingScheduleForHolder(
                 beneficiary,
