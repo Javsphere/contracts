@@ -47,11 +47,13 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
     EnumerableSet.UintSet private _openOrders;
     EnumerableSet.AddressSet private _tokens;
 
-    address public botAddress;
+    address public botAddress; // deprecated
     address public treasuryAddress;
     uint256 public totalOrders;
     uint256 public totalAmount;
     uint256 public fee;
+
+    EnumerableSet.AddressSet private _bots;
 
     /* ========== EVENTS ========== */
     event SetBotAddress(address indexed _address);
@@ -72,9 +74,11 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
         string _tokenName,
         JavMarket.OrderStatus _status
     );
+    event AddBotAddress(address indexed _address);
+    event RemoveBotAddress(address indexed _address);
 
     modifier onlyBot() {
-        require(msg.sender == botAddress, "JavMarket: only bot");
+        require(_bots.contains(msg.sender), "JavMarket: only bot");
         _;
     }
 
@@ -94,22 +98,16 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
         address _treasuryAddress,
         uint256 _fee
     ) external initializer {
-        botAddress = _botAddress;
         treasuryAddress = _treasuryAddress;
         fee = _fee;
 
         for (uint256 i = 0; i < _tokensAddresses.length; ++i) {
             _tokens.add(_tokensAddresses[i]);
         }
+        _bots.add(_botAddress);
 
         __Base_init();
         __ReentrancyGuard_init();
-    }
-
-    function setBotAddress(address _address) external onlyAdmin {
-        botAddress = _address;
-
-        emit SetBotAddress(_address);
     }
 
     function setTreasuryAddress(address _address) external onlyAdmin {
@@ -122,6 +120,18 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
         fee = _fee;
 
         emit SetFee(_fee);
+    }
+
+    function addBotAddress(address _address) external onlyAdmin {
+        _bots.add(_address);
+
+        emit AddBotAddress(_address);
+    }
+
+    function removeBotAddress(address _address) external onlyAdmin {
+        _bots.remove(_address);
+
+        emit RemoveBotAddress(_address);
     }
 
     function addToken(address _address) external onlyAdmin {
@@ -138,6 +148,10 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
 
     function getTokens() external view returns (address[] memory) {
         return _tokens.values();
+    }
+
+    function getBotsAddresses() external view returns (address[] memory) {
+        return _bots.values();
     }
 
     /**
@@ -222,14 +236,20 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
 
     /**
      * @notice Function to withdraw tokens from contract by bot
+     * @param _tokenId: tokenId
      * @param _amount: amount
+     * @param _withdrawAddress: address for withdraw
      */
-    function withdraw(uint256 _tokenId, uint256 _amount) external validTokenId(_tokenId) onlyBot {
+    function withdraw(
+        uint256 _tokenId,
+        uint256 _amount,
+        address _withdrawAddress
+    ) external validTokenId(_tokenId) onlyBot {
         IERC20 token = IERC20(_tokens.at(_tokenId));
         require(token.balanceOf(address(this)) >= _amount, "JavMarket: invalid amount");
 
-        token.safeTransfer(botAddress, _amount);
+        token.safeTransfer(_withdrawAddress, _amount);
 
-        emit Withdraw(botAddress, _amount);
+        emit Withdraw(_withdrawAddress, _amount);
     }
 }

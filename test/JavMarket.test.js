@@ -47,7 +47,7 @@ describe("JavMarket contract", () => {
         });
 
         it("Should set the right bot address", async () => {
-            await expect(await hhJavMarket.botAddress()).to.equal(bot.address);
+            await expect((await hhJavMarket.getBotsAddresses())[0]).to.equal(bot.address);
         });
 
         it("Should set the right treasuryAddress address", async () => {
@@ -96,16 +96,35 @@ describe("JavMarket contract", () => {
             await expect(await hhJavMarket.adminAddress()).to.equal(owner.address);
         });
 
-        it("Should revert when set the bot address", async () => {
-            await expect(hhJavMarket.connect(addr1).setBotAddress(bot.address)).to.be.revertedWith(
+        it("Should revert when addBotAddress", async () => {
+            await expect(hhJavMarket.connect(addr1).addBotAddress(bot.address)).to.be.revertedWith(
                 ADMIN_ERROR,
             );
         });
 
-        it("Should set the bot address", async () => {
-            await hhJavMarket.setBotAddress(bot.address);
+        it("Should addBotAddress", async () => {
+            await hhJavMarket.addBotAddress(addr2.address);
 
-            await expect(await hhJavMarket.botAddress()).to.equal(bot.address);
+            const addresses = await hhJavMarket.getBotsAddresses();
+
+            await expect(addresses.length).to.equal(2);
+            await expect(addresses[0]).to.equal(bot.address);
+            await expect(addresses[1]).to.equal(addr2.address);
+        });
+
+        it("Should revert when removeBotAddress", async () => {
+            await expect(hhJavMarket.connect(addr1).removeBotAddress(bot.address)).to.be.revertedWith(
+                ADMIN_ERROR,
+            );
+        });
+
+        it("Should removeBotAddress", async () => {
+            await hhJavMarket.removeBotAddress(addr2.address);
+
+            const addresses = await hhJavMarket.getBotsAddresses();
+
+            await expect(addresses.length).to.equal(1);
+            await expect(addresses[0]).to.equal(bot.address);
         });
 
         it("Should revert when set the treasury address", async () => {
@@ -249,26 +268,26 @@ describe("JavMarket contract", () => {
         });
 
         it("Should revert when withdraw - only bot error", async () => {
-            await expect(hhJavMarket.connect(addr1).withdraw(0, 1)).to.be.revertedWith(
+            await expect(hhJavMarket.connect(addr1).withdraw(0, 1, addr3.address)).to.be.revertedWith(
                 "JavMarket: only bot",
             );
         });
 
         it("Should revert when withdraw - invalid amount", async () => {
             await expect(
-                hhJavMarket.connect(bot).withdraw(0, ethers.parseEther("5")),
+                hhJavMarket.connect(bot).withdraw(0, ethers.parseEther("5"), addr3.address),
             ).to.be.revertedWith("JavMarket: invalid amount");
         });
 
         it("Should withdraw", async () => {
             const contractBalanceBefore = await erc20Token.balanceOf(hhJavMarket.target);
-            const botBalanceBefore = await erc20Token.balanceOf(bot.address);
+            const balanceBefore = await erc20Token.balanceOf(addr3.address);
 
-            await hhJavMarket.connect(bot).withdraw(0, contractBalanceBefore);
+            await hhJavMarket.connect(bot).withdraw(0, contractBalanceBefore, addr3.address);
 
             await expect(await erc20Token.balanceOf(hhJavMarket.target)).to.be.equal(0);
-            await expect(await erc20Token.balanceOf(bot.address)).to.be.equal(
-                botBalanceBefore + contractBalanceBefore,
+            await expect(await erc20Token.balanceOf(addr3.address)).to.be.equal(
+                balanceBefore + contractBalanceBefore,
             );
         });
     });
