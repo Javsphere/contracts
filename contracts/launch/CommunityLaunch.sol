@@ -5,6 +5,7 @@ pragma solidity ^0.8.16;
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../interfaces/IStateRelayer.sol";
 import "../interfaces/ITokenVesting.sol";
 import "../interfaces/IVanillaPair.sol";
 import "../base/BaseUpgradable.sol";
@@ -26,9 +27,11 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     VestingParams public vestingParams;
     IERC20 public token;
     bool public isSaleActive;
+    address public botAddress;
     address public vestingAddress;
     address public usdtAddress;
     address public pairAddress;
+    address public stateRelayer;
 
     uint256 public startTokenPrice; // price in usd. E.g
     uint256 public startBlock;
@@ -36,6 +39,8 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
 
     /* ========== EVENTS ========== */
     event SetVestingAddress(address indexed _address);
+    event SetStateRelayer(address indexed _address);
+    event SetBotAddress(address indexed _address);
     event SetUSDTAddress(address indexed _address);
     event SetPairAddress(address indexed _address);
     event SetVestingParams(
@@ -48,12 +53,17 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     event SetStartTokenPrice(uint256 indexed startBlock);
     event SetStartBlock(uint256 indexed price);
     event SetIncPricePerBlock(uint256 indexed incPricePerBlock);
-    event TokensPurchased(address indexed _address, uint256 amount);
+    event TokensPurchased(address indexed _address, address indexed _referrer, uint256 amount);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event WithdrawDFI(address indexed to, uint256 amount);
 
     modifier onlyActive() {
         require(isSaleActive, "CommunityLaunch: contract is not available right now");
+        _;
+    }
+
+    modifier onlyBot() {
+        require(msg.sender == botAddress, "CommunityLaunch: only bot");
         _;
     }
 
@@ -64,6 +74,8 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
 
     function initialize(
         address _tokenAddress,
+        address _stateRelayer,
+        address _botAddress,
         address _usdtAddress,
         address _pairAddress,
         address _vesting,
@@ -72,6 +84,8 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         VestingParams memory _vestingParams
     ) external initializer {
         token = IERC20(_tokenAddress);
+        botAddress = _botAddress;
+        stateRelayer = _stateRelayer;
         vestingAddress = _vesting;
         usdtAddress = _usdtAddress;
         pairAddress = _pairAddress;
@@ -94,6 +108,18 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             _vestingParams.duration,
             _vestingParams.slicePeriodSeconds
         );
+    }
+
+    function setBotAddress(address _address) external onlyAdmin {
+        botAddress = _address;
+
+        emit SetBotAddress(_address);
+    }
+
+    function setStateRelayer(address _address) external onlyAdmin {
+        stateRelayer = _address;
+
+        emit SetStateRelayer(_address);
     }
 
     function setVestingAddress(address _address) external onlyAdmin {
@@ -153,9 +179,16 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     /**
-     * @notice Functon to buy JAV tokens with native tokens
+     * @notice Functon to buy JAV tokens with native tokens/dusd
+     * @param _referrer _referrer address
+     * @param _amountIn dusd amount
+     * @param _isEqualUSD is 1 dusd = 1 $
      */
-    function buy(uint256 _amountIn) external payable onlyActive nonReentrant {
+    function buy(
+        address _referrer,
+        uint256 _amountIn,
+        bool _isEqualUSD
+    ) external payable onlyActive nonReentrant {
         require(block.number >= startBlock, "CommunityLaunch: Need wait startBlock");
         require(
             _amountIn == 0 || msg.value == 0,
@@ -163,6 +196,9 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         );
 
         uint256 usdAmount = 0;
+        uint128 cliff = vestingParams.cliff;
+        uint128 duration = vestingParams.duration;
+        uint128 slicePeriodSeconds = vestingParams.slicePeriodSeconds;
 
         if (_amountIn != 0) {
             require(
@@ -170,9 +206,17 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
                 "CommunityLaunch: invalid amount"
             );
             IERC20(usdtAddress).safeTransferFrom(msg.sender, address(this), _amountIn);
-            usdAmount = _amountIn;
+            if (_isEqualUSD) {
+                usdAmount = _amountIn;
+                cliff = cliff * 2;
+                duration = duration * 2;
+                slicePeriodSeconds = slicePeriodSeconds * 2;
+            } else {
+                usdAmount = _getDUSDPrice(_amountIn);
+            }
         } else {
-            usdAmount = _getTokenPrice(msg.value);
+            uint256 _dusdAmount = _getTokenPrice(msg.value);
+            usdAmount = _getDUSDPrice(_dusdAmount);
         }
 
         uint256 _tokensAmount = (usdAmount * 1e18) / _tokenPrice();
@@ -181,9 +225,34 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             "CommunityLaunch: Invalid amount for purchase"
         );
 
-        _createVesting(msg.sender, uint128(_tokensAmount));
+        _createVesting(
+            msg.sender,
+            uint128(_tokensAmount),
+            vestingParams.start,
+            cliff,
+            duration,
+            slicePeriodSeconds
+        );
 
-        emit TokensPurchased(msg.sender, _tokensAmount);
+        emit TokensPurchased(msg.sender, _referrer, _tokensAmount);
+    }
+
+    function simulateBuy(
+        address _beneficiary,
+        address _referrer,
+        uint128 _amount,
+        uint128 _start,
+        uint128 _cliff,
+        uint128 _duration,
+        uint128 _slicePeriodSeconds
+    ) external onlyActive onlyBot {
+        require(
+            token.balanceOf(address(this)) >= _amount,
+            "CommunityLaunch: Invalid amount for purchase"
+        );
+        _createVesting(_beneficiary, _amount, _start, _cliff, _duration, _slicePeriodSeconds);
+
+        emit TokensPurchased(_beneficiary, _referrer, _amount);
     }
 
     /**
@@ -222,25 +291,39 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         return ((block.number - startBlock) * incPricePerBlock) + startTokenPrice;
     }
 
-    function _createVesting(address _beneficiary, uint128 _amount) private {
+    function _createVesting(
+        address _beneficiary,
+        uint128 _amount,
+        uint128 _start,
+        uint128 _cliff,
+        uint128 _duration,
+        uint128 _slicePeriodSeconds
+    ) private {
         token.safeTransfer(vestingAddress, _amount);
         ITokenVesting(vestingAddress).createVestingSchedule(
             _beneficiary,
-            vestingParams.start,
-            vestingParams.cliff,
-            vestingParams.duration,
-            vestingParams.slicePeriodSeconds,
+            _start,
+            _cliff,
+            _duration,
+            _slicePeriodSeconds,
             true,
             _amount
         );
     }
 
     function _getTokenPrice(uint256 _amount) private view returns (uint256) {
-        (uint reserve0, uint reserve1, ) = IVanillaPair(pairAddress).getReserves();
+        (uint reserve0, uint reserve1,) = IVanillaPair(pairAddress).getReserves();
         if (IVanillaPair(pairAddress).token0() == usdtAddress) {
             return (_amount * reserve0) / reserve1;
         } else {
             return (_amount * reserve1) / reserve0;
         }
+    }
+
+    function _getDUSDPrice(uint256 _amount) private view returns (uint256) {
+        (, IStateRelayer.DEXInfo memory dex) = IStateRelayer(stateRelayer).getDexPairInfo(
+            "DUSD-DFI"
+        );
+        return (_amount * 1e18) / dex.primaryTokenPrice;
     }
 }

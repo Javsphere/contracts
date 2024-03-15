@@ -64,8 +64,16 @@ async function deployUniswapFixture() {
     return [WETH, uniswapV2Factory, uniswapV2Router02, UniswapV2PairContract];
 }
 
+async function deployStateRelayerFixture() {
+    const stateRelayerFactory = await ethers.getContractFactory("StateRelayer");
+    const stateRelayer = await stateRelayerFactory.deploy();
+    await stateRelayer.waitForDeployment();
+    return stateRelayer;
+}
+
 module.exports = {
     deployTokenFixture,
     deployToken2Fixture,
     deployUniswapFixture,
+    deployStateRelayerFixture,
 };
