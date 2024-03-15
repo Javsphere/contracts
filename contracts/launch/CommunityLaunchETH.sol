@@ -29,7 +29,7 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
     event SetStartBlock(uint256 indexed price);
     event SetAvailableTokens(uint256 indexed availableTokens);
     event SetIncPricePerBlock(uint256 indexed incPricePerBlock);
-    event TokensPurchased(address indexed _address, uint256 amount);
+    event TokensPurchased(address indexed _address, address indexed _referrer, uint256 amount);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event WithdrawEth(address indexed to, uint256 amount);
 
@@ -121,7 +121,7 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
     /**
      * @notice Functon to buy JAV tokens with native tokens
      */
-    function buy(uint256 _amountIn) external payable onlyActive nonReentrant {
+    function buy(address _referrer, uint256 _amountIn) external payable onlyActive nonReentrant {
         require(block.number >= startBlock, "CommunityLaunch: Need wait startBlock");
         require(
             _amountIn == 0 || msg.value == 0,
@@ -146,7 +146,7 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
 
         availableTokens -= _tokensAmount;
 
-        emit TokensPurchased(msg.sender, _tokensAmount);
+        emit TokensPurchased(msg.sender, _referrer, _tokensAmount);
     }
 
     /**

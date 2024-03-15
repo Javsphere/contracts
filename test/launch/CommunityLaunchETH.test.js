@@ -248,7 +248,7 @@ describe("CommunityLaunchETH contract", () => {
             await hhCommunityLaunch.setSaleActive(false);
 
             await expect(
-                hhCommunityLaunch.connect(addr1).buy(0, {
+                hhCommunityLaunch.connect(addr1).buy(addr1.address, 0, {
                     value: ethers.parseEther("1.0"),
                 }),
             ).to.be.revertedWith(saleActiveError);
@@ -258,7 +258,7 @@ describe("CommunityLaunchETH contract", () => {
 
         it("Should revert when buy with block.number >= startBlock", async () => {
             await expect(
-                hhCommunityLaunch.connect(addr1).buy(0, {
+                hhCommunityLaunch.connect(addr1).buy(addr1.address, 0, {
                     value: ethers.parseEther("1.0"),
                 }),
             ).to.be.revertedWith("CommunityLaunch: Need wait startBlock");
@@ -276,12 +276,12 @@ describe("CommunityLaunchETH contract", () => {
             const amount = ethers.parseEther((usdtAmount / tokenPrice).toString());
 
             await expect(
-                hhCommunityLaunch.connect(addr1).buy(usdtAmount, {
+                hhCommunityLaunch.connect(addr1).buy(addr2.address, usdtAmount, {
                     value: 0,
                 }),
             )
                 .emit(hhCommunityLaunch, "TokensPurchased")
-                .withArgs(addr1.address, amount);
+                .withArgs(addr1.address, addr2.address, amount);
 
             await expect(await erc20Token.balanceOf(hhCommunityLaunch.target)).to.be.equal(
                 usdtAmount,
@@ -297,12 +297,12 @@ describe("CommunityLaunchETH contract", () => {
             const amount = ethers.parseEther("5");
 
             await expect(
-                hhCommunityLaunch.connect(addr1).buy(0, {
+                hhCommunityLaunch.connect(addr1).buy(addr2.address, 0, {
                     value: buyNativeAmount,
                 }),
             )
                 .emit(hhCommunityLaunch, "TokensPurchased")
-                .withArgs(addr1.address, amount);
+                .withArgs(addr1.address, addr2.address, amount);
 
             await expect(await ethers.provider.getBalance(hhCommunityLaunch.target)).to.be.equal(
                 buyNativeAmount,
