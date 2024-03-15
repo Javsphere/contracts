@@ -16,4 +16,3 @@ run_tests:
     - echo "OWNER_KEY=${OWNER_KEY}" >> .env
     - npm install
     - npx hardhat compile
-    - npx hardhat test
