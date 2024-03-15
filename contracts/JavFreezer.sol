@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.16;
+
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./RewardRateConfigurable.sol";
 import "./base/BaseUpgradable.sol";
+import "./interfaces/IJavFreezer.sol";
 
-contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConfigurable {
+contract JavFreezer is
+    IJavFreezer,
+    BaseUpgradable,
+    ReentrancyGuardUpgradeable,
+    RewardRateConfigurable
+{
     using SafeERC20 for IERC20;
 
     /**
@@ -54,6 +61,8 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
         uint256 accRewardPerShare;
     }
 
+    address public vestingAddress;
+
     PoolInfo[] public poolInfo;
     mapping(uint256 => uint256) public lockPeriod;
     mapping(address => mapping(uint256 => UserInfo)) public userInfo;
@@ -67,6 +76,7 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
         uint256 _accRewardPerShare
     );
     event SetLockPeriod(uint256 indexed _lockId, uint256 _duration);
+    event SetVestingAddress(address indexed _address);
     event ClaimUserReward(address indexed user, uint256 amount);
     event Deposit(address indexed user, uint256 amount, uint256 indexed period);
     event Withdraw(address indexed user, uint256 amount, uint256 indexed period);
@@ -81,6 +91,11 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
         _;
     }
 
+    modifier onlyVesting() {
+        require(msg.sender == vestingAddress, "JavFreezer: only vesting");
+        _;
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -88,8 +103,11 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
 
     function initialize(
         uint256 _rewardPerBlock,
-        uint256 _rewardUpdateBlocksInterval
+        uint256 _rewardUpdateBlocksInterval,
+        address _vestingAddress
     ) external initializer {
+        vestingAddress = _vestingAddress;
+
         __Base_init();
         __ReentrancyGuard_init();
         __RewardRateConfigurable_init(_rewardPerBlock, _rewardUpdateBlocksInterval);
@@ -128,6 +146,12 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
         uint256 updateBlocksInterval
     ) external onlyAdmin {
         _setRewardConfiguration(rewardPerBlock, updateBlocksInterval);
+    }
+
+    function setVestingAddress(address _address) external onlyAdmin {
+        vestingAddress = _address;
+
+        emit SetVestingAddress(_address);
     }
 
     function setPoolInfo(
@@ -169,6 +193,79 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
     }
 
     /**
+     * @notice Deposit in given pool from vesting
+     * @param _holder: holder address
+     * @param _pid: pool id
+     * @param _amount: Amount of want token that user wants to deposit
+     */
+    function depositVesting(
+        address _holder,
+        uint256 _pid,
+        uint256 _amount,
+        uint256 _depositTimestamp,
+        uint256 _withdrawalTimestamp
+    ) external nonReentrant whenNotPaused poolExists(_pid) onlyVesting {
+        UserInfo storage user = userInfo[_holder][_pid];
+        PoolInfo storage pool = poolInfo[_pid];
+        updatePool(_pid);
+
+        user.totalDepositTokens += _amount;
+        pool.totalShares += _amount;
+
+        uint256 rewardDebt = (_amount * (pool.accRewardPerShare)) / (1e18);
+        UserDeposit memory depositDetails = UserDeposit({
+            depositTokens: _amount,
+            stakePeriod: lockPeriod[0],
+            depositTimestamp: _depositTimestamp,
+            withdrawalTimestamp: _withdrawalTimestamp,
+            is_finished: false,
+            rewardsClaimed: 0,
+            rewardDebt: rewardDebt
+        });
+        userDeposits[_holder][_pid].push(depositDetails);
+        user.depositId = userDeposits[_holder][_pid].length;
+
+        emit Deposit(_holder, _amount, 0);
+    }
+
+    /**
+     * @notice Withdraw amount from freeze schedule
+     * @param _holder: holder address
+     * @param _pid: pool id
+     * @param _depositId: deposit id
+     * @param _amount: Amount of want token that user wants to deposit
+     */
+    function withdrawVesting(
+        address _holder,
+        uint256 _pid,
+        uint256 _depositId,
+        uint256 _amount
+    ) external nonReentrant whenNotPaused poolExists(_pid) onlyVesting {
+        updatePool(_pid);
+        UserInfo storage user = userInfo[_holder][_pid];
+        PoolInfo storage pool = poolInfo[_pid];
+        UserDeposit storage depositDetails = userDeposits[_holder][_pid][_depositId];
+        require(depositDetails.depositTokens >= _amount, "JavFreezer: invalid withdraw amount");
+        require(!depositDetails.is_finished, "JavFreezer: already withdrawn");
+
+        _claim(_holder, _pid, _depositId);
+        depositDetails.depositTokens -= _amount;
+        depositDetails.rewardDebt =
+            (depositDetails.depositTokens * (pool.accRewardPerShare)) /
+            (1e18);
+
+        user.totalDepositTokens -= _amount;
+        pool.totalShares -= _amount;
+
+        pool.baseToken.safeTransfer(_holder, _amount);
+
+        if (depositDetails.depositTokens == 0) {
+            depositDetails.is_finished = true;
+        }
+        emit Withdraw(_holder, _amount, depositDetails.stakePeriod);
+    }
+
+    /**
      * @notice withdraw one claim
      * @param _pid: pool id.
      * @param _depositId: is the id of user element.
@@ -185,7 +282,7 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
      */
     function claim(uint256 _pid, uint256 _depositId) external nonReentrant poolExists(_pid) {
         updatePool(_pid);
-        _claim(_pid, _depositId);
+        _claim(msg.sender, _pid, _depositId);
     }
 
     /**
@@ -198,8 +295,14 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
             ++_depositId
         ) {
             updatePool(_pid);
-            _claim(_pid, _depositId);
+            _claim(msg.sender, _pid, _depositId);
         }
+    }
+
+    function getUserLastDepositId(uint256 _pid, address _user) external view returns (uint256) {
+        UserInfo memory user = userInfo[_user][_pid];
+
+        return user.depositId - 1;
     }
 
     /**
@@ -300,7 +403,7 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
         );
         require(!depositDetails.is_finished, "JavFreezer: already withdrawn");
 
-        _claim(_pid, _depositId);
+        _claim(msg.sender, _pid, _depositId);
         depositDetails.rewardDebt =
             (depositDetails.depositTokens * (pool.accRewardPerShare)) /
             (1e18);
@@ -318,12 +421,12 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
    Should approve allowance before initiating
    accepts _depositId - is the id of user element.
    */
-    function _claim(uint256 _pid, uint256 _depositId) private {
-        UserInfo storage user = userInfo[msg.sender][_pid];
-        UserDeposit storage depositDetails = userDeposits[msg.sender][_pid][_depositId];
+    function _claim(address _user, uint256 _pid, uint256 _depositId) private {
+        UserInfo storage user = userInfo[_user][_pid];
+        UserDeposit storage depositDetails = userDeposits[_user][_pid][_depositId];
         PoolInfo memory pool = poolInfo[_pid];
 
-        uint256 pending = _getPendingRewards(_pid, _depositId, msg.sender);
+        uint256 pending = _getPendingRewards(_pid, _depositId, _user);
 
         if (pending > 0) {
             user.totalClaim += pending;
@@ -332,9 +435,9 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
                 (depositDetails.depositTokens * (pool.accRewardPerShare)) /
                 (1e18);
 
-            pool.rewardToken.safeTransfer(msg.sender, pending);
+            pool.rewardToken.safeTransfer(_user, pending);
 
-            emit ClaimUserReward(msg.sender, pending);
+            emit ClaimUserReward(_user, pending);
         }
     }
 
@@ -345,7 +448,7 @@ contract JavFreezer is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateCon
     ) private view returns (uint256) {
         UserDeposit memory depositDetails = userDeposits[_user][_pid][_depositId];
         PoolInfo memory pool = poolInfo[_pid];
-        if (depositDetails.is_finished) {
+        if (depositDetails.is_finished || block.number >= depositDetails.depositTimestamp) {
             return 0;
         }
 

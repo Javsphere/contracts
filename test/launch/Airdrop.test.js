@@ -15,9 +15,12 @@ describe("Airdrop contract", () => {
 
     async function deployVestingFixture() {
         const tokenVestingFactory = await ethers.getContractFactory("TokenVesting");
+        const freezerContractFactory = await ethers.getContractFactory("JavFreezerMock");
         const erc20Token = await loadFixture(deployTokenFixture);
+        const freezer = await freezerContractFactory.deploy();
+        await freezer.waitForDeployment();
 
-        const hhTokenVesting = await upgrades.deployProxy(tokenVestingFactory, [erc20Token.target], {
+        const hhTokenVesting = await upgrades.deployProxy(tokenVestingFactory, [freezer.target], {
             initializer: "initialize",
         });
 

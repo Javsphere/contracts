@@ -10,7 +10,6 @@ import "./interfaces/IVanillaRouter02.sol";
 import "./interfaces/IVanillaPair.sol";
 import "./RewardRateConfigurable.sol";
 import "./base/BaseUpgradable.sol";
-import "hardhat/console.sol";
 
 contract JavFarming is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConfigurable {
     using SafeERC20 for IERC20;

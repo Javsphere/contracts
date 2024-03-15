@@ -1,8 +1,8 @@
-const { expect } = require("chai");
-const { ethers, upgrades } = require("hardhat");
-const { loadFixture, time } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { ADMIN_ERROR } = require("../common/constanst");
-const { deployTokenFixture } = require("../common/mocks");
+const {expect} = require("chai");
+const {ethers, upgrades} = require("hardhat");
+const {loadFixture, time} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const {ADMIN_ERROR} = require("../common/constanst");
+const {deployTokenFixture} = require("../common/mocks");
 
 describe("TokenVesting contract", () => {
     let hhTokenVesting;
@@ -12,14 +12,30 @@ describe("TokenVesting contract", () => {
     let admin;
     let multiSignWallet;
     let erc20Token;
+    let freezerMock;
+
+    async function deployFreezerFixture() {
+        const javFreezerFactory = await ethers.getContractFactory("JavFreezer");
+        const javFreezer = await upgrades.deployProxy(
+            javFreezerFactory,
+            [ethers.parseEther("0.05"), 864000, "0x0000000000000000000000000000000000000000"],
+
+            {
+                initializer: "initialize",
+            },
+        );
+        await javFreezer.waitForDeployment();
+        return javFreezer
+    }
 
     before(async () => {
         const tokenVesting = await ethers.getContractFactory("TokenVesting");
         [owner, addr1, addr2, admin, multiSignWallet, ...addrs] = await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await loadFixture(deployTokenFixture);
+        freezerMock = await deployFreezerFixture()
 
-        hhTokenVesting = await upgrades.deployProxy(tokenVesting, [erc20Token.target], {
+        hhTokenVesting = await upgrades.deployProxy(tokenVesting, [freezerMock.target], {
             initializer: "initialize",
         });
     });
@@ -29,8 +45,8 @@ describe("TokenVesting contract", () => {
             await expect(await hhTokenVesting.owner()).to.equal(owner.address);
         });
 
-        it("Should set the right token address", async () => {
-            await expect(await hhTokenVesting.token()).to.equal(erc20Token.target);
+        it("Should set the right freezer address", async () => {
+            await expect(await hhTokenVesting.freezer()).to.equal(freezerMock.target);
         });
 
         it("Should set the right admin address", async () => {
@@ -46,6 +62,17 @@ describe("TokenVesting contract", () => {
 
             await erc20Token.mint(hhTokenVesting.target, tokenAmounts);
             await expect(await erc20Token.balanceOf(hhTokenVesting.target)).to.equal(tokenAmounts);
+        });
+
+        it("Should create freezer pool", async () => {
+            const lastRewardBlock = await ethers.provider.getBlockNumber();
+            const accRewardPerShare = ethers.parseEther("0.01");
+
+            await freezerMock.addPool(erc20Token.target, erc20Token.target, lastRewardBlock, accRewardPerShare);
+        });
+
+        it("Should set vesting address", async () => {
+            await freezerMock.setVestingAddress(hhTokenVesting.target);
         });
     });
 
@@ -80,6 +107,18 @@ describe("TokenVesting contract", () => {
             await hhTokenVesting.setAdminAddress(admin.address);
 
             await expect(await hhTokenVesting.adminAddress()).to.equal(admin.address);
+        });
+
+        it("Should revert when setFreezerAddress", async () => {
+            await expect(
+                hhTokenVesting.connect(addr1).setFreezerAddress(admin.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should setFreezerAddress", async () => {
+            await hhTokenVesting.setFreezerAddress(freezerMock.target);
+
+            await expect(await hhTokenVesting.freezer()).to.equal(freezerMock.target);
         });
 
         it("Should revert when addAllowedAddress", async () => {
@@ -138,27 +177,6 @@ describe("TokenVesting contract", () => {
                         1,
                     ),
             ).to.be.revertedWith("TokenVesting: only allowed addresses");
-        });
-
-        it("Should revert when create vesting schedule - balance < amount", async () => {
-            const amount =
-                (await erc20Token.balanceOf(hhTokenVesting.target)) + ethers.parseEther("1");
-            const vestingInfo = [
-                {
-                    beneficiary: "0x0000000000000000000000000000000000000000",
-                    start: 1,
-                    cliff: 1,
-                    duration: 1,
-                    slicePeriodSeconds: 1,
-                    revocable: true,
-                    amount: amount,
-                },
-            ];
-            await expect(
-                hhTokenVesting.connect(admin).createVestingScheduleBatch(vestingInfo),
-            ).to.be.revertedWith(
-                "TokenVesting: cannot create vesting schedule because not sufficient tokens",
-            );
         });
 
         it("Should revert when create vesting schedule - duration <= 0", async () => {
@@ -365,6 +383,8 @@ describe("TokenVesting contract", () => {
             const revocable = true;
             const amount = ethers.parseEther("0.0005");
 
+            await erc20Token.mint(freezerMock.target, ethers.parseEther("1"))
+
             const vestingInfo = [
                 {
                     beneficiary: beneficiary,
@@ -406,28 +426,6 @@ describe("TokenVesting contract", () => {
             await expect(hhTokenVesting.connect(admin).revoke(scheduleId)).to.be.reverted;
         });
 
-        it("Should revert when withdraw only admin", async () => {
-            await expect(
-                hhTokenVesting.connect(addr1).withdraw(addr1.address, 1),
-            ).to.be.revertedWith(ADMIN_ERROR);
-        });
-
-        it("Should revert when withdraw - not enough withdrawable funds", async () => {
-            const amount =
-                (await hhTokenVesting.getWithdrawableAmount()) + ethers.parseEther("0.0005");
-
-            await expect(
-                hhTokenVesting.connect(admin).withdraw(addr1.address, amount),
-            ).to.be.revertedWith("TokenVesting: not enough withdrawable funds");
-        });
-
-        it("Should withdraw", async () => {
-            const amount = ethers.parseEther("0.0005");
-
-            await hhTokenVesting.connect(admin).withdraw(owner.address, amount);
-
-            await expect(await erc20Token.balanceOf(owner.address)).to.be.equal(amount);
-        });
 
         it("Should revoke when release - not contract owner", async () => {
             const beneficiary = addr1.address;
@@ -485,15 +483,20 @@ describe("TokenVesting contract", () => {
                 beneficiary,
                 index,
             );
+            const depositId = await hhTokenVesting.vestingFreezeId(scheduleId);
+            const userDepositBefore = await freezerMock.userDeposits(beneficiary, 0, depositId);
 
             await hhTokenVesting.connect(addr1).release(scheduleId, releaseAmount);
             const vestingSchedule = await hhTokenVesting.getVestingScheduleByAddressAndIndex(
                 beneficiary,
                 index,
             );
+            const userDeposit = await freezerMock.userDeposits(beneficiary, 0, depositId);
 
             await expect(vestingSchedule.released).to.be.equal(releaseAmount);
-            await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(releaseAmount);
+            const claimAmount = userDeposit[4] - userDepositBefore[4];
+
+            await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(releaseAmount + claimAmount);
         });
 
         it("Should compute vesting schedule id for address and index", async () => {
@@ -660,15 +663,6 @@ describe("TokenVesting contract", () => {
             await expect(vestingScheduleForHolder.amountTotal).to.be.equal(amount);
             await expect(vestingScheduleForHolder.released).to.be.equal(amount);
             await expect(vestingScheduleForHolder.revoked).to.be.equal(false);
-        });
-
-        it("Should get right withdrawable amount", async () => {
-            const vestingSchedulesTotalAmount = await hhTokenVesting.vestingSchedulesTotalAmount();
-            const totalAmount = await erc20Token.balanceOf(hhTokenVesting.target);
-
-            await expect(await hhTokenVesting.getWithdrawableAmount()).to.be.equal(
-                totalAmount - vestingSchedulesTotalAmount,
-            );
         });
 
         it("Should get vesting schedule by address and index", async () => {

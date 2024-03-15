@@ -31,10 +31,3 @@ npx hardhat help
 npx hardhat coverage
 npx hardhat flatten
 ```
-
-### Deploy
-
-1. ProxyAdmin
-2. JavToken
-3. Remaining contracts
-

@@ -29,6 +29,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     bool public isSaleActive;
     address public botAddress;
     address public vestingAddress;
+    address public freezerAddress;
     address public usdtAddress;
     address public pairAddress;
     address public stateRelayer;
@@ -43,6 +44,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     event SetBotAddress(address indexed _address);
     event SetUSDTAddress(address indexed _address);
     event SetPairAddress(address indexed _address);
+    event SetFreezerAddress(address indexed _address);
     event SetVestingParams(
         uint128 _start,
         uint128 _cliff,
@@ -79,6 +81,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         address _usdtAddress,
         address _pairAddress,
         address _vesting,
+        address _freezer,
         uint256 _startTokenPrice,
         uint256 _incPricePerBlock,
         VestingParams memory _vestingParams
@@ -89,6 +92,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         vestingAddress = _vesting;
         usdtAddress = _usdtAddress;
         pairAddress = _pairAddress;
+        freezerAddress = _freezer;
 
         isSaleActive = false;
         startTokenPrice = _startTokenPrice;
@@ -138,6 +142,12 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         pairAddress = _address;
 
         emit SetPairAddress(_address);
+    }
+
+    function setFreezerAddress(address _address) external onlyAdmin {
+        freezerAddress = _address;
+
+        emit SetFreezerAddress(_address);
     }
 
     function setSaleActive(bool _status) external onlyAdmin {
@@ -299,7 +309,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint128 _duration,
         uint128 _slicePeriodSeconds
     ) private {
-        token.safeTransfer(vestingAddress, _amount);
+        token.safeTransfer(freezerAddress, _amount);
         ITokenVesting(vestingAddress).createVestingSchedule(
             _beneficiary,
             _start,
