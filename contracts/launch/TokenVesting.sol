@@ -4,13 +4,11 @@ pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../base/BaseUpgradable.sol";
+import "../interfaces/IJavFreezer.sol";
 import "../interfaces/ITokenVesting.sol";
 
 contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeable {
-    using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     struct VestingSchedule {
@@ -37,10 +35,11 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
 
     EnumerableSet.AddressSet private _allowedAddresses;
 
-    IERC20 public token;
+    address public freezer;
     uint256 public currentVestingId;
     uint256 public vestingSchedulesTotalAmount;
     mapping(bytes32 => VestingSchedule) public vestingSchedules;
+    mapping(bytes32 => uint256) public vestingFreezeId;
     mapping(address => uint256) public holdersVestingCount;
 
     /* ========== EVENTS ========== */
@@ -53,6 +52,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         uint256 amountTotal,
         bool revocable
     );
+    event SetFreezerAddress(address indexed _address);
     event Revoked(bytes32 indexed vestingScheduleId, uint256 amount);
     event Withdraw(address indexed to, uint256 amount);
     event Released(bytes32 indexed vestingScheduleId, address indexed to, uint256 amount);
@@ -65,8 +65,8 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         _;
     }
 
-    modifier onlyAllowedAddresses(address _sender) {
-        require(_allowedAddresses.contains(_sender), "TokenVesting: only allowed addresses");
+    modifier onlyAllowedAddresses() {
+        require(_allowedAddresses.contains(msg.sender), "TokenVesting: only allowed addresses");
         _;
     }
 
@@ -75,14 +75,20 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         _disableInitializers();
     }
 
-    function initialize(address _token) external initializer {
-        token = IERC20(_token);
+    function initialize(address _freezerAddress) external initializer {
         currentVestingId = 1;
+        freezer = _freezerAddress;
 
         _allowedAddresses.add(msg.sender);
 
         __Base_init();
         __ReentrancyGuard_init();
+    }
+
+    function setFreezerAddress(address _address) external onlyAdmin {
+        freezer = _address;
+
+        emit SetFreezerAddress(_address);
     }
 
     function addAllowedAddress(address _address) external onlyAdmin {
@@ -115,7 +121,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         uint128 _slicePeriodSeconds,
         bool _revocable,
         uint128 _amount
-    ) external onlyAllowedAddresses(msg.sender) {
+    ) external onlyAllowedAddresses {
         _createVestingSchedule(
             _beneficiary,
             _start,
@@ -133,7 +139,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
      */
     function createVestingScheduleBatch(
         InitialVestingSchedule[] memory _vestingInfo
-    ) external onlyAllowedAddresses(msg.sender) {
+    ) external onlyAllowedAddresses {
         for (uint256 i = 0; i < _vestingInfo.length; ++i) {
             _createVestingSchedule(
                 _vestingInfo[i].beneficiary,
@@ -158,25 +164,13 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         require(vestingSchedule.revocable, "TokenVesting: vesting is not revocable");
         uint128 vestedAmount = _computeReleasableAmount(vestingSchedule);
         if (vestedAmount > 0) {
-            _release(vestingScheduleId, vestedAmount);
+            _release(msg.sender, vestingScheduleId, vestedAmount);
         }
         uint256 unreleased = vestingSchedule.amountTotal - vestingSchedule.released;
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - unreleased;
         vestingSchedule.revoked = true;
 
         emit Revoked(vestingScheduleId, vestedAmount);
-    }
-
-    /**
-     * @notice Withdraw the specified amount if possible.
-     * @param amount the amount to withdraw
-     */
-    function withdraw(address to, uint256 amount) external nonReentrant onlyAdmin {
-        require(getWithdrawableAmount() >= amount, "TokenVesting: not enough withdrawable funds");
-
-        token.safeTransfer(to, amount);
-
-        emit Withdraw(to, amount);
     }
 
     /**
@@ -188,7 +182,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         bytes32 vestingScheduleId,
         uint128 amount
     ) external whenNotPaused nonReentrant onlyIfVestingScheduleNotRevoked(vestingScheduleId) {
-        _release(vestingScheduleId, amount);
+        _release(msg.sender, vestingScheduleId, amount);
     }
 
     /**
@@ -218,7 +212,13 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         bytes32 vestingScheduleId
     ) external view onlyIfVestingScheduleNotRevoked(vestingScheduleId) returns (uint256) {
         VestingSchedule memory vestingSchedule = vestingSchedules[vestingScheduleId];
-        return _computeReleasableAmount(vestingSchedule);
+        uint256 vestedAmount = _computeReleasableAmount(vestingSchedule);
+        uint256 freezeProfit = IJavFreezer(freezer).pendingReward(
+            0,
+            vestingFreezeId[vestingScheduleId],
+            vestingSchedule.beneficiary
+        );
+        return vestedAmount + freezeProfit;
     }
 
     /**
@@ -243,14 +243,6 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         return _computeVestingScheduleIdForAddressAndIndex(holder, index);
     }
 
-    /**
-     * @dev Returns the amount of tokens that can be withdrawn by the multisign wallet.
-     * @return the amount of tokens
-     */
-    function getWithdrawableAmount() public view returns (uint256) {
-        return token.balanceOf(address(this)) - vestingSchedulesTotalAmount;
-    }
-
     function _createVestingSchedule(
         address _beneficiary,
         uint128 _start,
@@ -260,10 +252,6 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         bool _revocable,
         uint128 _amount
     ) private {
-        require(
-            getWithdrawableAmount() >= _amount,
-            "TokenVesting: cannot create vesting schedule because not sufficient tokens"
-        );
         require(_duration > 0, "TokenVesting: duration must be > 0");
         require(_amount > 0, "TokenVesting: amount must be > 0");
         require(_slicePeriodSeconds > 0, "TokenVesting: slicePeriodSeconds must be > 0");
@@ -289,6 +277,11 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         currentVestingId++;
         holdersVestingCount[_beneficiary] += 1;
 
+        IJavFreezer(freezer).depositVesting(_beneficiary, 0, _amount, cliff, _start + _duration);
+        uint256 freezeId = IJavFreezer(freezer).getUserLastDepositId(0, _beneficiary);
+
+        vestingFreezeId[vestingScheduleId] = freezeId;
+
         emit VestingScheduleAdded(
             _beneficiary,
             cliff,
@@ -305,10 +298,10 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
      * @param vestingScheduleId the vesting schedule identifier
      * @param amount the amount to release
      */
-    function _release(bytes32 vestingScheduleId, uint128 amount) private {
+    function _release(address holder, bytes32 vestingScheduleId, uint128 amount) private {
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
-        bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
-        bool isReleasor = msg.sender == owner();
+        bool isBeneficiary = holder == vestingSchedule.beneficiary;
+        bool isReleasor = holder == owner();
 
         require(
             isBeneficiary || isReleasor,
@@ -319,10 +312,15 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
             vestedAmount >= amount,
             "TokenVesting: cannot release tokens, not enough vested tokens"
         );
+        IJavFreezer(freezer).withdrawVesting(
+            vestingSchedule.beneficiary,
+            0,
+            vestingFreezeId[vestingScheduleId],
+            amount
+        );
+
         vestingSchedule.released = vestingSchedule.released + amount;
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - amount;
-
-        token.safeTransfer(vestingSchedule.beneficiary, amount);
 
         emit Released(vestingScheduleId, vestingSchedule.beneficiary, amount);
     }
