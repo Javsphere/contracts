@@ -5,18 +5,13 @@ async function main() {
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
     const Contract = await ethers.getContractFactory("LPProvider");
-    const contract = await upgrades.deployProxy(
-        Contract,
-        [
-        ],
-        {
-            initializer: "initialize",
-            kind: "uups",
-            txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei"),
-            },
+    const contract = await upgrades.deployProxy(Contract, [], {
+        initializer: "initialize",
+        kind: "uups",
+        txOverrides: {
+            gasLimit: ethers.parseUnits("0.03", "gwei"),
         },
-    );
+    });
     await contract.waitForDeployment();
 
     const contractAddress = await contract.getAddress();

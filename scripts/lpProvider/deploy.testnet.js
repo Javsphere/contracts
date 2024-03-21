@@ -7,8 +7,7 @@ async function main() {
     const Contract = await ethers.getContractFactory("LPProvider");
     const contract = await upgrades.deployProxy(
         Contract,
-        [
-        ],
+        [],
 
         {
             initializer: "initialize",

@@ -1,8 +1,8 @@
-const {expect} = require("chai");
-const {ethers, upgrades} = require("hardhat");
-const {loadFixture, time} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const {ADMIN_ERROR} = require("../common/constanst");
-const {deployTokenFixture} = require("../common/mocks");
+const { expect } = require("chai");
+const { ethers, upgrades } = require("hardhat");
+const { loadFixture, time } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const { ADMIN_ERROR } = require("../common/constanst");
+const { deployTokenFixture } = require("../common/mocks");
 
 describe("TokenVesting contract", () => {
     let hhTokenVesting;
@@ -25,7 +25,7 @@ describe("TokenVesting contract", () => {
             },
         );
         await javFreezer.waitForDeployment();
-        return javFreezer
+        return javFreezer;
     }
 
     before(async () => {
@@ -33,7 +33,7 @@ describe("TokenVesting contract", () => {
         [owner, addr1, addr2, admin, multiSignWallet, ...addrs] = await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await loadFixture(deployTokenFixture);
-        freezerMock = await deployFreezerFixture()
+        freezerMock = await deployFreezerFixture();
 
         hhTokenVesting = await upgrades.deployProxy(tokenVesting, [freezerMock.target], {
             initializer: "initialize",
@@ -68,7 +68,12 @@ describe("TokenVesting contract", () => {
             const lastRewardBlock = await ethers.provider.getBlockNumber();
             const accRewardPerShare = ethers.parseEther("0.01");
 
-            await freezerMock.addPool(erc20Token.target, erc20Token.target, lastRewardBlock, accRewardPerShare);
+            await freezerMock.addPool(
+                erc20Token.target,
+                erc20Token.target,
+                lastRewardBlock,
+                accRewardPerShare,
+            );
         });
 
         it("Should set vesting address", async () => {
@@ -383,7 +388,7 @@ describe("TokenVesting contract", () => {
             const revocable = true;
             const amount = ethers.parseEther("0.0005");
 
-            await erc20Token.mint(freezerMock.target, ethers.parseEther("1"))
+            await erc20Token.mint(freezerMock.target, ethers.parseEther("1"));
 
             const vestingInfo = [
                 {
@@ -425,7 +430,6 @@ describe("TokenVesting contract", () => {
 
             await expect(hhTokenVesting.connect(admin).revoke(scheduleId)).to.be.reverted;
         });
-
 
         it("Should revoke when release - not contract owner", async () => {
             const beneficiary = addr1.address;
@@ -496,7 +500,9 @@ describe("TokenVesting contract", () => {
             await expect(vestingSchedule.released).to.be.equal(releaseAmount);
             const claimAmount = userDeposit[4] - userDepositBefore[4];
 
-            await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(releaseAmount + claimAmount);
+            await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(
+                releaseAmount + claimAmount,
+            );
         });
 
         it("Should compute vesting schedule id for address and index", async () => {

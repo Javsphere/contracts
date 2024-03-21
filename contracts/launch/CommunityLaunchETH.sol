@@ -17,19 +17,13 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
     address public pairAddress;
 
     uint256 public availableTokens; // availableTokens * 1e18
-    uint256 public startTokenPrice; // price in usd. E.g
-    uint256 public startBlock;
-    uint256 public incPricePerBlock;
 
     /* ========== EVENTS ========== */
     event SetUSDTAddress(address indexed _address);
     event SetPairAddress(address indexed _address);
     event SetSaleActive(bool indexed activeSale);
-    event SetStartTokenPrice(uint256 indexed startBlock);
-    event SetStartBlock(uint256 indexed price);
     event SetAvailableTokens(uint256 indexed availableTokens);
-    event SetIncPricePerBlock(uint256 indexed incPricePerBlock);
-    event TokensPurchased(address indexed _address, address indexed _referrer, uint256 amount);
+    event TokensPurchased(address indexed _address, address indexed _referrer, uint256 usdAmount);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event WithdrawEth(address indexed to, uint256 amount);
 
@@ -46,17 +40,13 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
     function initialize(
         address _usdtAddress,
         address _pairAddress,
-        uint256 _availableTokens,
-        uint256 _startTokenPrice,
-        uint256 _incPricePerBlock
+        uint256 _availableTokens
     ) external initializer {
         usdtAddress = _usdtAddress;
         pairAddress = _pairAddress;
 
         isSaleActive = false;
         availableTokens = _availableTokens;
-        startTokenPrice = _startTokenPrice;
-        incPricePerBlock = _incPricePerBlock;
 
         __Base_init();
         __ReentrancyGuard_init();
@@ -80,49 +70,17 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit SetSaleActive(_status);
     }
 
-    function setStartTokenPrice(uint256 _price) external onlyAdmin {
-        startTokenPrice = _price;
-
-        emit SetStartTokenPrice(_price);
-    }
-
-    function setStartBlock(uint256 _startBlock) external onlyAdmin {
-        startBlock = _startBlock;
-
-        emit SetStartBlock(_startBlock);
-    }
-
     function setAvailableTokens(uint256 _availableTokens) external onlyAdmin {
         availableTokens = _availableTokens;
 
         emit SetAvailableTokens(_availableTokens);
     }
 
-    function setIncPricePerBlock(uint256 _incPricePerBlock) external onlyAdmin {
-        incPricePerBlock = _incPricePerBlock;
-
-        emit SetIncPricePerBlock(_incPricePerBlock);
-    }
-
-    /**
-     * @notice Functon to get current token price
-     */
-    function tokenPrice() external view returns (uint256) {
-        return _tokenPrice();
-    }
-
-    /**
-     * @notice Functon to get tokens balance
-     */
-    function tokensBalance() external view returns (uint256) {
-        return availableTokens;
-    }
-
     /**
      * @notice Functon to buy JAV tokens with native tokens
      */
     function buy(address _referrer, uint256 _amountIn) external payable onlyActive nonReentrant {
-        require(block.number >= startBlock, "CommunityLaunch: Need wait startBlock");
+        require(availableTokens > 0, "CommunityLaunch: Invalid amount for purchase");
         require(
             _amountIn == 0 || msg.value == 0,
             "CommunityLaunch: Cannot pass both DFI and ERC-20 assets"
@@ -141,12 +99,7 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
             usdAmount = _getTokenPrice(msg.value);
         }
 
-        uint256 _tokensAmount = (usdAmount * 1e18) / _tokenPrice();
-        require(availableTokens >= _tokensAmount, "CommunityLaunch: Invalid amount for purchase");
-
-        availableTokens -= _tokensAmount;
-
-        emit TokensPurchased(msg.sender, _referrer, _tokensAmount);
+        emit TokensPurchased(msg.sender, _referrer, usdAmount);
     }
 
     /**
@@ -176,13 +129,6 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
         _to.transfer(_amount);
 
         emit WithdrawEth(_to, _amount);
-    }
-
-    function _tokenPrice() private view returns (uint256) {
-        if (block.number < startBlock) {
-            return startTokenPrice;
-        }
-        return ((block.number - startBlock) * incPricePerBlock) + startTokenPrice;
     }
 
     function _getTokenPrice(uint256 _amount) private view returns (uint256) {
