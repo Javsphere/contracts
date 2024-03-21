@@ -14,14 +14,22 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
     struct VestingParams {
-        // start time of the vesting period
-        uint128 start;
         // duration in seconds of the cliff in which tokens will begin to vest
         uint128 cliff;
         // duration in seconds of the period in which the tokens will vest
         uint128 duration;
         // duration of a slice period for the vesting in seconds
         uint128 slicePeriodSeconds;
+    }
+
+    struct ConfigAddresses {
+        address tokenAddress;
+        address stateRelayer;
+        address botAddress;
+        address usdtAddress;
+        address pairAddress;
+        address vesting;
+        address freezer;
     }
 
     VestingParams public vestingParams;
@@ -35,8 +43,11 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     address public stateRelayer;
 
     uint256 public startTokenPrice; // price in usd. E.g
-    uint256 public startBlock;
-    uint256 public incPricePerBlock;
+    uint256 public endTokenPrice; // price in usd. E.g
+    uint256 public tokensToSale;
+    uint256 public sectionsNumber;
+
+    mapping(uint256 => uint256) public tokensAmountByType;
 
     /* ========== EVENTS ========== */
     event SetVestingAddress(address indexed _address);
@@ -45,16 +56,13 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     event SetUSDTAddress(address indexed _address);
     event SetPairAddress(address indexed _address);
     event SetFreezerAddress(address indexed _address);
-    event SetVestingParams(
-        uint128 _start,
-        uint128 _cliff,
-        uint128 _duration,
-        uint128 _slicePeriodSeconds
-    );
+    event SetVestingParams(uint128 _cliff, uint128 _duration, uint128 _slicePeriodSeconds);
     event SetSaleActive(bool indexed activeSale);
-    event SetStartTokenPrice(uint256 indexed startBlock);
-    event SetStartBlock(uint256 indexed price);
-    event SetIncPricePerBlock(uint256 indexed incPricePerBlock);
+    event SetStartTokenPrice(uint256 indexed startTokenPrice);
+    event SetEndTokenPrice(uint256 indexed endTokenPrice);
+    event SetTokensToSale(uint256 indexed tokensToSale);
+    event SetTokensAmountByType(uint256 indexed tokensAmountByType);
+    event SetSectionsNumber(uint256 indexed sectionsNumber);
     event TokensPurchased(address indexed _address, address indexed _referrer, uint256 amount);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event WithdrawDFI(address indexed to, uint256 amount);
@@ -75,29 +83,30 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     function initialize(
-        address _tokenAddress,
-        address _stateRelayer,
-        address _botAddress,
-        address _usdtAddress,
-        address _pairAddress,
-        address _vesting,
-        address _freezer,
+        uint256 _tokensToSale,
         uint256 _startTokenPrice,
-        uint256 _incPricePerBlock,
+        uint256 _endTokenPrice,
+        uint256 _sectionsNumber,
+        uint256[] memory _tokensAmountByType,
+        ConfigAddresses memory _configAddresses,
         VestingParams memory _vestingParams
     ) external initializer {
-        token = IERC20(_tokenAddress);
-        botAddress = _botAddress;
-        stateRelayer = _stateRelayer;
-        vestingAddress = _vesting;
-        usdtAddress = _usdtAddress;
-        pairAddress = _pairAddress;
-        freezerAddress = _freezer;
+        token = IERC20(_configAddresses.tokenAddress);
+        botAddress = _configAddresses.botAddress;
+        stateRelayer = _configAddresses.stateRelayer;
+        vestingAddress = _configAddresses.vesting;
+        usdtAddress = _configAddresses.usdtAddress;
+        pairAddress = _configAddresses.pairAddress;
+        freezerAddress = _configAddresses.freezer;
 
         isSaleActive = false;
         startTokenPrice = _startTokenPrice;
-        incPricePerBlock = _incPricePerBlock;
+        endTokenPrice = _endTokenPrice;
+        tokensToSale = _tokensToSale;
+        sectionsNumber = _sectionsNumber;
         vestingParams = _vestingParams;
+
+        tokensAmountByType[0] = _tokensAmountByType[0];
 
         __Base_init();
         __ReentrancyGuard_init();
@@ -107,7 +116,6 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         vestingParams = _vestingParams;
 
         emit SetVestingParams(
-            _vestingParams.start,
             _vestingParams.cliff,
             _vestingParams.duration,
             _vestingParams.slicePeriodSeconds
@@ -162,23 +170,35 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit SetStartTokenPrice(_price);
     }
 
-    function setStartBlock(uint256 _startBlock) external onlyAdmin {
-        startBlock = _startBlock;
+    function setEndTokenPrice(uint256 _price) external onlyAdmin {
+        endTokenPrice = _price;
 
-        emit SetStartBlock(_startBlock);
+        emit SetEndTokenPrice(_price);
     }
 
-    function setIncPricePerBlock(uint256 _incPricePerBlock) external onlyAdmin {
-        incPricePerBlock = _incPricePerBlock;
+    function setSectionsNumber(uint256 _sectionsNumber) external onlyAdmin {
+        sectionsNumber = _sectionsNumber;
 
-        emit SetIncPricePerBlock(_incPricePerBlock);
+        emit SetSectionsNumber(_sectionsNumber);
+    }
+
+    function setTokensToSale(uint256 _tokensToSale) external onlyAdmin {
+        tokensToSale = _tokensToSale;
+
+        emit SetTokensToSale(_tokensToSale);
+    }
+
+    function setTokensAmountByType(uint256[] memory _tokensAmountByType) external onlyAdmin {
+        tokensAmountByType[0] = _tokensAmountByType[0];
+
+        emit SetTokensAmountByType(_tokensAmountByType[0]);
     }
 
     /**
-     * @notice Functon to get current token price
+     * @notice Functon to calculate tokens based on usd input amount
      */
-    function tokenPrice() external view returns (uint256) {
-        return _tokenPrice();
+    function getTokenAmountByUsd(uint256 _usdAmount) external view returns (uint256) {
+        return _calculateTokensAmount(_usdAmount);
     }
 
     /**
@@ -199,7 +219,6 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint256 _amountIn,
         bool _isEqualUSD
     ) external payable onlyActive nonReentrant {
-        require(block.number >= startBlock, "CommunityLaunch: Need wait startBlock");
         require(
             _amountIn == 0 || msg.value == 0,
             "CommunityLaunch: Cannot pass both DFI and ERC-20 assets"
@@ -229,16 +248,25 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             usdAmount = _getDUSDPrice(_dusdAmount);
         }
 
-        uint256 _tokensAmount = (usdAmount * 1e18) / _tokenPrice();
+        uint256 _tokensAmount = _calculateTokensAmount(usdAmount);
         require(
             token.balanceOf(address(this)) >= _tokensAmount,
             "CommunityLaunch: Invalid amount for purchase"
         );
 
+        if (_amountIn != 0) {
+            require(
+                tokensAmountByType[0] >= _tokensAmount,
+                "CommunityLaunch: Invalid amount to purchase for the selected token"
+            );
+
+            tokensAmountByType[0] -= _tokensAmount;
+        }
+
         _createVesting(
             msg.sender,
             uint128(_tokensAmount),
-            vestingParams.start,
+            uint128(block.timestamp),
             cliff,
             duration,
             slicePeriodSeconds
@@ -250,19 +278,27 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     function simulateBuy(
         address _beneficiary,
         address _referrer,
-        uint128 _amount,
+        uint256 _usdAmount,
         uint128 _start,
         uint128 _cliff,
         uint128 _duration,
         uint128 _slicePeriodSeconds
     ) external onlyActive onlyBot {
+        uint256 _tokensAmount = _calculateTokensAmount(_usdAmount);
         require(
-            token.balanceOf(address(this)) >= _amount,
+            token.balanceOf(address(this)) >= _tokensAmount,
             "CommunityLaunch: Invalid amount for purchase"
         );
-        _createVesting(_beneficiary, _amount, _start, _cliff, _duration, _slicePeriodSeconds);
+        _createVesting(
+            _beneficiary,
+            uint128(_tokensAmount),
+            _start,
+            _cliff,
+            _duration,
+            _slicePeriodSeconds
+        );
 
-        emit TokensPurchased(_beneficiary, _referrer, _amount);
+        emit TokensPurchased(_beneficiary, _referrer, _tokensAmount);
     }
 
     /**
@@ -294,11 +330,30 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit WithdrawDFI(_to, _amount);
     }
 
-    function _tokenPrice() private view returns (uint256) {
-        if (block.number < startBlock) {
-            return startTokenPrice;
+    function _calculateTokensAmount(uint256 _usdAmount) private view returns (uint256) {
+        uint256 _soldTokens = tokensToSale - token.balanceOf(address(this));
+        uint256 _incPricePerSection = (endTokenPrice - startTokenPrice) / (sectionsNumber - 1);
+        uint256 _tokenPerSection = tokensToSale / sectionsNumber;
+        uint256 currentSection = 0;
+        for (uint256 i = 1; i <= sectionsNumber; ++i) {
+            if (_tokenPerSection * (i - 1) <= _soldTokens && _soldTokens <= _tokenPerSection * i) {
+                currentSection = i;
+                break;
+            }
         }
-        return ((block.number - startBlock) * incPricePerBlock) + startTokenPrice;
+        uint256 amount = (_usdAmount * 1e18) /
+            (startTokenPrice + (_incPricePerSection * (currentSection - 1)));
+        if (_soldTokens + amount > _tokenPerSection * currentSection) {
+            amount = _tokenPerSection * currentSection - _soldTokens;
+            uint256 _remainingUsd = _usdAmount -
+                ((amount * (startTokenPrice + (_incPricePerSection * (currentSection - 1)))) /
+                    1e18);
+            amount +=
+                (_remainingUsd * 1e18) /
+                (startTokenPrice + (_incPricePerSection * currentSection));
+        }
+
+        return amount;
     }
 
     function _createVesting(
@@ -322,7 +377,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     function _getTokenPrice(uint256 _amount) private view returns (uint256) {
-        (uint reserve0, uint reserve1,) = IVanillaPair(pairAddress).getReserves();
+        (uint reserve0, uint reserve1, ) = IVanillaPair(pairAddress).getReserves();
         if (IVanillaPair(pairAddress).token0() == usdtAddress) {
             return (_amount * reserve0) / reserve1;
         } else {

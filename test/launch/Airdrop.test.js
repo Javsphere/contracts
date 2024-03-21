@@ -1,8 +1,8 @@
-const {expect} = require("chai");
-const {ethers, upgrades} = require("hardhat");
-const {loadFixture, time} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const {ADMIN_ERROR} = require("../common/constanst");
-const {deployTokenFixture} = require("../common/mocks");
+const { expect } = require("chai");
+const { ethers, upgrades } = require("hardhat");
+const { loadFixture, time } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const { ADMIN_ERROR } = require("../common/constanst");
+const { deployTokenFixture } = require("../common/mocks");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 describe("Airdrop contract", () => {
@@ -28,7 +28,6 @@ describe("Airdrop contract", () => {
         await erc20Token.mint(hhTokenVesting.target, ethers.parseEther("20"));
         return hhTokenVesting;
     }
-
 
     before(async () => {
         const airdrop = await ethers.getContractFactory("Airdrop");
@@ -103,9 +102,8 @@ describe("Airdrop contract", () => {
             await expect(await hhAirdrop.vestingAddress()).to.equal(vestingMock.target);
         });
 
-
         it("Should revert when dropVestingTokens - not admin", async () => {
-            const recipients = ["0x0000000000000000000000000000000000000000"]
+            const recipients = ["0x0000000000000000000000000000000000000000"];
 
             await expect(
                 hhAirdrop.connect(addr1).dropVestingTokens(recipients, 1, 1, 1, 1, true, 1),
@@ -126,8 +124,15 @@ describe("Airdrop contract", () => {
 
             const currentVestingId = await vestingMock.currentVestingId();
 
-
-            await hhAirdrop.dropVestingTokens(recipients, start, cliff, duration, slicePeriodSeconds, revocable, amount);
+            await hhAirdrop.dropVestingTokens(
+                recipients,
+                start,
+                cliff,
+                duration,
+                slicePeriodSeconds,
+                revocable,
+                amount,
+            );
 
             const vestingScheduleForHolder = await vestingMock.getLastVestingScheduleForHolder(
                 beneficiary,
@@ -148,6 +153,5 @@ describe("Airdrop contract", () => {
             await expect(vestingScheduleForHolder.released).to.be.equal(0);
             await expect(vestingScheduleForHolder.revoked).to.be.equal(false);
         });
-
     });
 });

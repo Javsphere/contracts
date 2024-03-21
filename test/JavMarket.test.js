@@ -113,9 +113,9 @@ describe("JavMarket contract", () => {
         });
 
         it("Should revert when removeBotAddress", async () => {
-            await expect(hhJavMarket.connect(addr1).removeBotAddress(bot.address)).to.be.revertedWith(
-                ADMIN_ERROR,
-            );
+            await expect(
+                hhJavMarket.connect(addr1).removeBotAddress(bot.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should removeBotAddress", async () => {
@@ -268,9 +268,9 @@ describe("JavMarket contract", () => {
         });
 
         it("Should revert when withdraw - only bot error", async () => {
-            await expect(hhJavMarket.connect(addr1).withdraw(0, 1, addr3.address)).to.be.revertedWith(
-                "JavMarket: only bot",
-            );
+            await expect(
+                hhJavMarket.connect(addr1).withdraw(0, 1, addr3.address),
+            ).to.be.revertedWith("JavMarket: only bot");
         });
 
         it("Should revert when withdraw - invalid amount", async () => {

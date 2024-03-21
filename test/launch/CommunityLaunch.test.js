@@ -1,12 +1,13 @@
-const {expect} = require("chai");
-const {ethers, upgrades} = require("hardhat");
+const { expect } = require("chai");
+const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const {
     deployTokenFixture,
     deployToken2Fixture,
-    deployUniswapFixture, deployStateRelayerFixture,
+    deployUniswapFixture,
+    deployStateRelayerFixture,
 } = require("../common/mocks");
-const {ADMIN_ERROR} = require("../common/constanst");
+const { ADMIN_ERROR } = require("../common/constanst");
 
 describe("CommunityLaunch contract", () => {
     let hhCommunityLaunch;
@@ -27,10 +28,9 @@ describe("CommunityLaunch contract", () => {
     let vestingMock;
     let saleActiveError;
     let startTokenPrice;
-    let incPricePerBlock;
-    let startBlock;
+    let endTokenPrice;
+    let tokensToSale;
     let dexPair;
-
 
     async function deployVestingFixture() {
         const tokenVestingFactory = await ethers.getContractFactory("TokenVesting");
@@ -42,7 +42,7 @@ describe("CommunityLaunch contract", () => {
             initializer: "initialize",
         });
         await vestingMock.waitForDeployment();
-        return [vestingMock, freezer]
+        return [vestingMock, freezer];
     }
 
     before(async () => {
@@ -53,14 +53,15 @@ describe("CommunityLaunch contract", () => {
         erc20Token = await helpers.loadFixture(deployTokenFixture);
         erc20Token2 = await helpers.loadFixture(deployToken2Fixture);
         stateRelayer = await helpers.loadFixture(deployStateRelayerFixture);
-        const vestingData = await deployVestingFixture()
+        const vestingData = await deployVestingFixture();
 
         const data = await helpers.loadFixture(deployUniswapFixture);
         [wdfiToken, uniswapFactory, uniswapRouter, uniswapPairContract] = Object.values(data);
-        [vestingMock, freezerMock] = vestingData
+        [vestingMock, freezerMock] = vestingData;
 
-        startTokenPrice = ethers.parseEther("0.02");
-        incPricePerBlock = ethers.parseEther("0.0000002");
+        startTokenPrice = ethers.parseEther("1");
+        endTokenPrice = ethers.parseEther("2");
+        tokensToSale = ethers.parseEther("100");
 
         // create pairs
         await uniswapFactory.createPair(wdfiToken.target, erc20Token2.target);
@@ -71,17 +72,21 @@ describe("CommunityLaunch contract", () => {
         hhCommunityLaunch = await upgrades.deployProxy(
             communityLaunch,
             [
-                await erc20Token.getAddress(),
-                stateRelayer.target,
-                bot.address,
-                await erc20Token2.getAddress(),
-                basePair.target,
-                vestingMock.target,
-                freezerMock.target,
+                tokensToSale,
                 startTokenPrice,
-                incPricePerBlock,
+                endTokenPrice,
+                6,
+                [ethers.parseEther("50")],
                 {
-                    start: 100,
+                    tokenAddress: await erc20Token.getAddress(),
+                    stateRelayer: stateRelayer.target,
+                    botAddress: bot.address,
+                    usdtAddress: await erc20Token2.getAddress(),
+                    pairAddress: basePair.target,
+                    vesting: vestingMock.target,
+                    freezer: freezerMock.target,
+                },
+                {
                     cliff: 200,
                     duration: 300,
                     slicePeriodSeconds: 50,
@@ -94,12 +99,12 @@ describe("CommunityLaunch contract", () => {
         );
 
         saleActiveError = "CommunityLaunch: contract is not available right now";
-        dexPair = "DUSD-DFI"
+        dexPair = "DUSD-DFI";
 
         // add liquidity
         const amountWeth = ethers.parseEther("100");
         const amount0 = ethers.parseEther("500");
-        await wdfiToken.deposit({value: amountWeth});
+        await wdfiToken.deposit({ value: amountWeth });
         await erc20Token2.mint(owner.address, amount0);
 
         await wdfiToken.approve(uniswapRouter.target, ethers.parseEther("100000"));
@@ -149,10 +154,9 @@ describe("CommunityLaunch contract", () => {
 
         it("Should set the right vestingParams", async () => {
             const vestingParams = await hhCommunityLaunch.vestingParams();
-            await expect(vestingParams[0]).to.equal(100);
-            await expect(vestingParams[1]).to.equal(200);
-            await expect(vestingParams[2]).to.equal(300);
-            await expect(vestingParams[3]).to.equal(50);
+            await expect(vestingParams[0]).to.equal(200);
+            await expect(vestingParams[1]).to.equal(300);
+            await expect(vestingParams[2]).to.equal(50);
         });
 
         it("Should set the right isSaleActive flag", async () => {
@@ -163,12 +167,23 @@ describe("CommunityLaunch contract", () => {
             await expect(await hhCommunityLaunch.startTokenPrice()).to.equal(startTokenPrice);
         });
 
-        it("Should set the right incPricePerBlock", async () => {
-            await expect(await hhCommunityLaunch.incPricePerBlock()).to.equal(incPricePerBlock);
+        it("Should set the right endTokenPrice", async () => {
+            await expect(await hhCommunityLaunch.endTokenPrice()).to.equal(endTokenPrice);
+        });
+
+        it("Should set the right sectionsNumber", async () => {
+            await expect(await hhCommunityLaunch.sectionsNumber()).to.equal(6);
+        });
+
+        it("Should set the right tokensToSale", async () => {
+            await expect(await hhCommunityLaunch.tokensAmountByType(0)).to.equal(
+                ethers.parseEther("50"),
+            );
+            await expect(await hhCommunityLaunch.tokensToSale()).to.equal(tokensToSale);
         });
 
         it("Should mint tokens", async () => {
-            const tokenAmounts = ethers.parseEther("20");
+            const tokenAmounts = ethers.parseEther("120");
 
             await erc20Token.mint(hhCommunityLaunch.target, tokenAmounts);
             await expect(await erc20Token.balanceOf(hhCommunityLaunch.target)).to.equal(
@@ -207,7 +222,6 @@ describe("CommunityLaunch contract", () => {
 
         it("Should setVestingParams", async () => {
             await hhCommunityLaunch.setVestingParams({
-                start: 200,
                 cliff: 200,
                 duration: 300,
                 slicePeriodSeconds: 50,
@@ -215,9 +229,8 @@ describe("CommunityLaunch contract", () => {
 
             const vestingParams = await hhCommunityLaunch.vestingParams();
             await expect(vestingParams[0]).to.equal(200);
-            await expect(vestingParams[1]).to.equal(200);
-            await expect(vestingParams[2]).to.equal(300);
-            await expect(vestingParams[3]).to.equal(50);
+            await expect(vestingParams[1]).to.equal(300);
+            await expect(vestingParams[2]).to.equal(50);
         });
 
         it("Should revert when setVestingAddress", async () => {
@@ -274,71 +287,131 @@ describe("CommunityLaunch contract", () => {
             );
         });
 
+        it("Should revert when setBotAddress", async () => {
+            await expect(
+                hhCommunityLaunch.connect(addr1).setBotAddress(admin.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should setBotAddress", async () => {
+            await hhCommunityLaunch.setBotAddress(bot.address);
+
+            await expect(await hhCommunityLaunch.botAddress()).to.equal(bot.address);
+        });
+
+        it("Should revert when stateRelayer", async () => {
+            await expect(
+                hhCommunityLaunch.connect(addr1).setStateRelayer(admin.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should stateRelayer", async () => {
+            await hhCommunityLaunch.setStateRelayer(stateRelayer.target);
+
+            await expect(await hhCommunityLaunch.stateRelayer()).to.equal(stateRelayer.target);
+        });
+
         it("Should set the setSaleActive", async () => {
             await hhCommunityLaunch.setSaleActive(true);
 
             await expect(await hhCommunityLaunch.isSaleActive()).to.equal(true);
         });
 
-        it("Should revert when set the setstartTokenPrice", async () => {
+        it("Should revert when set the setStartTokenPrice", async () => {
             await expect(
                 hhCommunityLaunch.connect(addr1).setStartTokenPrice(ethers.parseEther("0.0005")),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should set the setStartTokenPrice", async () => {
-            startTokenPrice = ethers.parseEther("1");
             await hhCommunityLaunch.setStartTokenPrice(startTokenPrice);
 
             await expect(await hhCommunityLaunch.startTokenPrice()).to.equal(startTokenPrice);
         });
 
-        it("Should revert when set the setStartBlock", async () => {
-            await expect(hhCommunityLaunch.connect(addr1).setStartBlock(1)).to.be.revertedWith(
-                ADMIN_ERROR,
-            );
-        });
-
-        it("Should set the setStartBlock", async () => {
-            startBlock = (await helpers.time.latestBlock()) + 50;
-            await hhCommunityLaunch.setStartBlock(startBlock);
-
-            await expect(await hhCommunityLaunch.startBlock()).to.equal(startBlock);
-        });
-
-        it("Should revert when set the setIncPricePerBlock", async () => {
+        it("Should revert when set the endTokenPrice", async () => {
             await expect(
-                hhCommunityLaunch.connect(addr1).setIncPricePerBlock(1),
+                hhCommunityLaunch.connect(addr1).setEndTokenPrice(ethers.parseEther("0.0005")),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
-        it("Should set the setIncPricePerBlock", async () => {
-            incPricePerBlock = ethers.parseEther("0");
+        it("Should set the endTokenPrice", async () => {
+            await hhCommunityLaunch.setEndTokenPrice(endTokenPrice);
 
-            await hhCommunityLaunch.setIncPricePerBlock(incPricePerBlock);
-
-            await expect(await hhCommunityLaunch.incPricePerBlock()).to.equal(incPricePerBlock);
+            await expect(await hhCommunityLaunch.endTokenPrice()).to.equal(endTokenPrice);
         });
 
-        it("Should get the right tokenPrice when block.number > startBlock", async () => {
-            const tokenPrice = await hhCommunityLaunch.startTokenPrice();
-
-            await expect(await hhCommunityLaunch.tokenPrice()).to.equal(tokenPrice);
+        it("Should revert when set the setSectionsNumber", async () => {
+            await expect(
+                hhCommunityLaunch.connect(addr1).setSectionsNumber(ethers.parseEther("0.0005")),
+            ).to.be.revertedWith(ADMIN_ERROR);
         });
 
-        it("Should get the right tokenPrice when block.number < startBlock", async () => {
-            await helpers.mine(100);
+        it("Should set the setSectionsNumber", async () => {
+            await hhCommunityLaunch.setSectionsNumber(6);
 
-            const currentBlock = BigInt(await helpers.time.latestBlock());
-            const price = (currentBlock - BigInt(startBlock)) * incPricePerBlock + startTokenPrice;
+            await expect(await hhCommunityLaunch.sectionsNumber()).to.equal(6);
+        });
 
-            await expect(await hhCommunityLaunch.tokenPrice()).to.equal(price);
+        it("Should revert when set the setTokensAmountByType", async () => {
+            await expect(
+                hhCommunityLaunch
+                    .connect(addr1)
+                    .setTokensAmountByType([
+                        ethers.parseEther("0.0005"),
+                        ethers.parseEther("0.0005"),
+                    ]),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
 
-            await hhCommunityLaunch.setStartBlock(currentBlock + BigInt(10));
+        it("Should set the setTokensAmountByType", async () => {
+            await hhCommunityLaunch.setTokensAmountByType([ethers.parseEther("60")]);
+
+            await expect(await hhCommunityLaunch.tokensAmountByType(0)).to.equal(
+                ethers.parseEther("60"),
+            );
+        });
+
+        it("Should revert when set the setTokensToSale", async () => {
+            await expect(
+                hhCommunityLaunch.connect(addr1).setTokensToSale(ethers.parseEther("0.0005")),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should set the setTokensToSale", async () => {
+            tokensToSale = ethers.parseEther("120");
+            await hhCommunityLaunch.setTokensToSale(tokensToSale);
+
+            await expect(await hhCommunityLaunch.tokensToSale()).to.equal(tokensToSale);
+        });
+
+        it("Should getTokenAmountByUsd", async () => {
+            const amount = ethers.parseEther("1");
+
+            await expect(await hhCommunityLaunch.getTokenAmountByUsd(amount)).to.equal(amount);
+        });
+
+        it("Should getTokenAmountByUsd - next section", async () => {
+            const usdAmount = ethers.parseEther("30");
+            const tokenPerSection =
+                (await hhCommunityLaunch.tokensToSale()) /
+                (await hhCommunityLaunch.sectionsNumber());
+            const sectionsNumber = await hhCommunityLaunch.sectionsNumber();
+            const incPricePerSection =
+                (endTokenPrice - startTokenPrice) / (sectionsNumber - BigInt(1));
+            const section2Tokens = usdAmount - tokenPerSection;
+            const amount =
+                (section2Tokens * ethers.parseEther("1")) / (startTokenPrice + incPricePerSection);
+
+            await expect(await hhCommunityLaunch.getTokenAmountByUsd(usdAmount)).to.be.equal(
+                amount + tokenPerSection,
+            );
         });
 
         it("Should get the right tokensBalance", async () => {
-            await expect(await hhCommunityLaunch.tokensBalance()).to.equal(ethers.parseEther("20"));
+            await expect(await hhCommunityLaunch.tokensBalance()).to.equal(
+                ethers.parseEther("120"),
+            );
         });
 
         it("Should revert when buy with isSaleActive = false", async () => {
@@ -353,14 +426,6 @@ describe("CommunityLaunch contract", () => {
             await hhCommunityLaunch.setSaleActive(true);
         });
 
-        it("Should revert when buy with block.number >= startBlock", async () => {
-            await expect(
-                hhCommunityLaunch.connect(addr1).buy(addr1.address, 0, {
-                    value: ethers.parseEther("1.0"),
-                }),
-            ).to.be.revertedWith("CommunityLaunch: Need wait startBlock");
-        });
-
         it("Should buy jav tokens with dusd", async () => {
             await helpers.mine(10);
 
@@ -368,10 +433,10 @@ describe("CommunityLaunch contract", () => {
             await erc20Token2.mint(addr1.address, usdtAmount);
             await erc20Token2.connect(addr1).approve(hhCommunityLaunch.target, usdtAmount);
             const tokenBeforeFreezer = await erc20Token.balanceOf(freezerMock.target);
+            const tokensAmountByTypeBefore = await hhCommunityLaunch.tokensAmountByType(0);
 
-            const mintedTokens = ethers.parseEther("20");
-            const tokenPrice = await hhCommunityLaunch.tokenPrice();
-            const amount = ethers.parseEther((usdtAmount / tokenPrice).toString());
+            const mintedTokens = ethers.parseEther("120");
+            const amount = await hhCommunityLaunch.getTokenAmountByUsd(usdtAmount);
 
             await hhCommunityLaunch.connect(addr1).buy(addr1.address, usdtAmount, true, {
                 value: 0,
@@ -395,6 +460,23 @@ describe("CommunityLaunch contract", () => {
             await expect(await hhCommunityLaunch.tokensBalance()).to.be.equal(
                 mintedTokens - amount,
             );
+            await expect(await hhCommunityLaunch.tokensAmountByType(0)).to.be.equal(
+                tokensAmountByTypeBefore - amount,
+            );
+        });
+
+        it("Should revert when buy jav tokens with dusd - tokensAmountByType < 0 ", async () => {
+            const usdtAmount = ethers.parseEther("120");
+            await erc20Token2.mint(addr1.address, usdtAmount);
+            await erc20Token2.connect(addr1).approve(hhCommunityLaunch.target, usdtAmount);
+
+            await expect(
+                hhCommunityLaunch.connect(addr1).buy(addr1.address, usdtAmount, true, {
+                    value: 0,
+                }),
+            ).to.be.revertedWith(
+                "CommunityLaunch: Invalid amount to purchase for the selected token",
+            );
         });
 
         it("Should buy jav tokens with dusd _isEqualUSD = false", async () => {
@@ -406,21 +488,27 @@ describe("CommunityLaunch contract", () => {
             await erc20Token2.mint(addr1.address, usdtAmount);
             await erc20Token2.connect(addr1).approve(hhCommunityLaunch.target, usdtAmount);
 
-            const tokenPrice = await hhCommunityLaunch.tokenPrice();
-            let amount = ethers.parseEther((usdtAmount / tokenPrice).toString());
-            const dexDUSDPrice = ethers.parseEther("0.5")
+            let amount = await hhCommunityLaunch.getTokenAmountByUsd(usdtAmount);
+            const dexDUSDPrice = ethers.parseEther("0.5");
             amount = ethers.parseEther((amount / dexDUSDPrice).toString());
 
-            await stateRelayer.updateDEXInfo([dexPair], [{
-                primaryTokenPrice: dexDUSDPrice,
-                volume24H: 0,
-                totalLiquidity: 0,
-                APR: 0,
-                firstTokenBalance: 0,
-                secondTokenBalance: 0,
-                rewards: 0,
-                commissions: 0,
-            }], 0, 0)
+            await stateRelayer.updateDEXInfo(
+                [dexPair],
+                [
+                    {
+                        primaryTokenPrice: dexDUSDPrice,
+                        volume24H: 0,
+                        totalLiquidity: 0,
+                        APR: 0,
+                        firstTokenBalance: 0,
+                        secondTokenBalance: 0,
+                        rewards: 0,
+                        commissions: 0,
+                    },
+                ],
+                0,
+                0,
+            );
 
             await hhCommunityLaunch.connect(addr1).buy(addr1.address, usdtAmount, false, {
                 value: 0,
@@ -453,19 +541,26 @@ describe("CommunityLaunch contract", () => {
             const tokenBeforeFreezer = await erc20Token.balanceOf(freezerMock.target);
             let amount = ethers.parseEther("5");
 
-            const dexDUSDPrice = ethers.parseEther("1")
+            const dexDUSDPrice = ethers.parseEther("1");
             amount = ethers.parseEther((amount / dexDUSDPrice).toString());
 
-            await stateRelayer.updateDEXInfo([dexPair], [{
-                primaryTokenPrice: dexDUSDPrice,
-                volume24H: 0,
-                totalLiquidity: 0,
-                APR: 0,
-                firstTokenBalance: 0,
-                secondTokenBalance: 0,
-                rewards: 0,
-                commissions: 0,
-            }], 0, 0)
+            await stateRelayer.updateDEXInfo(
+                [dexPair],
+                [
+                    {
+                        primaryTokenPrice: dexDUSDPrice,
+                        volume24H: 0,
+                        totalLiquidity: 0,
+                        APR: 0,
+                        firstTokenBalance: 0,
+                        secondTokenBalance: 0,
+                        rewards: 0,
+                        commissions: 0,
+                    },
+                ],
+                0,
+                0,
+            );
 
             await hhCommunityLaunch.connect(addr1).buy(addr1.address, 0, true, {
                 value: buyNativeAmount,
@@ -502,14 +597,14 @@ describe("CommunityLaunch contract", () => {
                 hhCommunityLaunch.withdraw(
                     erc20Token.target,
                     addr1.address,
-                    ethers.parseEther("100"),
+                    ethers.parseEther("150"),
                 ),
             ).to.be.revertedWith("CommunityLaunch: Invalid amount");
         });
 
         it("Should withdraw", async () => {
             const amount = ethers.parseEther("0.05");
-            await erc20Token.mint(hhCommunityLaunch.target, amount)
+            await erc20Token.mint(hhCommunityLaunch.target, amount);
 
             const balanceBefore = await erc20Token.balanceOf(addr1.address);
 
@@ -542,6 +637,36 @@ describe("CommunityLaunch contract", () => {
 
             await expect(await ethers.provider.getBalance(addr1.address)).to.equal(
                 amount + balanceBefore,
+            );
+        });
+
+        it("Should revert when simulateBuy - bot error", async () => {
+            await expect(
+                hhCommunityLaunch
+                    .connect(addr1)
+                    .simulateBuy(addr1.address, addr1.address, 1, 1, 1, 1, 1),
+            ).to.be.revertedWith("CommunityLaunch: only bot");
+        });
+
+        it("Should simulateBuy", async () => {
+            const tokenBefore = await erc20Token.balanceOf(hhCommunityLaunch.target);
+            const usdAmount = ethers.parseEther("5");
+            const tokenAmount = await hhCommunityLaunch.getTokenAmountByUsd(usdAmount);
+
+            await hhCommunityLaunch
+                .connect(bot)
+                .simulateBuy(addr1.address, addr1.address, usdAmount, 1, 1, 1, 1);
+
+            const vestingScheduleForHolder = await vestingMock.getLastVestingScheduleForHolder(
+                addr1.address,
+            );
+            await expect(await vestingScheduleForHolder.amountTotal).to.be.equal(tokenAmount);
+
+            await expect(await erc20Token.balanceOf(hhCommunityLaunch.target)).to.be.equal(
+                tokenBefore - tokenAmount,
+            );
+            await expect(await hhCommunityLaunch.tokensBalance()).to.be.equal(
+                tokenBefore - tokenAmount,
             );
         });
     });

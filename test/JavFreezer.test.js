@@ -1,8 +1,8 @@
-const {expect} = require("chai");
-const {ethers, upgrades} = require("hardhat");
+const { expect } = require("chai");
+const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const {ADMIN_ERROR} = require("./common/constanst");
-const {deployTokenFixture} = require("./common/mocks");
+const { ADMIN_ERROR } = require("./common/constanst");
+const { deployTokenFixture } = require("./common/mocks");
 
 describe("JavFreezer contract", () => {
     let hhJavFreezer;
@@ -259,15 +259,15 @@ describe("JavFreezer contract", () => {
         });
 
         it("Should revert when depositVesting - poolError", async () => {
-            await expect(hhJavFreezer.connect(addr1).depositVesting(addr1.address, 2, 1, 1, 1)).to.be.revertedWith(
-                poolError,
-            );
+            await expect(
+                hhJavFreezer.connect(addr1).depositVesting(addr1.address, 2, 1, 1, 1),
+            ).to.be.revertedWith(poolError);
         });
 
         it("Should revert when depositVesting - only vesting", async () => {
-            await expect(hhJavFreezer.connect(addr1).depositVesting(addr1.address, 0, 2, 1, 1)).to.be.revertedWith(
-                "JavFreezer: only vesting",
-            );
+            await expect(
+                hhJavFreezer.connect(addr1).depositVesting(addr1.address, 0, 2, 1, 1),
+            ).to.be.revertedWith("JavFreezer: only vesting");
         });
 
         it("Should deposit", async () => {
@@ -315,15 +315,17 @@ describe("JavFreezer contract", () => {
         it("Should depositVesting", async () => {
             const pid = 0;
             const amount = ethers.parseEther("10");
-            const depositTimestamp = 123456689
-            const withdrawalTimestamp = 123456789
+            const depositTimestamp = 123456689;
+            const withdrawalTimestamp = 123456789;
 
             await erc20Token.mint(hhJavFreezer.target, amount);
 
             const poolInfoBefore = await hhJavFreezer.poolInfo(pid);
             const userInfoBefore = await hhJavFreezer.userInfo(addr1.address, pid);
 
-            await hhJavFreezer.connect(vesting).depositVesting(addr1.address, pid, amount, depositTimestamp, withdrawalTimestamp);
+            await hhJavFreezer
+                .connect(vesting)
+                .depositVesting(addr1.address, pid, amount, depositTimestamp, withdrawalTimestamp);
 
             const poolInfo = await hhJavFreezer.poolInfo(pid);
             const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
@@ -384,17 +386,15 @@ describe("JavFreezer contract", () => {
         });
 
         it("Should get pendingRewardTotal - 2 deposit", async () => {
-            const rewards1 = await hhJavFreezer.pendingReward(0, 0, addr1.address)
-            const rewards2 = await hhJavFreezer.pendingReward(0, 1, addr1.address)
+            const rewards1 = await hhJavFreezer.pendingReward(0, 0, addr1.address);
+            const rewards2 = await hhJavFreezer.pendingReward(0, 1, addr1.address);
             await expect(await hhJavFreezer.pendingRewardTotal(0, addr1.address)).to.be.equal(
                 rewards1 + rewards2,
             );
         });
 
         it("Should get getUserLastDepositId", async () => {
-            await expect(await hhJavFreezer.getUserLastDepositId(0, addr1.address)).to.be.equal(
-                1,
-            );
+            await expect(await hhJavFreezer.getUserLastDepositId(0, addr1.address)).to.be.equal(1);
         });
 
         it("Should revert when claim - poolError", async () => {
@@ -503,13 +503,19 @@ describe("JavFreezer contract", () => {
         });
 
         it("Should revert when withdrawVesting - poolError", async () => {
-            await expect(hhJavFreezer.connect(vesting).withdrawVesting(addr1.address, 2, 0, ethers.parseEther("1"))).to.be.revertedWith(poolError);
+            await expect(
+                hhJavFreezer
+                    .connect(vesting)
+                    .withdrawVesting(addr1.address, 2, 0, ethers.parseEther("1")),
+            ).to.be.revertedWith(poolError);
         });
 
         it("Should revert when withdrawVesting - invalid withdraw amount", async () => {
-            await expect(hhJavFreezer.connect(vesting).withdrawVesting(addr1.address, 0, 1, ethers.parseEther("100"))).to.be.revertedWith(
-                "JavFreezer: invalid withdraw amount",
-            );
+            await expect(
+                hhJavFreezer
+                    .connect(vesting)
+                    .withdrawVesting(addr1.address, 0, 1, ethers.parseEther("100")),
+            ).to.be.revertedWith("JavFreezer: invalid withdraw amount");
         });
 
         it("Should withdrawVesting ", async () => {
@@ -517,7 +523,7 @@ describe("JavFreezer contract", () => {
             const depositId = 1;
             await erc20Token.mint(hhJavFreezer.target, ethers.parseEther("10"));
             await helpers.mine(50);
-            const withdrawAmount = ethers.parseEther("5")
+            const withdrawAmount = ethers.parseEther("5");
 
             const userBalanceBefore = await erc20Token.balanceOf(addr1.address);
             const contractBalanceBefore = await erc20Token.balanceOf(hhJavFreezer.target);
@@ -529,7 +535,10 @@ describe("JavFreezer contract", () => {
             );
             const poolInfoBefore = await hhJavFreezer.poolInfo(pid);
 
-            await hhJavFreezer.connect(addr1).connect(vesting).withdrawVesting(addr1.address, pid, depositId, withdrawAmount);
+            await hhJavFreezer
+                .connect(addr1)
+                .connect(vesting)
+                .withdrawVesting(addr1.address, pid, depositId, withdrawAmount);
 
             const userBalance = await erc20Token.balanceOf(addr1.address);
             const contractBalance = await erc20Token.balanceOf(hhJavFreezer.target);
@@ -556,7 +565,7 @@ describe("JavFreezer contract", () => {
             const depositId = 1;
             await erc20Token.mint(hhJavFreezer.target, ethers.parseEther("10"));
             await helpers.mine(50);
-            const withdrawAmount = ethers.parseEther("5")
+            const withdrawAmount = ethers.parseEther("5");
 
             const userBalanceBefore = await erc20Token.balanceOf(addr1.address);
             const contractBalanceBefore = await erc20Token.balanceOf(hhJavFreezer.target);
@@ -568,7 +577,10 @@ describe("JavFreezer contract", () => {
             );
             const poolInfoBefore = await hhJavFreezer.poolInfo(pid);
 
-            await hhJavFreezer.connect(addr1).connect(vesting).withdrawVesting(addr1.address, pid, depositId, withdrawAmount);
+            await hhJavFreezer
+                .connect(addr1)
+                .connect(vesting)
+                .withdrawVesting(addr1.address, pid, depositId, withdrawAmount);
 
             const userBalance = await erc20Token.balanceOf(addr1.address);
             const contractBalance = await erc20Token.balanceOf(hhJavFreezer.target);
