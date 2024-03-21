@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IVanillaRouter02.sol";
 import "./interfaces/IVanillaPair.sol";
-import "./RewardRateConfigurable.sol";
+import "./helpers/RewardRateConfigurable.sol";
 import "./base/BaseUpgradable.sol";
 
 contract JavFarming is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConfigurable {

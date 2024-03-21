@@ -4,8 +4,8 @@ pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/IVanillaRouter02.sol";
-import "./base/BaseUpgradable.sol";
+import "../interfaces/IVanillaRouter02.sol";
+import "../base/BaseUpgradable.sol";
 
 contract LPProvider is BaseUpgradable {
     using SafeERC20 for IERC20;
