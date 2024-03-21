@@ -1,8 +1,8 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { ADMIN_ERROR } = require("./common/constanst");
-const { deployTokenFixture, deployUniswapFixture, deployToken2Fixture } = require("./common/mocks");
+const { deployTokenFixture, deployUniswapFixture, deployToken2Fixture } = require("../common/mocks");
+const {ADMIN_ERROR} = require("../common/constanst");
 
 describe("LPProvider contract", () => {
     let hhLpProvider;
