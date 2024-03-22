@@ -60,7 +60,7 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
     event AddToken(address indexed _address);
     event RemoveToken(address indexed _address);
     event SetTreasuryAddress(address indexed _address);
-    event Withdraw(address indexed _to, uint256 _amount);
+    event Withdraw(uint256 indexed _tokenId, address indexed _to, uint256 _amount);
     event SetFee(uint256 indexed _fee);
     event OrderExecuted(
         uint256 indexed _id,
@@ -250,6 +250,6 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
 
         token.safeTransfer(_withdrawAddress, _amount);
 
-        emit Withdraw(_withdrawAddress, _amount);
+        emit Withdraw(_tokenId, _withdrawAddress, _amount);
     }
 }
