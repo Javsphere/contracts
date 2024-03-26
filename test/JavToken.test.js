@@ -11,9 +11,7 @@ describe("JavToken contract", () => {
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         hhToken = await upgrades.deployProxy(
             token,
-            [
-                ethers.parseEther("1000")
-            ],
+            [ethers.parseEther("1000")],
 
             {
                 initializer: "initialize",

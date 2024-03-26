@@ -3,6 +3,7 @@ const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { ADMIN_ERROR } = require("./common/constanst");
 const { deployTokenFixture } = require("./common/mocks");
+const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("JavFreezer contract", () => {
     let hhJavFreezer;
@@ -222,6 +223,21 @@ describe("JavFreezer contract", () => {
             await expect(await hhJavFreezer.lockPeriod(id)).to.be.equal(durations);
         });
 
+        it("Should revert when setLockPeriodMultiplier - admin error", async () => {
+            await expect(
+                hhJavFreezer.connect(addr1).setLockPeriodMultiplier(1, 1),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should setLockPeriodMultiplier ", async () => {
+            const id = 0;
+            const multiplier = 1e5; //1.00000
+
+            await hhJavFreezer.setLockPeriodMultiplier(id, multiplier);
+
+            await expect(await hhJavFreezer.lockPeriodMultiplier(id)).to.be.equal(multiplier);
+        });
+
         it("Should revert when deposit - pause", async () => {
             await hhJavFreezer.pause();
 
@@ -243,6 +259,12 @@ describe("JavFreezer contract", () => {
             );
         });
 
+        it("Should revert when deposit - invalid lock id", async () => {
+            await expect(hhJavFreezer.connect(addr1).deposit(0, 5, 1)).to.be.revertedWith(
+                lockError,
+            );
+        });
+
         it("Should revert when deposit - invalid balance", async () => {
             await expect(hhJavFreezer.connect(addr1).deposit(0, 0, 1)).to.be.revertedWith(
                 "JavFreezer: invalid balance for deposit",
@@ -253,20 +275,20 @@ describe("JavFreezer contract", () => {
             await hhJavFreezer.pause();
 
             await expect(
-                hhJavFreezer.connect(addr1).depositVesting(addr1.address, 1, 1, 1, 1),
+                hhJavFreezer.connect(addr1).depositVesting(addr1.address, 1, 1, 1, 1, 5),
             ).to.be.revertedWithCustomError(hhJavFreezer, "EnforcedPause");
             await hhJavFreezer.unpause();
         });
 
         it("Should revert when depositVesting - poolError", async () => {
             await expect(
-                hhJavFreezer.connect(addr1).depositVesting(addr1.address, 2, 1, 1, 1),
+                hhJavFreezer.connect(addr1).depositVesting(addr1.address, 2, 1, 1, 1, 5),
             ).to.be.revertedWith(poolError);
         });
 
         it("Should revert when depositVesting - only vesting", async () => {
             await expect(
-                hhJavFreezer.connect(addr1).depositVesting(addr1.address, 0, 2, 1, 1),
+                hhJavFreezer.connect(addr1).depositVesting(addr1.address, 0, 2, 1, 1, 5),
             ).to.be.revertedWith("JavFreezer: only vesting");
         });
 
@@ -304,17 +326,19 @@ describe("JavFreezer contract", () => {
             await expect(userInfo[1]).to.be.equal(userInfoBefore[1] + BigInt(1));
             await expect(userInfo[2]).to.be.equal(userInfoBefore[2]);
             await expect(userDeposit[0]).to.be.equal(amount);
-            await expect(userDeposit[1]).to.be.equal(lockPeriod);
+            await expect(userDeposit[1]).to.be.equal(lockId);
             await expect(userDeposit[2]).to.be.equal(blockTimestamp);
             await expect(userDeposit[3]).to.be.equal(BigInt(blockTimestamp) + lockPeriod);
             await expect(userDeposit[4]).to.be.equal(0);
             await expect(userDeposit[5]).to.be.equal(rewardDebt);
             await expect(userDeposit[6]).to.be.equal(false);
+            await expect(await hhJavFreezer.pendingReward(pid, 0, addr1.address)).to.be.equal(0);
         });
 
         it("Should depositVesting", async () => {
             const pid = 0;
             const amount = ethers.parseEther("10");
+            const lockId = 5;
             const depositTimestamp = 123456689;
             const withdrawalTimestamp = 123456789;
 
@@ -325,7 +349,7 @@ describe("JavFreezer contract", () => {
 
             await hhJavFreezer
                 .connect(vesting)
-                .depositVesting(addr1.address, pid, amount, depositTimestamp, withdrawalTimestamp);
+                .depositVesting(addr1.address, pid, amount, depositTimestamp, withdrawalTimestamp, lockId);
 
             const poolInfo = await hhJavFreezer.poolInfo(pid);
             const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
@@ -342,6 +366,7 @@ describe("JavFreezer contract", () => {
             await expect(userInfo[1]).to.be.equal(userInfoBefore[1] + BigInt(1));
             await expect(userInfo[2]).to.be.equal(userInfoBefore[2]);
             await expect(userDeposit[0]).to.be.equal(amount);
+            await expect(userDeposit[1]).to.be.equal(lockId);
             await expect(userDeposit[2]).to.be.equal(depositTimestamp);
             await expect(userDeposit[3]).to.be.equal(withdrawalTimestamp);
             await expect(userDeposit[4]).to.be.equal(0);
@@ -383,6 +408,33 @@ describe("JavFreezer contract", () => {
             await expect(
                 await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
             ).to.be.equal(pendingReward);
+        });
+
+        it("Should get pendingReward, block > lastRewardBlock with lock period multiplier", async () => {
+            const pid = 0;
+            const depositId = 0;
+            const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, depositId);
+            const poolInfo = await hhJavFreezer.poolInfo(pid);
+            const lockMultiplier = BigInt(100005); //1.00005
+            await hhJavFreezer.setLockPeriodMultiplier(0, lockMultiplier);
+
+            await helpers.mine(10);
+            const blockNumber = await ethers.provider.getBlockNumber();
+
+            const multiplier = BigInt(blockNumber) - poolInfo[3];
+            const rewardPerBlock = await hhJavFreezer.getRewardPerBlock();
+            const reward = multiplier * rewardPerBlock;
+            const accRewardPerShare = poolInfo[4] + (reward * ethers.parseEther("1")) / poolInfo[2];
+            let pendingReward =
+                (userDeposit[0] * accRewardPerShare) / ethers.parseEther("1") - userDeposit[5];
+
+            pendingReward = (pendingReward * lockMultiplier) / BigInt(1e5);
+
+            await expect(
+                await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
+            ).to.be.equal(pendingReward);
+
+            await hhJavFreezer.setLockPeriodMultiplier(0, 1e5);
         });
 
         it("Should get pendingRewardTotal - 2 deposit", async () => {

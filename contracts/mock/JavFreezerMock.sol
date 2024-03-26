@@ -10,7 +10,8 @@ contract JavFreezerMock is IJavFreezer {
         uint256 _pid,
         uint256 _amount,
         uint256 _depositTimestamp,
-        uint256 _withdrawalTimestamp
+        uint256 _withdrawalTimestamp,
+        uint256 _lockId
     ) external {}
 
     function withdrawVesting(

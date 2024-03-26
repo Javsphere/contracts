@@ -17,6 +17,10 @@ interface ITokenVesting {
         bool revocable;
         // total amount of tokens to be released at the end of the vesting
         uint128 amount;
+        // vesting type
+        uint8 vestingType;
+        // lock id (use only for freezer
+        uint8 lockId;
     }
 
     function createVestingScheduleBatch(InitialVestingSchedule[] memory _vestingInfo) external;
@@ -28,6 +32,8 @@ interface ITokenVesting {
         uint128 _duration,
         uint128 _slicePeriodSeconds,
         bool _revocable,
-        uint128 _amount
+        uint128 _amount,
+        uint8 _vestingType,
+        uint256 _lockId
     ) external;
 }
