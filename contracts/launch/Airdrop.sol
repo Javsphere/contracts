@@ -54,7 +54,9 @@ contract Airdrop is BaseUpgradable {
         uint128 _duration,
         uint128 _slicePeriodSeconds,
         bool _revocable,
-        uint128 _amount
+        uint128 _amount,
+        uint8 _vestingType,
+        uint8 _lockId
     ) external onlyAdmin {
         ITokenVesting.InitialVestingSchedule[]
             memory vestingInfo = new ITokenVesting.InitialVestingSchedule[](_recipients.length);
@@ -67,7 +69,9 @@ contract Airdrop is BaseUpgradable {
                 duration: _duration,
                 slicePeriodSeconds: _slicePeriodSeconds,
                 revocable: _revocable,
-                amount: _amount
+                amount: _amount,
+                vestingType: _vestingType,
+                lockId: _lockId
             });
         }
 

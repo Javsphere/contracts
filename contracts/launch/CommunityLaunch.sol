@@ -9,6 +9,7 @@ import "../interfaces/IStateRelayer.sol";
 import "../interfaces/ITokenVesting.sol";
 import "../interfaces/IVanillaPair.sol";
 import "../base/BaseUpgradable.sol";
+import "hardhat/console.sol";
 
 contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -20,12 +21,17 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint128 duration;
         // duration of a slice period for the vesting in seconds
         uint128 slicePeriodSeconds;
+        // vesting type
+        uint8 vestingType;
+        // lock id (use only for freezer
+        uint8 lockId;
     }
 
     struct ConfigAddresses {
         address tokenAddress;
         address stateRelayer;
         address botAddress;
+        address dusdAddress;
         address usdtAddress;
         address pairAddress;
         address vesting;
@@ -38,6 +44,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     address public botAddress;
     address public vestingAddress;
     address public freezerAddress;
+    address public dusdAddress;
     address public usdtAddress;
     address public pairAddress;
     address public stateRelayer;
@@ -53,17 +60,31 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     event SetVestingAddress(address indexed _address);
     event SetStateRelayer(address indexed _address);
     event SetBotAddress(address indexed _address);
+    event SetDUSDAddress(address indexed _address);
     event SetUSDTAddress(address indexed _address);
     event SetPairAddress(address indexed _address);
     event SetFreezerAddress(address indexed _address);
-    event SetVestingParams(uint128 _cliff, uint128 _duration, uint128 _slicePeriodSeconds);
+    event SetVestingParams(
+        uint128 _cliff,
+        uint128 _duration,
+        uint128 _slicePeriodSeconds,
+        uint8 vestingType,
+        uint8 lockId
+    );
     event SetSaleActive(bool indexed activeSale);
     event SetStartTokenPrice(uint256 indexed startTokenPrice);
     event SetEndTokenPrice(uint256 indexed endTokenPrice);
     event SetTokensToSale(uint256 indexed tokensToSale);
     event SetTokensAmountByType(uint256 indexed tokensAmountByType);
     event SetSectionsNumber(uint256 indexed sectionsNumber);
-    event TokensPurchased(address indexed _address, address indexed _referrer, uint256 amount);
+    event TokensPurchased(
+        address indexed _address,
+        address indexed _referrer,
+        uint256 amount,
+        uint256 saleTokenType,
+        uint256 inputAmount,
+        uint256 price
+    );
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event WithdrawDFI(address indexed to, uint256 amount);
 
@@ -95,6 +116,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         botAddress = _configAddresses.botAddress;
         stateRelayer = _configAddresses.stateRelayer;
         vestingAddress = _configAddresses.vesting;
+        dusdAddress = _configAddresses.dusdAddress;
         usdtAddress = _configAddresses.usdtAddress;
         pairAddress = _configAddresses.pairAddress;
         freezerAddress = _configAddresses.freezer;
@@ -118,7 +140,9 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit SetVestingParams(
             _vestingParams.cliff,
             _vestingParams.duration,
-            _vestingParams.slicePeriodSeconds
+            _vestingParams.slicePeriodSeconds,
+            _vestingParams.vestingType,
+            _vestingParams.lockId
         );
     }
 
@@ -138,6 +162,12 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         vestingAddress = _address;
 
         emit SetVestingAddress(_address);
+    }
+
+    function setDUSDAddress(address _address) external onlyAdmin {
+        dusdAddress = _address;
+
+        emit SetDUSDAddress(_address);
     }
 
     function setUSDTAddress(address _address) external onlyAdmin {
@@ -202,6 +232,15 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     /**
+     * @notice Functon to get token price
+     */
+    function getTokenPrice() external view returns (uint256) {
+        (uint256 section, , ) = _calculateCurrentSection();
+
+        return _getTokenPrice(section - 1);
+    }
+
+    /**
      * @notice Functon to get tokens balance
      */
     function tokensBalance() external view returns (uint256) {
@@ -212,11 +251,13 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
      * @notice Functon to buy JAV tokens with native tokens/dusd
      * @param _referrer _referrer address
      * @param _amountIn dusd amount
+     * @param _token token address
      * @param _isEqualUSD is 1 dusd = 1 $
      */
     function buy(
         address _referrer,
         uint256 _amountIn,
+        address _token,
         bool _isEqualUSD
     ) external payable onlyActive nonReentrant {
         require(
@@ -224,37 +265,54 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             "CommunityLaunch: Cannot pass both DFI and ERC-20 assets"
         );
 
+        uint256 saleTokenType;
+        uint256 inputAmount;
         uint256 usdAmount = 0;
         uint128 cliff = vestingParams.cliff;
         uint128 duration = vestingParams.duration;
         uint128 slicePeriodSeconds = vestingParams.slicePeriodSeconds;
+        uint256 lockId = vestingParams.lockId;
 
         if (_amountIn != 0) {
             require(
-                IERC20(usdtAddress).balanceOf(msg.sender) >= _amountIn,
+                _token == usdtAddress || _token == dusdAddress,
+                "CommunityLaunch: invalid token"
+            );
+            require(
+                IERC20(_token).balanceOf(msg.sender) >= _amountIn,
                 "CommunityLaunch: invalid amount"
             );
-            IERC20(usdtAddress).safeTransferFrom(msg.sender, address(this), _amountIn);
+            inputAmount = _amountIn;
+            IERC20(_token).safeTransferFrom(msg.sender, address(this), inputAmount);
             if (_isEqualUSD) {
-                usdAmount = _amountIn;
+                usdAmount = inputAmount;
                 cliff = cliff * 2;
                 duration = duration * 2;
                 slicePeriodSeconds = slicePeriodSeconds * 2;
+                lockId += 1;
             } else {
-                usdAmount = _getDUSDPrice(_amountIn);
+                usdAmount = _token == usdtAddress ? _amountIn : _dudsToUSD(inputAmount);
             }
+            saleTokenType = _token == usdtAddress ? 1 : 2;
         } else {
-            uint256 _dusdAmount = _getTokenPrice(msg.value);
-            usdAmount = _getDUSDPrice(_dusdAmount);
+            inputAmount = msg.value;
+            uint256 _dusdAmount = _getDUSDAmount(inputAmount);
+            usdAmount = _dudsToUSD(_dusdAmount);
+            saleTokenType = 0;
         }
 
         uint256 _tokensAmount = _calculateTokensAmount(usdAmount);
+
+        if (_isEqualUSD && _token == usdtAddress) {
+            _tokensAmount = (_tokensAmount * 1e18) / _getDUSDPrice("dUSDT-DUSD");
+        }
+
         require(
             token.balanceOf(address(this)) >= _tokensAmount,
             "CommunityLaunch: Invalid amount for purchase"
         );
 
-        if (_amountIn != 0) {
+        if (_amountIn != 0 && _token == dusdAddress) {
             require(
                 tokensAmountByType[0] >= _tokensAmount,
                 "CommunityLaunch: Invalid amount to purchase for the selected token"
@@ -262,6 +320,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
 
             tokensAmountByType[0] -= _tokensAmount;
         }
+        uint256 eventPrice = (usdAmount * 1e18) / _tokensAmount;
 
         _createVesting(
             msg.sender,
@@ -269,10 +328,18 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             uint128(block.timestamp),
             cliff,
             duration,
-            slicePeriodSeconds
+            slicePeriodSeconds,
+            lockId
         );
 
-        emit TokensPurchased(msg.sender, _referrer, _tokensAmount);
+        emit TokensPurchased(
+            msg.sender,
+            _referrer,
+            _tokensAmount,
+            saleTokenType,
+            inputAmount,
+            eventPrice
+        );
     }
 
     function simulateBuy(
@@ -282,23 +349,34 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint128 _start,
         uint128 _cliff,
         uint128 _duration,
-        uint128 _slicePeriodSeconds
+        uint128 _slicePeriodSeconds,
+        uint256 _saleTokenType,
+        uint256 _lockId
     ) external onlyActive onlyBot {
         uint256 _tokensAmount = _calculateTokensAmount(_usdAmount);
         require(
             token.balanceOf(address(this)) >= _tokensAmount,
             "CommunityLaunch: Invalid amount for purchase"
         );
+        uint256 eventPrice = (_usdAmount * 1e18) / _tokensAmount;
         _createVesting(
             _beneficiary,
             uint128(_tokensAmount),
             _start,
             _cliff,
             _duration,
-            _slicePeriodSeconds
+            _slicePeriodSeconds,
+            _lockId
         );
 
-        emit TokensPurchased(_beneficiary, _referrer, _tokensAmount);
+        emit TokensPurchased(
+            _beneficiary,
+            _referrer,
+            _tokensAmount,
+            _saleTokenType,
+            _usdAmount,
+            eventPrice
+        );
     }
 
     /**
@@ -331,26 +409,18 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     function _calculateTokensAmount(uint256 _usdAmount) private view returns (uint256) {
-        uint256 _soldTokens = tokensToSale - token.balanceOf(address(this));
-        uint256 _incPricePerSection = (endTokenPrice - startTokenPrice) / (sectionsNumber - 1);
-        uint256 _tokenPerSection = tokensToSale / sectionsNumber;
-        uint256 currentSection = 0;
-        for (uint256 i = 1; i <= sectionsNumber; ++i) {
-            if (_tokenPerSection * (i - 1) <= _soldTokens && _soldTokens <= _tokenPerSection * i) {
-                currentSection = i;
-                break;
-            }
-        }
-        uint256 amount = (_usdAmount * 1e18) /
-            (startTokenPrice + (_incPricePerSection * (currentSection - 1)));
+        (
+            uint256 currentSection,
+            uint256 _soldTokens,
+            uint256 _tokenPerSection
+        ) = _calculateCurrentSection();
+
+        uint256 amount = (_usdAmount * 1e18) / _getTokenPrice(currentSection - 1);
         if (_soldTokens + amount > _tokenPerSection * currentSection) {
             amount = _tokenPerSection * currentSection - _soldTokens;
             uint256 _remainingUsd = _usdAmount -
-                ((amount * (startTokenPrice + (_incPricePerSection * (currentSection - 1)))) /
-                    1e18);
-            amount +=
-                (_remainingUsd * 1e18) /
-                (startTokenPrice + (_incPricePerSection * currentSection));
+                ((amount * _getTokenPrice(currentSection - 1)) / 1e18);
+            amount += (_remainingUsd * 1e18) / _getTokenPrice(currentSection);
         }
 
         return amount;
@@ -362,7 +432,8 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint128 _start,
         uint128 _cliff,
         uint128 _duration,
-        uint128 _slicePeriodSeconds
+        uint128 _slicePeriodSeconds,
+        uint256 _lockId
     ) private {
         token.safeTransfer(freezerAddress, _amount);
         ITokenVesting(vestingAddress).createVestingSchedule(
@@ -372,23 +443,54 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             _duration,
             _slicePeriodSeconds,
             true,
-            _amount
+            _amount,
+            vestingParams.vestingType,
+            _lockId
         );
     }
 
-    function _getTokenPrice(uint256 _amount) private view returns (uint256) {
+    function _getTokenPrice(uint256 section) private view returns (uint256) {
+        uint256 _incPricePerSection = (endTokenPrice - startTokenPrice) / (sectionsNumber - 1);
+
+        return startTokenPrice + (_incPricePerSection * section);
+    }
+
+    function _calculateCurrentSection() private view returns (uint256, uint256, uint256) {
+        uint256 currentSection = 0;
+        uint256 _soldTokens = tokensToSale - token.balanceOf(address(this));
+        uint256 _tokenPerSection = tokensToSale / sectionsNumber;
+
+        for (uint256 i = 1; i <= sectionsNumber; ++i) {
+            if (_tokenPerSection * (i - 1) <= _soldTokens && _soldTokens <= _tokenPerSection * i) {
+                currentSection = i;
+                break;
+            }
+        }
+        return (currentSection, _soldTokens, _tokenPerSection);
+    }
+
+    function _getDUSDAmount(uint256 _amount) private view returns (uint256) {
         (uint reserve0, uint reserve1, ) = IVanillaPair(pairAddress).getReserves();
-        if (IVanillaPair(pairAddress).token0() == usdtAddress) {
+        if (IVanillaPair(pairAddress).token0() == dusdAddress) {
             return (_amount * reserve0) / reserve1;
         } else {
             return (_amount * reserve1) / reserve0;
         }
     }
 
-    function _getDUSDPrice(uint256 _amount) private view returns (uint256) {
-        (, IStateRelayer.DEXInfo memory dex) = IStateRelayer(stateRelayer).getDexPairInfo(
-            "DUSD-DFI"
-        );
-        return (_amount * 1e18) / dex.primaryTokenPrice;
+    function _dudsToUSD(uint256 _amount) private view returns (uint256) {
+        uint256 dudsPrice = _getDUSDPrice("DUSD-DFI");
+        return (_amount * 1e18) / dudsPrice;
+    }
+
+    function _getDUSDPrice(string memory _pair) private view returns (uint256) {
+        uint256 price = 0;
+        (, IStateRelayer.DEXInfo memory dex) = IStateRelayer(stateRelayer).getDexPairInfo(_pair);
+        if (keccak256(abi.encodePacked(_pair)) == keccak256(abi.encodePacked("DUSD-DFI"))) {
+            price = dex.primaryTokenPrice;
+        } else {
+            price = (dex.primaryTokenPrice * dex.firstTokenBalance * 1e18) / dex.secondTokenBalance;
+        }
+        return price;
     }
 }

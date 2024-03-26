@@ -8,14 +8,27 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x0000000000000000000000000000000000000000", //_tokenAddress
-            "0x0000000000000000000000000000000000000000", //_stateRelayer
-            "0x0000000000000000000000000000000000000000", //_botAddress
-            "0x0000000000000000000000000000000000000000", //_usdtAddress
-            "0x0000000000000000000000000000000000000000", //_pairAddress
-            "0x0000000000000000000000000000000000000000", //_vesting
-            0, //_startTokenPrice
-            0, //_incPricePerBlock
+            ethers.parseEther("30000000"), //_tokensToSale
+            ethers.parseEther("0.03"), //_startTokenPrice
+            ethers.parseEther("0.04"), //_endTokenPrice
+            6, //_sectionsNumber
+            [ethers.parseEther("30000000")], //_tokensAmountByType
+            {
+                tokenAddress: "0x66F3Cf265D2D146A0348F6fC67E3Da0835e0968E",
+                stateRelayer: "0xa075dC93D00ac14f4a7416C03cAbec4728586760",
+                botAddress: "0x0000000000000000000000000000000000000000",
+                dusdAddress: "0xFf0000000000000000000000000000000000000F",
+                usdtAddress: "0xFF00000000000000000000000000000000000003",
+                pairAddress: "0x36633D610302044FCe7Fd05638C6Ca00E8908788",
+                vesting: "0x0000000000000000000000000000000000000000",
+                freezer: "0x0000000000000000000000000000000000000000",
+            },
+            {
+                cliff: 5259486, //2 mouth
+                duration: 21037944, //8 mouth
+                slicePeriodSeconds: 60, //60 seconds
+                vestingType: 0, // 0
+            },
         ],
         {
             initializer: "initialize",

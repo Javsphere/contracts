@@ -5,7 +5,7 @@ async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("TokenVesting");
+    const Contract = await ethers.getContractFactory("TokenVestingFreezer");
 
     // const deployment = await upgrades.forceImport(PROXY, Contract);
     // console.log("Proxy imported from:", deployment.address);
@@ -36,7 +36,7 @@ async function main() {
     }
 
     console.log(`New implementation Address: ${newImplementationAddress}`);
-    console.log(`TokenVesting contract upgraded`);
+    console.log(`TokenVestingFreezer contract upgraded`);
 }
 
 main()

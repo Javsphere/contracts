@@ -5,17 +5,19 @@ async function main() {
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
     const Contract = await ethers.getContractFactory("JavToken");
-    const contract = await upgrades.deployProxy(Contract,
+    const contract = await upgrades.deployProxy(
+        Contract,
         [
-            ethers.parseEther("2000000000") //_cap
+            ethers.parseEther("2000000000"), //_cap
         ],
         {
-        initializer: "initialize",
-        kind: "uups",
-        txOverrides: {
-            gasLimit: ethers.parseUnits("0.03", "gwei"),
+            initializer: "initialize",
+            kind: "uups",
+            txOverrides: {
+                gasLimit: ethers.parseUnits("0.03", "gwei"),
+            },
         },
-    });
+    );
     const contractAddress = await contract.getAddress();
     console.log(`JavToken contract deployed to: ${contractAddress}`);
 }

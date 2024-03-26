@@ -8,8 +8,7 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x31C4Afcef7277801f460A4d04B5966286a28A295", //_token
-            "0x0000000000000000000000000000000000000000", //_multiSignWallet
+            "0x695D64AdEbD82480f22638E50dA04f6C95df6Ef5", //_token
         ],
         {
             initializer: "initialize",

@@ -14,7 +14,7 @@ describe("Airdrop contract", () => {
     let vestingMock;
 
     async function deployVestingFixture() {
-        const tokenVestingFactory = await ethers.getContractFactory("TokenVesting");
+        const tokenVestingFactory = await ethers.getContractFactory("TokenVestingFreezer");
         const freezerContractFactory = await ethers.getContractFactory("JavFreezerMock");
         const erc20Token = await loadFixture(deployTokenFixture);
         const freezer = await freezerContractFactory.deploy();
@@ -106,7 +106,7 @@ describe("Airdrop contract", () => {
             const recipients = ["0x0000000000000000000000000000000000000000"];
 
             await expect(
-                hhAirdrop.connect(addr1).dropVestingTokens(recipients, 1, 1, 1, 1, true, 1),
+                hhAirdrop.connect(addr1).dropVestingTokens(recipients, 1, 1, 1, 1, true, 1, 1, 1),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
@@ -119,6 +119,7 @@ describe("Airdrop contract", () => {
             const slicePeriodSeconds = 1;
             const revocable = true;
             const amount = ethers.parseEther("0.0005");
+            const vestingType = 5;
 
             await vestingMock.addAllowedAddress(hhAirdrop.target);
 
@@ -132,6 +133,8 @@ describe("Airdrop contract", () => {
                 slicePeriodSeconds,
                 revocable,
                 amount,
+                vestingType,
+                1
             );
 
             const vestingScheduleForHolder = await vestingMock.getLastVestingScheduleForHolder(
@@ -152,6 +155,7 @@ describe("Airdrop contract", () => {
             await expect(vestingScheduleForHolder.amountTotal).to.be.equal(amount);
             await expect(vestingScheduleForHolder.released).to.be.equal(0);
             await expect(vestingScheduleForHolder.revoked).to.be.equal(false);
+            await expect(vestingScheduleForHolder.vestingType).to.be.equal(vestingType);
         });
     });
 });
