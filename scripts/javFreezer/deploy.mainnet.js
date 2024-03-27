@@ -4,12 +4,13 @@ async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("CommunityLaunchETH");
+    const Contract = await ethers.getContractFactory("JavFreezer");
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd", //_usdtAddress bsc
-            ethers.parseEther("100"), //_availableTokens
+            0,  //_rewardPerBlock
+            0,  //_rewardUpdateBlocksInterval
+            "0x0000000000000000000000000000000000000000", //_vestingAddress
         ],
         {
             initializer: "initialize",
@@ -22,7 +23,7 @@ async function main() {
     await contract.waitForDeployment();
 
     const contractAddress = await contract.getAddress();
-    console.log(`CommunityLaunchETH contract deployed to: ${contractAddress}`);
+    console.log(`JavFreezer contract deployed to: ${contractAddress}`);
 }
 
 main()

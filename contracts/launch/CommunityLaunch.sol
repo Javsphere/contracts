@@ -9,7 +9,6 @@ import "../interfaces/IStateRelayer.sol";
 import "../interfaces/ITokenVesting.sol";
 import "../interfaces/IVanillaPair.sol";
 import "../base/BaseUpgradable.sol";
-import "hardhat/console.sol";
 
 contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -265,6 +264,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             "CommunityLaunch: Cannot pass both DFI and ERC-20 assets"
         );
 
+        bool bonus = false;
         uint256 saleTokenType;
         uint256 inputAmount;
         uint256 usdAmount = 0;
@@ -294,10 +294,12 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
                 usdAmount = _token == usdtAddress ? _amountIn : _dudsToUSD(inputAmount);
             }
             saleTokenType = _token == usdtAddress ? 1 : 2;
+            bonus = _token == usdtAddress ? true : false;
         } else {
             inputAmount = msg.value;
             uint256 _dusdAmount = _getDUSDAmount(inputAmount);
             usdAmount = _dudsToUSD(_dusdAmount);
+            bonus = true;
             saleTokenType = 0;
         }
 
@@ -321,6 +323,11 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             tokensAmountByType[0] -= _tokensAmount;
         }
         uint256 eventPrice = (usdAmount * 1e18) / _tokensAmount;
+
+        if (bonus) {
+            uint256 bonusAmount = _calculateBonus(_tokensAmount);
+            _tokensAmount += bonusAmount;
+        }
 
         _createVesting(
             msg.sender,
@@ -489,8 +496,24 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         if (keccak256(abi.encodePacked(_pair)) == keccak256(abi.encodePacked("DUSD-DFI"))) {
             price = dex.primaryTokenPrice;
         } else {
-            price = (dex.primaryTokenPrice * dex.firstTokenBalance * 1e18) / dex.secondTokenBalance;
+            price = (dex.primaryTokenPrice * dex.secondTokenBalance) / dex.firstTokenBalance;
         }
-        return price;
+        return 1e36 / price;
+    }
+
+    function _calculateBonus(uint256 _amount) private pure returns (uint256) {
+        uint256 bonus = 0;
+
+        if (_amount > 50 ether) {
+            bonus = (_amount * 1) / 100;
+        }
+        if (_amount > 200 ether) {
+            bonus = (_amount * 2) / 100;
+        }
+        if (_amount > 500 ether) {
+            bonus = (_amount * 3) / 100;
+        }
+
+        return bonus;
     }
 }
