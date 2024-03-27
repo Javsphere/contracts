@@ -570,17 +570,23 @@ describe("CommunityLaunch contract", () => {
             const tokensAmountByTypeBefore = await hhCommunityLaunch.tokensAmountByType(0);
 
             const amount = await hhCommunityLaunch.getTokenAmountByUsd(usdtAmount);
+            const firstTokenBalance = BigInt(67270871);
+            const secondTokenBalance = BigInt(196592085);
+
+            const price = ethers.parseEther("1") * firstTokenBalance / secondTokenBalance
+
+            const amountTotal = amount * ethers.parseEther("1") / price
 
             await stateRelayer.updateDEXInfo(
                 ["dUSDT-DUSD"],
                 [
                     {
-                        primaryTokenPrice: 1,
+                        primaryTokenPrice: ethers.parseEther("1"),
                         volume24H: 0,
                         totalLiquidity: 0,
                         APR: 0,
-                        firstTokenBalance: 2,
-                        secondTokenBalance: 4,
+                        firstTokenBalance: firstTokenBalance,
+                        secondTokenBalance: secondTokenBalance,
                         rewards: 0,
                         commissions: 0,
                     },
@@ -601,7 +607,7 @@ describe("CommunityLaunch contract", () => {
             const vestingParams = await hhCommunityLaunch.vestingParams();
 
             await expect(await vestingScheduleForHolder.amountTotal).to.be.equal(
-                amount * BigInt(2),
+                amountTotal,
             );
             await expect(await vestingScheduleForHolder.duration).to.be.equal(
                 vestingParams.duration * BigInt(2),
@@ -614,13 +620,13 @@ describe("CommunityLaunch contract", () => {
                 usdtAmount,
             );
             await expect(await erc20Token.balanceOf(hhCommunityLaunch.target)).to.be.equal(
-                tokensBefore - amount * BigInt(2),
+                tokensBefore - amountTotal,
             );
             await expect(await erc20Token.balanceOf(freezerMock.target)).to.be.equal(
-                tokenBeforeFreezer + amount * BigInt(2),
+                tokenBeforeFreezer + amountTotal
             );
             await expect(await hhCommunityLaunch.tokensBalance()).to.be.equal(
-                tokensBefore - amount * BigInt(2),
+                tokensBefore - amountTotal,
             );
             await expect(await hhCommunityLaunch.tokensAmountByType(0)).to.be.equal(
                 tokensAmountByTypeBefore,
@@ -653,8 +659,8 @@ describe("CommunityLaunch contract", () => {
             await erc20Token2.connect(addr1).approve(hhCommunityLaunch.target, dusdAmount);
 
             const dexDUSDPrice = ethers.parseEther("0.5");
-            const usdtAmount = ethers.parseEther((dusdAmount / dexDUSDPrice).toString());
-            const amount = await hhCommunityLaunch.getTokenAmountByUsd(usdtAmount);
+            const usdAmount = ethers.formatEther(dusdAmount * dexDUSDPrice);
+            const amount = await hhCommunityLaunch.getTokenAmountByUsd(BigInt(Math.floor(usdAmount)));
 
             await stateRelayer.updateDEXInfo(
                 [dexPair],

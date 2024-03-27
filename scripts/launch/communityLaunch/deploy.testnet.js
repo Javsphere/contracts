@@ -8,11 +8,11 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            ethers.parseEther("500"), //_tokensToSale
+            ethers.parseEther("1000"), //_tokensToSale
             ethers.parseEther("1"), //_startTokenPrice
             ethers.parseEther("2"), //_endTokenPrice
             6, //_sectionsNumber
-            [ethers.parseEther("300")], //_tokensAmountByType
+            [ethers.parseEther("500")], //_tokensAmountByType
             {
                 tokenAddress: "0x695D64AdEbD82480f22638E50dA04f6C95df6Ef5",
                 stateRelayer: "0xA6A853DDbfB6C85d3584E33313628555BA85753B",
@@ -28,6 +28,7 @@ async function main() {
                 duration: 7200, //2 hour
                 slicePeriodSeconds: 60, //60s
                 vestingType: 0, //
+                lockId: 5, //
             },
         ],
         {
