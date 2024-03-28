@@ -139,7 +139,7 @@ describe("TokenVesting contract", () => {
                         true,
                         1,
                         0,
-                        0
+                        0,
                     ),
             ).to.be.revertedWith("TokenVesting: only allowed addresses");
         });

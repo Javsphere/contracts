@@ -8,8 +8,8 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            0,  //_rewardPerBlock
-            0,  //_rewardUpdateBlocksInterval
+            0, //_rewardPerBlock
+            0, //_rewardUpdateBlocksInterval
             "0x0000000000000000000000000000000000000000", //_vestingAddress
         ],
         {

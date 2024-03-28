@@ -1,8 +1,12 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { deployTokenFixture, deployUniswapFixture, deployToken2Fixture } = require("../common/mocks");
-const {ADMIN_ERROR} = require("../common/constanst");
+const {
+    deployTokenFixture,
+    deployUniswapFixture,
+    deployToken2Fixture,
+} = require("../common/mocks");
+const { ADMIN_ERROR } = require("../common/constanst");
 
 describe("LPProvider contract", () => {
     let hhLpProvider;
@@ -132,13 +136,24 @@ describe("LPProvider contract", () => {
             await expect(
                 hhLpProvider
                     .connect(addr1)
-                    .addLiquidity(owner.address, owner.address, owner.address, 0, 0, 0, 0, 0),
+                    .addLiquidity(
+                        pair2.target,
+                        owner.address,
+                        owner.address,
+                        owner.address,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                    ),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should revert when addLiquidity - Invalid balance - tokenA", async () => {
             await expect(
                 hhLpProvider.addLiquidity(
+                    pair2.target,
                     uniswapRouter.target,
                     erc20Token.target,
                     erc20Token2.target,
@@ -154,6 +169,7 @@ describe("LPProvider contract", () => {
         it("Should revert when addLiquidity - Invalid balance - tokenB", async () => {
             await expect(
                 hhLpProvider.addLiquidity(
+                    pair2.target,
                     uniswapRouter.target,
                     erc20Token.target,
                     erc20Token2.target,
@@ -174,6 +190,7 @@ describe("LPProvider contract", () => {
             await erc20Token2.mint(hhLpProvider.target, tokenBAmount);
 
             await hhLpProvider.addLiquidity(
+                pair2.target,
                 uniswapRouter.target,
                 erc20Token.target,
                 erc20Token2.target,
@@ -185,20 +202,21 @@ describe("LPProvider contract", () => {
             );
 
             const lpBalance = await pair2.balanceOf(hhLpProvider.target);
-            await expect(lpBalance !== 0).to.be.true;
+            await expect(await hhLpProvider.lpLockAmount(pair2.target)).to.be.equal(lpBalance);
         });
 
         it("Should revert when addLiquidityETH - admin error", async () => {
             await expect(
                 hhLpProvider
                     .connect(addr1)
-                    .addLiquidityETH(owner.address, owner.address, 0, 0, 0, 0, 0),
+                    .addLiquidityETH(pair2.target, owner.address, owner.address, 0, 0, 0, 0, 0),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should revert when addLiquidityETH - Invalid balance - amountETH", async () => {
             await expect(
                 hhLpProvider.addLiquidityETH(
+                    pair2.target,
                     uniswapRouter.target,
                     erc20Token.target,
                     ethers.parseEther("100"),
@@ -213,6 +231,7 @@ describe("LPProvider contract", () => {
         it("Should revert when addLiquidityETH - Invalid balance - amountTokenDesired", async () => {
             await expect(
                 hhLpProvider.addLiquidityETH(
+                    pair2.target,
                     uniswapRouter.target,
                     erc20Token.target,
                     0,
@@ -235,6 +254,7 @@ describe("LPProvider contract", () => {
             await erc20Token.mint(hhLpProvider.target, tokenBAmount);
 
             await hhLpProvider.addLiquidityETH(
+                basePair.target,
                 uniswapRouter.target,
                 erc20Token.target,
                 ETHAmount,
@@ -245,7 +265,7 @@ describe("LPProvider contract", () => {
             );
 
             const lpBalance = await basePair.balanceOf(hhLpProvider.target);
-            await expect(lpBalance !== 0).to.be.true;
+            await expect(await hhLpProvider.lpLockAmount(basePair.target)).to.be.equal(lpBalance);
         });
     });
 });

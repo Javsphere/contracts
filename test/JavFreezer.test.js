@@ -349,7 +349,14 @@ describe("JavFreezer contract", () => {
 
             await hhJavFreezer
                 .connect(vesting)
-                .depositVesting(addr1.address, pid, amount, depositTimestamp, withdrawalTimestamp, lockId);
+                .depositVesting(
+                    addr1.address,
+                    pid,
+                    amount,
+                    depositTimestamp,
+                    withdrawalTimestamp,
+                    lockId,
+                );
 
             const poolInfo = await hhJavFreezer.poolInfo(pid);
             const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
