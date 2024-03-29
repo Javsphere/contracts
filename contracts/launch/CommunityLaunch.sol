@@ -55,6 +55,9 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
 
     mapping(uint256 => uint256) public tokensAmountByType;
 
+    uint256 public avgDUSDPrice;
+    uint256 public lastUpdateBlockDUSDPrice;
+
     /* ========== EVENTS ========== */
     event SetVestingAddress(address indexed _address);
     event SetStateRelayer(address indexed _address);
@@ -86,6 +89,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     );
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event WithdrawDFI(address indexed to, uint256 amount);
+    event UpdateDUSDPrice(uint256 indexed lastBlock, uint256 price);
 
     modifier onlyActive() {
         require(isSaleActive, "CommunityLaunch: contract is not available right now");
@@ -247,6 +251,37 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     /**
+     * @notice Functon to get dfi to usd price
+     */
+    function getDFIToUSDPrice() external view returns (uint256) {
+        return _getTokenToUSDPrice("dUSDT-DFI");
+    }
+
+    /**
+     * @notice Functon to get dusd to usd price
+     */
+    function getDUSDToUSDPrice() external view returns (uint256) {
+        return _dfiToUSD(_dusdToDFI(1e18));
+    }
+
+    function updateDUSDPrice() external {
+        uint256 newAvgPrice;
+        uint256 _price = _getDUSDToDFIPrice(); // 1e18
+
+        if (avgDUSDPrice > 0) {
+            uint256 _multiplier = (2 * 1e18) / (block.number - lastUpdateBlockDUSDPrice + 1);
+            newAvgPrice = ((_price * _multiplier) + (avgDUSDPrice * (1e18 - _multiplier))) / 1e18;
+        } else {
+            newAvgPrice = _price;
+        }
+
+        avgDUSDPrice = newAvgPrice;
+        lastUpdateBlockDUSDPrice = block.number;
+
+        emit UpdateDUSDPrice(lastUpdateBlockDUSDPrice, avgDUSDPrice);
+    }
+
+    /**
      * @notice Functon to buy JAV tokens with native tokens/dusd
      * @param _referrer _referrer address
      * @param _amountIn dusd amount
@@ -291,14 +326,13 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
                 slicePeriodSeconds = slicePeriodSeconds * 2;
                 lockId += 1;
             } else {
-                usdAmount = _token == usdtAddress ? _amountIn : _dudsToUSD(inputAmount);
+                usdAmount = _token == usdtAddress ? _amountIn : _dfiToUSD(_dusdToDFI(_amountIn));
             }
             saleTokenType = _token == usdtAddress ? 1 : 2;
             bonus = _token == usdtAddress ? true : false;
         } else {
             inputAmount = msg.value;
-            uint256 _dusdAmount = _getDUSDAmount(inputAmount);
-            usdAmount = _dudsToUSD(_dusdAmount);
+            usdAmount = _dfiToUSD(inputAmount);
             bonus = true;
             saleTokenType = 0;
         }
@@ -306,7 +340,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint256 _tokensAmount = _calculateTokensAmount(usdAmount);
 
         if (_isEqualUSD && _token == usdtAddress) {
-            _tokensAmount = (_tokensAmount * 1e18) / _getDUSDPrice("dUSDT-DUSD");
+            _tokensAmount = (_tokensAmount * 1e18) / _getTokenToUSDPrice("dUSDT-DUSD");
         }
 
         require(
@@ -476,41 +510,44 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         return (currentSection, _soldTokens, _tokenPerSection);
     }
 
-    function _getDUSDAmount(uint256 _amount) private view returns (uint256) {
+    function _getDUSDToDFIPrice() private view returns (uint256) {
         (uint reserve0, uint reserve1, ) = IVanillaPair(pairAddress).getReserves();
-        if (IVanillaPair(pairAddress).token0() == dusdAddress) {
-            return (_amount * reserve0) / reserve1;
+        if (IVanillaPair(pairAddress).token0() != dusdAddress) {
+            return (1e18 * reserve0) / reserve1;
         } else {
-            return (_amount * reserve1) / reserve0;
+            return (1e18 * reserve1) / reserve0;
         }
     }
 
-    function _dudsToUSD(uint256 _amount) private view returns (uint256) {
-        uint256 dudsPrice = _getDUSDPrice("DUSD-DFI");
-        return (_amount * 1e18) / dudsPrice;
+    function _dusdToDFI(uint256 _amount) private view returns (uint256) {
+        return (_amount * avgDUSDPrice) / 1e18;
     }
 
-    function _getDUSDPrice(string memory _pair) private view returns (uint256) {
-        uint256 price = 0;
+    function _getTokenToUSDPrice(string memory _pair) private view returns (uint256) {
         (, IStateRelayer.DEXInfo memory dex) = IStateRelayer(stateRelayer).getDexPairInfo(_pair);
-        if (keccak256(abi.encodePacked(_pair)) == keccak256(abi.encodePacked("DUSD-DFI"))) {
-            price = dex.primaryTokenPrice;
-        } else {
-            price = (dex.primaryTokenPrice * dex.secondTokenBalance) / dex.firstTokenBalance;
-        }
+        uint256 price = (dex.primaryTokenPrice * dex.secondTokenBalance) / dex.firstTokenBalance;
         return 1e36 / price;
+    }
+
+    function _dfiToUSD(uint256 _amount) private view returns (uint256) {
+        uint256 dfiPrice = _getTokenToUSDPrice("dUSDT-DFI");
+        if (dfiPrice > 1e18) {
+            return (_amount * 1e18) / dfiPrice;
+        } else {
+            return (_amount * dfiPrice) / 1e18;
+        }
     }
 
     function _calculateBonus(uint256 _amount) private pure returns (uint256) {
         uint256 bonus = 0;
 
-        if (_amount > 50 ether) {
+        if (_amount > 50000 ether) {
             bonus = (_amount * 1) / 100;
         }
-        if (_amount > 200 ether) {
+        if (_amount > 200000 ether) {
             bonus = (_amount * 2) / 100;
         }
-        if (_amount > 500 ether) {
+        if (_amount > 500000 ether) {
             bonus = (_amount * 3) / 100;
         }
 
