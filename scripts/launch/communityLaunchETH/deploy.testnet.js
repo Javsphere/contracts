@@ -8,15 +8,12 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd", //_usdtAddress bsc
-            ethers.parseEther("100"), //_availableTokens
+            "0xc0bAF6200639C52821245BEcc757480Eb03A4e3e", //_usdtAddress bsc
+            ethers.parseEther("10000"), //_availableTokens
         ],
         {
             initializer: "initialize",
             kind: "uups",
-            txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei"),
-            },
         },
     );
     await contract.waitForDeployment();

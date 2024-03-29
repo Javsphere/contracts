@@ -31,7 +31,8 @@ describe("CommunityLaunch contract", () => {
     let startTokenPrice;
     let endTokenPrice;
     let tokensToSale;
-    let dexPair;
+    let amountWeth;
+    let amount0;
 
     async function deployVestingFixture() {
         const tokenVestingFactory = await ethers.getContractFactory("TokenVestingFreezer");
@@ -111,11 +112,10 @@ describe("CommunityLaunch contract", () => {
         );
 
         saleActiveError = "CommunityLaunch: contract is not available right now";
-        dexPair = "DUSD-DFI";
 
         // add liquidity
-        const amountWeth = ethers.parseEther("100");
-        const amount0 = ethers.parseEther("500");
+        amountWeth = ethers.parseEther("500");
+        amount0 = ethers.parseEther("100");
         await wdfiToken.deposit({ value: amountWeth });
         await erc20Token2.mint(owner.address, amount0);
 
@@ -656,22 +656,27 @@ describe("CommunityLaunch contract", () => {
             await erc20Token2.mint(addr1.address, dusdAmount);
             await erc20Token2.connect(addr1).approve(hhCommunityLaunch.target, dusdAmount);
 
-            const dexDUSDPrice = ethers.parseEther("0.5");
-            const usdAmount = ethers.formatEther(dusdAmount * dexDUSDPrice);
-            const amount = await hhCommunityLaunch.getTokenAmountByUsd(
-                BigInt(Math.floor(usdAmount)),
-            );
+            await hhCommunityLaunch.updateDUSDPrice();
+
+            const firstTokenBalance = BigInt(313643539540840000000000);
+            const secondTokenBalance = BigInt(3988438984219900000000000);
+
+            const dfiAmount = (dusdAmount * amountWeth) / amount0;
+
+            const price = (ethers.parseEther("1") * firstTokenBalance) / secondTokenBalance;
+            const usdAmount = (dfiAmount * price) / ethers.parseEther("1");
+            const amount = await hhCommunityLaunch.getTokenAmountByUsd(usdAmount);
 
             await stateRelayer.updateDEXInfo(
-                [dexPair],
+                ["dUSDT-DFI"],
                 [
                     {
-                        primaryTokenPrice: dexDUSDPrice,
+                        primaryTokenPrice: ethers.parseEther("1"),
                         volume24H: 0,
                         totalLiquidity: 0,
                         APR: 0,
-                        firstTokenBalance: 0,
-                        secondTokenBalance: 0,
+                        firstTokenBalance: firstTokenBalance,
+                        secondTokenBalance: secondTokenBalance,
                         rewards: 0,
                         commissions: 0,
                     },
@@ -719,22 +724,25 @@ describe("CommunityLaunch contract", () => {
             const buyNativeAmount = ethers.parseEther("1.0");
             const tokenBefore = await erc20Token.balanceOf(hhCommunityLaunch.target);
             const tokenBeforeFreezer = await erc20Token.balanceOf(freezerMock.target);
-            let amount = ethers.parseEther("5");
 
-            const dexDUSDPrice = ethers.parseEther("1");
-            const usdAmount = ethers.parseEther((amount / dexDUSDPrice).toString());
+            const firstTokenBalance = BigInt(313643539540840000000000);
+            const secondTokenBalance = BigInt(3988438984219900000000000);
+
+            const price = (ethers.parseEther("1") * firstTokenBalance) / secondTokenBalance;
+
+            const usdAmount = (buyNativeAmount * price) / ethers.parseEther("1");
             const tokensAmount = await hhCommunityLaunch.getTokenAmountByUsd(usdAmount);
 
             await stateRelayer.updateDEXInfo(
-                [dexPair],
+                ["dUSDT-DFI"],
                 [
                     {
-                        primaryTokenPrice: dexDUSDPrice,
+                        primaryTokenPrice: ethers.parseEther("1"),
                         volume24H: 0,
                         totalLiquidity: 0,
                         APR: 0,
-                        firstTokenBalance: 0,
-                        secondTokenBalance: 0,
+                        firstTokenBalance: firstTokenBalance,
+                        secondTokenBalance: secondTokenBalance,
                         rewards: 0,
                         commissions: 0,
                     },
