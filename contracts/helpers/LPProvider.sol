@@ -10,6 +10,7 @@ import "../base/BaseUpgradable.sol";
 contract LPProvider is BaseUpgradable {
     using SafeERC20 for IERC20;
 
+    mapping(address => uint256) public lpLockAmount;
     /* ========== EVENTS ========== */
     event AddLiquidity(uint256 amountA, uint256 amountB, uint256 liquidity);
     event AddLiquidityETH(uint256 amountToken, uint256 amountETH, uint256 liquidity);
@@ -28,6 +29,7 @@ contract LPProvider is BaseUpgradable {
     }
 
     function addLiquidity(
+        address lpToken,
         address routerAddress,
         address tokenA,
         address tokenB,
@@ -64,10 +66,13 @@ contract LPProvider is BaseUpgradable {
                 deadline
             );
 
+        lpLockAmount[lpToken] += liquidity;
+
         emit AddLiquidity(amountA, amountB, liquidity);
     }
 
     function addLiquidityETH(
+        address lpToken,
         address routerAddress,
         address token,
         uint256 amountETH,
@@ -95,6 +100,8 @@ contract LPProvider is BaseUpgradable {
             address(this),
             deadline
         );
+
+        lpLockAmount[lpToken] += liquidity;
 
         emit AddLiquidityETH(amountToken, amountETH_, liquidity);
     }

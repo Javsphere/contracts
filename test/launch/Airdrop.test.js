@@ -134,7 +134,7 @@ describe("Airdrop contract", () => {
                 revocable,
                 amount,
                 vestingType,
-                1
+                1,
             );
 
             const vestingScheduleForHolder = await vestingMock.getLastVestingScheduleForHolder(

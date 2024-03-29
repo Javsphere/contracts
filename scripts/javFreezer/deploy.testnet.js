@@ -8,8 +8,8 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            ethers.parseEther("0.0000005"),  //_rewardPerBlock
-            30,  //_rewardUpdateBlocksInterval
+            ethers.parseEther("0.0000005"), //_rewardPerBlock
+            30, //_rewardUpdateBlocksInterval
             "0xF977A2D3EA547731f04B19cfDCE00fe9d23dB485", //_vestingAddress
         ],
         {

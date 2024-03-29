@@ -573,9 +573,9 @@ describe("CommunityLaunch contract", () => {
             const firstTokenBalance = BigInt(67270871);
             const secondTokenBalance = BigInt(196592085);
 
-            const price = ethers.parseEther("1") * firstTokenBalance / secondTokenBalance
+            const price = (ethers.parseEther("1") * firstTokenBalance) / secondTokenBalance;
 
-            const amountTotal = amount * ethers.parseEther("1") / price
+            const amountTotal = (amount * ethers.parseEther("1")) / price;
 
             await stateRelayer.updateDEXInfo(
                 ["dUSDT-DUSD"],
@@ -606,9 +606,7 @@ describe("CommunityLaunch contract", () => {
             );
             const vestingParams = await hhCommunityLaunch.vestingParams();
 
-            await expect(await vestingScheduleForHolder.amountTotal).to.be.equal(
-                amountTotal,
-            );
+            await expect(await vestingScheduleForHolder.amountTotal).to.be.equal(amountTotal);
             await expect(await vestingScheduleForHolder.duration).to.be.equal(
                 vestingParams.duration * BigInt(2),
             );
@@ -623,7 +621,7 @@ describe("CommunityLaunch contract", () => {
                 tokensBefore - amountTotal,
             );
             await expect(await erc20Token.balanceOf(freezerMock.target)).to.be.equal(
-                tokenBeforeFreezer + amountTotal
+                tokenBeforeFreezer + amountTotal,
             );
             await expect(await hhCommunityLaunch.tokensBalance()).to.be.equal(
                 tokensBefore - amountTotal,
@@ -660,7 +658,9 @@ describe("CommunityLaunch contract", () => {
 
             const dexDUSDPrice = ethers.parseEther("0.5");
             const usdAmount = ethers.formatEther(dusdAmount * dexDUSDPrice);
-            const amount = await hhCommunityLaunch.getTokenAmountByUsd(BigInt(Math.floor(usdAmount)));
+            const amount = await hhCommunityLaunch.getTokenAmountByUsd(
+                BigInt(Math.floor(usdAmount)),
+            );
 
             await stateRelayer.updateDEXInfo(
                 [dexPair],
