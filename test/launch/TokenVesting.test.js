@@ -455,62 +455,41 @@ describe("TokenVesting contract", () => {
 
         it("Should revoke when release - not contract owner", async () => {
             const beneficiary = addr1.address;
-            const releaseAmount = ethers.parseEther("0.0005");
             const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
                 beneficiary,
                 index,
             );
 
-            await expect(
-                hhTokenVesting.connect(addr2).release(scheduleId, releaseAmount),
-            ).to.be.revertedWith(
+            await expect(hhTokenVesting.connect(addr2).release(scheduleId)).to.be.revertedWith(
                 "TokenVesting: only beneficiary and owner can release vested tokens",
             );
         });
 
         it("Should revoke when release - not contract beneficiary", async () => {
             const beneficiary = addr1.address;
-            const releaseAmount = ethers.parseEther("0.0005");
             const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
                 beneficiary,
                 index,
             );
 
-            await expect(
-                hhTokenVesting.connect(addr2).release(scheduleId, releaseAmount),
-            ).to.be.revertedWith(
+            await expect(hhTokenVesting.connect(addr2).release(scheduleId)).to.be.revertedWith(
                 "TokenVesting: only beneficiary and owner can release vested tokens",
             );
         });
 
-        it("Should revoke when release - vestedAmount < amount", async () => {
-            const beneficiary = addr1.address;
-            const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
-            const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
-                beneficiary,
-                index,
-            );
-            const releaseAmount =
-                (await hhTokenVesting.computeReleasableAmount(scheduleId)) +
-                ethers.parseEther("0.0005");
-
-            await expect(
-                hhTokenVesting.connect(addr1).release(scheduleId, releaseAmount),
-            ).to.be.revertedWith("TokenVesting: cannot release tokens, not enough vested tokens");
-        });
-
         it("Should release", async () => {
             const beneficiary = addr1.address;
-            const releaseAmount = ethers.parseEther("0.0005");
             const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
             const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
                 beneficiary,
                 index,
             );
 
-            await hhTokenVesting.connect(addr1).release(scheduleId, releaseAmount);
+            const releaseAmount = await hhTokenVesting.computeReleasableAmount(scheduleId);
+
+            await hhTokenVesting.connect(addr1).release(scheduleId);
             const vestingSchedule = await hhTokenVesting.getVestingScheduleByAddressAndIndex(
                 beneficiary,
                 index,
@@ -518,6 +497,19 @@ describe("TokenVesting contract", () => {
 
             await expect(vestingSchedule.released).to.be.equal(releaseAmount);
             await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(releaseAmount);
+        });
+
+        it("Should revoke when release - vestedAmount = 0 ", async () => {
+            const beneficiary = addr1.address;
+            const index = (await hhTokenVesting.holdersVestingCount(beneficiary)) - BigInt(1);
+            const scheduleId = await hhTokenVesting.computeVestingScheduleIdForAddressAndIndex(
+                beneficiary,
+                index,
+            );
+
+            await expect(hhTokenVesting.connect(addr1).release(scheduleId)).to.be.revertedWith(
+                "TokenVesting: invalid releasable amount",
+            );
         });
 
         it("Should compute vesting schedule id for address and index", async () => {

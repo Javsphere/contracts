@@ -165,7 +165,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         require(vestingSchedule.revocable, "TokenVesting: vesting is not revocable");
         uint128 vestedAmount = _computeReleasableAmount(vestingSchedule);
         if (vestedAmount > 0) {
-            _release(vestingScheduleId, vestedAmount);
+            _release(vestingScheduleId);
         }
         uint256 unreleased = vestingSchedule.amountTotal - vestingSchedule.released;
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - unreleased;
@@ -189,13 +189,11 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     /**
      * @notice Release vested amount of tokens.
      * @param vestingScheduleId the vesting schedule identifier
-     * @param amount the amount to release
      */
     function release(
-        bytes32 vestingScheduleId,
-        uint128 amount
+        bytes32 vestingScheduleId
     ) external whenNotPaused nonReentrant onlyIfVestingScheduleNotRevoked(vestingScheduleId) {
-        _release(vestingScheduleId, amount);
+        _release(vestingScheduleId);
     }
 
     /**
@@ -313,9 +311,8 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     /**
      * @notice Release vested amount of tokens.
      * @param vestingScheduleId the vesting schedule identifier
-     * @param amount the amount to release
      */
-    function _release(bytes32 vestingScheduleId, uint128 amount) private {
+    function _release(bytes32 vestingScheduleId) private {
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
         bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
         bool isReleasor = msg.sender == owner();
@@ -324,17 +321,16 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
             isBeneficiary || isReleasor,
             "TokenVesting: only beneficiary and owner can release vested tokens"
         );
-        uint256 vestedAmount = _computeReleasableAmount(vestingSchedule);
-        require(
-            vestedAmount >= amount,
-            "TokenVesting: cannot release tokens, not enough vested tokens"
-        );
-        vestingSchedule.released = vestingSchedule.released + amount;
-        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - amount;
+        uint128 releasableAmount = _computeReleasableAmount(vestingSchedule);
 
-        token.safeTransfer(vestingSchedule.beneficiary, amount);
+        require(releasableAmount > 0, "TokenVesting: invalid releasable amount");
 
-        emit Released(vestingScheduleId, vestingSchedule.beneficiary, amount);
+        vestingSchedule.released = vestingSchedule.released + releasableAmount;
+        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - releasableAmount;
+
+        token.safeTransfer(vestingSchedule.beneficiary, releasableAmount);
+
+        emit Released(vestingScheduleId, vestingSchedule.beneficiary, releasableAmount);
     }
 
     /**
