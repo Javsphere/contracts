@@ -491,7 +491,7 @@ describe("CommunityLaunch contract", () => {
                 vestingParams.duration * BigInt(2),
             );
             await expect(await vestingScheduleForHolder.slicePeriodSeconds).to.be.equal(
-                vestingParams.slicePeriodSeconds * BigInt(2),
+                vestingParams.slicePeriodSeconds,
             );
 
             await expect(await erc20Token2.balanceOf(hhCommunityLaunch.target)).to.be.equal(
@@ -611,7 +611,7 @@ describe("CommunityLaunch contract", () => {
                 vestingParams.duration * BigInt(2),
             );
             await expect(await vestingScheduleForHolder.slicePeriodSeconds).to.be.equal(
-                vestingParams.slicePeriodSeconds * BigInt(2),
+                vestingParams.slicePeriodSeconds,
             );
 
             await expect(await erc20Token2.balanceOf(hhCommunityLaunch.target)).to.be.equal(
@@ -835,7 +835,7 @@ describe("CommunityLaunch contract", () => {
             await expect(
                 hhCommunityLaunch
                     .connect(addr1)
-                    .simulateBuy(addr1.address, addr1.address, 1, 1, 1, 1, 1, 0, 0),
+                    .simulateBuy(addr1.address, addr1.address, 1, 1, 1, 1, 1, 0, 0, false),
             ).to.be.revertedWith("CommunityLaunch: only bot");
         });
 
@@ -846,7 +846,7 @@ describe("CommunityLaunch contract", () => {
 
             await hhCommunityLaunch
                 .connect(bot)
-                .simulateBuy(addr1.address, addr1.address, usdAmount, 1, 1, 1, 1, 0, 0);
+                .simulateBuy(addr1.address, addr1.address, usdAmount, 1, 1, 1, 1, 0, 0, false);
 
             const vestingScheduleForHolder = await vestingMock.getLastVestingScheduleForHolder(
                 addr1.address,

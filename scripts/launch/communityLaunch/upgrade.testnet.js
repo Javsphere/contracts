@@ -12,7 +12,6 @@ async function main() {
 
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",
-        redeployImplementation: "always",
         txOverrides: {
             gasLimit: ethers.parseUnits("0.03", "gwei"),
         },

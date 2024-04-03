@@ -303,9 +303,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint256 saleTokenType;
         uint256 inputAmount;
         uint256 usdAmount = 0;
-        uint128 cliff = vestingParams.cliff;
         uint128 duration = vestingParams.duration;
-        uint128 slicePeriodSeconds = vestingParams.slicePeriodSeconds;
         uint256 lockId = vestingParams.lockId;
 
         if (_amountIn != 0) {
@@ -321,9 +319,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             IERC20(_token).safeTransferFrom(msg.sender, address(this), inputAmount);
             if (_isEqualUSD) {
                 usdAmount = inputAmount;
-                cliff = cliff * 2;
                 duration = duration * 2;
-                slicePeriodSeconds = slicePeriodSeconds * 2;
                 lockId += 1;
             } else {
                 usdAmount = _token == usdtAddress ? _amountIn : _dfiToUSD(_dusdToDFI(_amountIn));
@@ -358,18 +354,22 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         }
         uint256 eventPrice = (usdAmount * 1e18) / _tokensAmount;
 
+        uint256 referralBonus = _calculateReferralBonus(_tokensAmount, _referrer, msg.sender);
+
         if (bonus) {
             uint256 bonusAmount = _calculateBonus(_tokensAmount);
             _tokensAmount += bonusAmount;
         }
 
+        _tokensAmount += referralBonus;
+
         _createVesting(
             msg.sender,
             uint128(_tokensAmount),
             uint128(block.timestamp),
-            cliff,
+            vestingParams.cliff,
             duration,
-            slicePeriodSeconds,
+            vestingParams.slicePeriodSeconds,
             lockId
         );
 
@@ -392,14 +392,22 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint128 _duration,
         uint128 _slicePeriodSeconds,
         uint256 _saleTokenType,
-        uint256 _lockId
+        uint256 _lockId,
+        bool _isBonus
     ) external onlyActive onlyBot {
         uint256 _tokensAmount = _calculateTokensAmount(_usdAmount);
+        if (_isBonus) {
+            _tokensAmount = (_tokensAmount * 1e18) / _getTokenToUSDPrice("dUSDT-DUSD");
+        }
+        uint256 eventPrice = (_usdAmount * 1e18) / _tokensAmount;
+        _tokensAmount += (_calculateBonus(_tokensAmount) +
+            _calculateReferralBonus(_tokensAmount, _referrer, _beneficiary));
+
         require(
             token.balanceOf(address(this)) >= _tokensAmount,
             "CommunityLaunch: Invalid amount for purchase"
         );
-        uint256 eventPrice = (_usdAmount * 1e18) / _tokensAmount;
+
         _createVesting(
             _beneficiary,
             uint128(_tokensAmount),
@@ -541,16 +549,28 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     function _calculateBonus(uint256 _amount) private pure returns (uint256) {
         uint256 bonus = 0;
 
-        if (_amount > 50000 ether) {
+        if (_amount >= 25000 ether) {
             bonus = (_amount * 1) / 100;
         }
-        if (_amount > 200000 ether) {
+        if (_amount >= 50000 ether) {
             bonus = (_amount * 2) / 100;
         }
-        if (_amount > 500000 ether) {
+        if (_amount >= 100000 ether) {
             bonus = (_amount * 3) / 100;
         }
 
         return bonus;
+    }
+
+    function _calculateReferralBonus(
+        uint256 _amount,
+        address _referral,
+        address _sender
+    ) private pure returns (uint256) {
+        if (_referral != _sender && _referral != address(0)) {
+            return (_amount * 1) / 100;
+        } else {
+            return 0;
+        }
     }
 }

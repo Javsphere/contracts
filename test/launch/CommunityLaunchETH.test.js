@@ -115,9 +115,9 @@ describe("CommunityLaunchETH contract", () => {
         it("Should revert when buy with isSaleActive = false", async () => {
             await hhCommunityLaunch.setSaleActive(false);
 
-            await expect(hhCommunityLaunch.connect(addr1).buy(addr1.address, 0)).to.be.revertedWith(
-                saleActiveError,
-            );
+            await expect(
+                hhCommunityLaunch.connect(addr1).buy(addr1.address, 0, false),
+            ).to.be.revertedWith(saleActiveError);
 
             await hhCommunityLaunch.setSaleActive(true);
         });
@@ -129,13 +129,9 @@ describe("CommunityLaunchETH contract", () => {
             await erc20Token.mint(addr1.address, usdtAmount);
             await erc20Token.connect(addr1).approve(hhCommunityLaunch.target, usdtAmount);
 
-            await expect(
-                hhCommunityLaunch.connect(addr1).buy(addr2.address, usdtAmount, {
-                    value: 0,
-                }),
-            )
+            await expect(hhCommunityLaunch.connect(addr1).buy(addr2.address, usdtAmount, true))
                 .emit(hhCommunityLaunch, "TokensPurchased")
-                .withArgs(addr1.address, addr2.address, usdtAmount);
+                .withArgs(addr1.address, addr2.address, usdtAmount, true);
 
             await expect(await erc20Token.balanceOf(hhCommunityLaunch.target)).to.be.equal(
                 usdtAmount,
