@@ -63,7 +63,6 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     event RemoveAllowedAddress(address indexed _address);
 
     modifier onlyIfVestingScheduleNotRevoked(bytes32 _vestingScheduleId) {
-        require(vestingSchedules[_vestingScheduleId].initialized);
         require(!vestingSchedules[_vestingScheduleId].revoked);
         _;
     }
