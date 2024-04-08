@@ -387,17 +387,15 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         address _beneficiary,
         address _referrer,
         uint256 _usdAmount,
-        uint128 _start,
-        uint128 _cliff,
-        uint128 _duration,
-        uint128 _slicePeriodSeconds,
-        uint256 _saleTokenType,
-        uint256 _lockId,
         bool _isBonus
     ) external onlyActive onlyBot {
         uint256 _tokensAmount = _calculateTokensAmount(_usdAmount);
+        uint128 duration = vestingParams.duration;
+        uint256 lockId = vestingParams.lockId;
         if (_isBonus) {
             _tokensAmount = (_tokensAmount * 1e18) / _getTokenToUSDPrice("dUSDT-DUSD");
+            duration = duration * 2;
+            lockId += 1;
         }
         uint256 eventPrice = (_usdAmount * 1e18) / _tokensAmount;
         _tokensAmount += (_calculateBonus(_tokensAmount) +
@@ -411,21 +409,14 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         _createVesting(
             _beneficiary,
             uint128(_tokensAmount),
-            _start,
-            _cliff,
-            _duration,
-            _slicePeriodSeconds,
-            _lockId
+            uint128(block.timestamp),
+            vestingParams.cliff,
+            duration,
+            vestingParams.slicePeriodSeconds,
+            lockId
         );
 
-        emit TokensPurchased(
-            _beneficiary,
-            _referrer,
-            _tokensAmount,
-            _saleTokenType,
-            _usdAmount,
-            eventPrice
-        );
+        emit TokensPurchased(_beneficiary, _referrer, _tokensAmount, 1, _usdAmount, eventPrice);
     }
 
     /**
@@ -487,7 +478,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         token.safeTransfer(freezerAddress, _amount);
         ITokenVesting(vestingAddress).createVestingSchedule(
             _beneficiary,
-            _start,
+            1718755200, // 19.06.2024
             _cliff,
             _duration,
             _slicePeriodSeconds,
