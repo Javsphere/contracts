@@ -660,5 +660,35 @@ describe("JavFreezer contract", () => {
                 await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
             ).to.be.equal(0);
         });
+
+        it("Should get pendingReward with block.timestamp <= pool.lastRewardBlock", async () => {
+            const pid = 0;
+            const amount = ethers.parseEther("10");
+            const lockId = 5;
+            const depositTimestamp = 123456689;
+            const withdrawalTimestamp = 123456789;
+
+            await erc20Token.mint(hhJavFreezer.target, amount);
+
+
+            const block = await ethers.provider.getBlockNumber() + 500;
+
+            await hhJavFreezer
+                .connect(vesting)
+                .depositVesting(
+                    addr1.address,
+                    pid,
+                    amount,
+                    depositTimestamp,
+                    withdrawalTimestamp,
+                    lockId,
+                );
+
+            await hhJavFreezer.setPoolInfo(0, block, 0);
+
+            await expect(await hhJavFreezer.pendingRewardTotal(0, addr1.address)).to.be.equal(
+                0,
+            );
+        });
     });
 });

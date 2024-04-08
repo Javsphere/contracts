@@ -457,7 +457,11 @@ contract JavFreezer is
     ) private view returns (uint256) {
         UserDeposit memory depositDetails = userDeposits[_user][_pid][_depositId];
         PoolInfo memory pool = poolInfo[_pid];
-        if (depositDetails.is_finished || block.timestamp <= depositDetails.depositTimestamp) {
+        if (
+            depositDetails.is_finished ||
+            block.timestamp <= depositDetails.depositTimestamp ||
+            block.number < pool.lastRewardBlock
+        ) {
             return 0;
         }
 

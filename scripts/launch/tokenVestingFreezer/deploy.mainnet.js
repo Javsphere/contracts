@@ -8,7 +8,7 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x0000000000000000000000000000000000000000", //_freezerAddress
+            "0x4e15D4225623D07Adb43e9D546E57E1E6097e869", //_freezerAddress
         ],
         {
             initializer: "initialize",

@@ -835,7 +835,7 @@ describe("CommunityLaunch contract", () => {
             await expect(
                 hhCommunityLaunch
                     .connect(addr1)
-                    .simulateBuy(addr1.address, addr1.address, 1, 1, 1, 1, 1, 0, 0, false),
+                    .simulateBuy(addr1.address, addr1.address, 1, false),
             ).to.be.revertedWith("CommunityLaunch: only bot");
         });
 
@@ -846,7 +846,7 @@ describe("CommunityLaunch contract", () => {
 
             await hhCommunityLaunch
                 .connect(bot)
-                .simulateBuy(addr1.address, addr1.address, usdAmount, 1, 1, 1, 1, 0, 0, false);
+                .simulateBuy(addr1.address, addr1.address, usdAmount, false);
 
             const vestingScheduleForHolder = await vestingMock.getLastVestingScheduleForHolder(
                 addr1.address,
