@@ -1,5 +1,5 @@
-const { expect } = require("chai");
-const { ethers, upgrades } = require("hardhat");
+const {expect} = require("chai");
+const {ethers, upgrades} = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const {
     deployTokenFixture,
@@ -7,7 +7,7 @@ const {
     deployUniswapFixture,
     deployStateRelayerFixture,
 } = require("../common/mocks");
-const { ADMIN_ERROR } = require("../common/constanst");
+const {ADMIN_ERROR} = require("../common/constanst");
 
 describe("CommunityLaunch contract", () => {
     let hhCommunityLaunch;
@@ -116,7 +116,7 @@ describe("CommunityLaunch contract", () => {
         // add liquidity
         amountWeth = ethers.parseEther("500");
         amount0 = ethers.parseEther("100");
-        await wdfiToken.deposit({ value: amountWeth });
+        await wdfiToken.deposit({value: amountWeth});
         await erc20Token2.mint(owner.address, amount0);
 
         await wdfiToken.approve(uniswapRouter.target, ethers.parseEther("100000"));
@@ -844,6 +844,30 @@ describe("CommunityLaunch contract", () => {
             const usdAmount = ethers.parseEther("5");
             const tokenAmount = await hhCommunityLaunch.getTokenAmountByUsd(usdAmount);
 
+            await hhCommunityLaunch
+                .connect(bot)
+                .simulateBuy(addr1.address, addr1.address, usdAmount, false);
+
+            const vestingScheduleForHolder = await vestingMock.getLastVestingScheduleForHolder(
+                addr1.address,
+            );
+            await expect(await vestingScheduleForHolder.amountTotal).to.be.equal(tokenAmount);
+
+            await expect(await erc20Token.balanceOf(hhCommunityLaunch.target)).to.be.equal(
+                tokenBefore - tokenAmount,
+            );
+            await expect(await hhCommunityLaunch.tokensBalance()).to.be.equal(
+                tokenBefore - tokenAmount,
+            );
+        });
+
+        it("Should simulateBuy - isSaleActive=False", async () => {
+            const tokenBefore = await erc20Token.balanceOf(hhCommunityLaunch.target);
+            const usdAmount = ethers.parseEther("5");
+            const endTokenPrice = await hhCommunityLaunch.endTokenPrice();
+            const tokenAmount = usdAmount * ethers.parseEther("1") / endTokenPrice
+
+            await hhCommunityLaunch.setSaleActive(false)
             await hhCommunityLaunch
                 .connect(bot)
                 .simulateBuy(addr1.address, addr1.address, usdAmount, false);

@@ -97,7 +97,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     }
 
     modifier onlyBot() {
-        require(msg.sender == botAddress, "CommunityLaunch: only bot");
+        require(msg.sender == botAddress || msg.sender == owner(), "CommunityLaunch: only bot");
         _;
     }
 
@@ -231,7 +231,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
      * @notice Functon to calculate tokens based on usd input amount
      */
     function getTokenAmountByUsd(uint256 _usdAmount) external view returns (uint256) {
-        return _calculateTokensAmount(_usdAmount);
+        return _calculateTokensAmount(_usdAmount, false);
     }
 
     /**
@@ -333,7 +333,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             saleTokenType = 0;
         }
 
-        uint256 _tokensAmount = _calculateTokensAmount(usdAmount);
+        uint256 _tokensAmount = _calculateTokensAmount(usdAmount, false);
 
         if (_isEqualUSD && _token == usdtAddress) {
             _tokensAmount = (_tokensAmount * 1e18) / _getTokenToUSDPrice("dUSDT-DUSD");
@@ -388,8 +388,8 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         address _referrer,
         uint256 _usdAmount,
         bool _isBonus
-    ) external onlyActive onlyBot {
-        uint256 _tokensAmount = _calculateTokensAmount(_usdAmount);
+    ) external onlyBot {
+        uint256 _tokensAmount = _calculateTokensAmount(_usdAmount, true);
         uint128 duration = vestingParams.duration;
         uint256 lockId = vestingParams.lockId;
         if (_isBonus) {
@@ -448,7 +448,13 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit WithdrawDFI(_to, _amount);
     }
 
-    function _calculateTokensAmount(uint256 _usdAmount) private view returns (uint256) {
+    function _calculateTokensAmount(
+        uint256 _usdAmount,
+        bool _simulateBuy
+    ) private view returns (uint256) {
+        if (_simulateBuy && !isSaleActive) {
+            return (_usdAmount * 1e18) / endTokenPrice;
+        }
         (
             uint256 currentSection,
             uint256 _soldTokens,

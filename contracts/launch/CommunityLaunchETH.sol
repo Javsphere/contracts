@@ -13,7 +13,8 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
     bool public isSaleActive;
     address public usdtAddress;
 
-    uint256 public availableTokens; // availableTokens * 1e18
+    uint256 public availableTokens;
+    uint256 public tokensPerTrx;
 
     /* ========== EVENTS ========== */
     event SetUSDTAddress(address indexed _address);
@@ -26,6 +27,7 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
         bool isBonus
     );
     event Withdraw(address indexed token, address indexed to, uint256 amount);
+    event SetTokensPerTrx(uint256 indexed tokensPerTrx);
 
     modifier onlyActive() {
         require(isSaleActive, "CommunityLaunch: contract is not available right now");
@@ -65,6 +67,12 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit SetAvailableTokens(_availableTokens);
     }
 
+    function setTokensPerTrx(uint256 _tokensPerTrx) external onlyAdmin {
+        tokensPerTrx = _tokensPerTrx;
+
+        emit SetTokensPerTrx(_tokensPerTrx);
+    }
+
     /**
      * @notice Functon to buy JAV tokens with native tokens
      */
@@ -73,13 +81,15 @@ contract CommunityLaunchETH is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint256 _amountIn,
         bool _isBonus
     ) external onlyActive nonReentrant {
-        require(availableTokens > 0, "CommunityLaunch: Invalid amount for purchase");
+        require(_amountIn <= tokensPerTrx, "CommunityLaunch: Invalid tokens amount - max amount");
+        require(_amountIn <= availableTokens, "CommunityLaunch: Invalid amount for purchase");
 
         require(
             IERC20(usdtAddress).balanceOf(msg.sender) >= _amountIn,
             "CommunityLaunch: invalid amount"
         );
         IERC20(usdtAddress).safeTransferFrom(msg.sender, address(this), _amountIn);
+        availableTokens -= _amountIn;
 
         emit TokensPurchased(msg.sender, _referrer, _amountIn, _isBonus);
     }

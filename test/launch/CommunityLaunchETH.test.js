@@ -81,10 +81,24 @@ describe("CommunityLaunchETH contract", () => {
         });
 
         it("Should setAvailableTokens", async () => {
-            await hhCommunityLaunch.setAvailableTokens(ethers.parseEther("100"));
+            await hhCommunityLaunch.setAvailableTokens(ethers.parseEther("70"));
 
             await expect(await hhCommunityLaunch.availableTokens()).to.equal(
-                ethers.parseEther("100"),
+                ethers.parseEther("70"),
+            );
+        });
+
+        it("Should revert when setTokensPerTrx", async () => {
+            await expect(
+                hhCommunityLaunch.connect(addr1).setTokensPerTrx(100),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should setTokensPerTrx", async () => {
+            await hhCommunityLaunch.setTokensPerTrx(ethers.parseEther("50"));
+
+            await expect(await hhCommunityLaunch.tokensPerTrx()).to.equal(
+                ethers.parseEther("50"),
             );
         });
 
@@ -122,12 +136,26 @@ describe("CommunityLaunchETH contract", () => {
             await hhCommunityLaunch.setSaleActive(true);
         });
 
-        it("Should buy jav tokens with dusd", async () => {
+        it("Should revert when buy tokens - tokensPerTrx", async () => {
             await helpers.mine(10);
 
-            const usdtAmount = ethers.parseEther("5");
+            const usdtAmount = ethers.parseEther("60");
             await erc20Token.mint(addr1.address, usdtAmount);
             await erc20Token.connect(addr1).approve(hhCommunityLaunch.target, usdtAmount);
+
+            await expect(
+                hhCommunityLaunch.connect(addr1).buy(addr1.address, usdtAmount, false),
+            ).to.be.revertedWith("CommunityLaunch: Invalid tokens amount - max amount");
+        });
+
+        it("Should buy tokens", async () => {
+            await helpers.mine(10);
+
+            const usdtAmount = ethers.parseEther("50");
+            await erc20Token.mint(addr1.address, usdtAmount);
+            await erc20Token.connect(addr1).approve(hhCommunityLaunch.target, usdtAmount);
+
+            const availableTokensBefore = await hhCommunityLaunch.availableTokens();
 
             await expect(hhCommunityLaunch.connect(addr1).buy(addr2.address, usdtAmount, true))
                 .emit(hhCommunityLaunch, "TokensPurchased")
@@ -136,6 +164,21 @@ describe("CommunityLaunchETH contract", () => {
             await expect(await erc20Token.balanceOf(hhCommunityLaunch.target)).to.be.equal(
                 usdtAmount,
             );
+            await expect(await hhCommunityLaunch.availableTokens()).to.be.equal(
+                availableTokensBefore - usdtAmount
+            );
+        });
+
+        it("Should revert when buy tokens - availableTokens", async () => {
+            await helpers.mine(10);
+
+            const usdtAmount = ethers.parseEther("50");
+            await erc20Token.mint(addr1.address, usdtAmount);
+            await erc20Token.connect(addr1).approve(hhCommunityLaunch.target, usdtAmount);
+
+            await expect(
+                hhCommunityLaunch.connect(addr1).buy(addr1.address, usdtAmount, false),
+            ).to.be.revertedWith("CommunityLaunch: Invalid amount for purchase");
         });
 
         it("Should revert when withdraw ADMIN_ERROR", async () => {
