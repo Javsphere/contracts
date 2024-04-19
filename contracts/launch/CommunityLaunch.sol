@@ -57,6 +57,8 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
 
     uint256 public avgDUSDPrice;
     uint256 public lastUpdateBlockDUSDPrice;
+    mapping(uint256 => uint256[]) public tokenFactor;
+    uint256 public maxBagSize;
 
     /* ========== EVENTS ========== */
     event SetVestingAddress(address indexed _address);
@@ -90,6 +92,8 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event WithdrawDFI(address indexed to, uint256 amount);
     event UpdateDUSDPrice(uint256 indexed lastBlock, uint256 price);
+    event SetMaxBagSize(uint256 indexed maxBagSize);
+    event SetTokenFactor(uint256 indexed tokenId, uint256[] factor);
 
     modifier onlyActive() {
         require(isSaleActive, "CommunityLaunch: contract is not available right now");
@@ -227,6 +231,19 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         emit SetTokensAmountByType(_tokensAmountByType[0]);
     }
 
+    function setMaxBagSize(uint256 _maxBagSize) external onlyAdmin {
+        maxBagSize = _maxBagSize;
+
+        emit SetMaxBagSize(_maxBagSize);
+    }
+
+    function setTokenFactor(uint256 _tokenId, uint256[] memory _factor) external onlyAdmin {
+        require(_factor.length == 2, "CommunityLaunch: invalid factor value");
+        tokenFactor[_tokenId] = _factor;
+
+        emit SetTokenFactor(_tokenId, _factor);
+    }
+
     /**
      * @notice Functon to calculate tokens based on usd input amount
      */
@@ -264,6 +281,10 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         return _dfiToUSD(_dusdToDFI(1e18));
     }
 
+    function getTokenFactorBonus(uint256 _tokenId) external view returns (uint256) {
+        return _calculateFactorBonus(_tokenId, false);
+    }
+
     function updateDUSDPrice() external {
         uint256 newAvgPrice;
         uint256 _price = _getDUSDToDFIPrice(); // 1e18
@@ -286,13 +307,13 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
      * @param _referrer _referrer address
      * @param _amountIn dusd amount
      * @param _token token address
-     * @param _isEqualUSD is 1 dusd = 1 $
+     * @param _isLongerVesting is double vesting period
      */
     function buy(
         address _referrer,
         uint256 _amountIn,
         address _token,
-        bool _isEqualUSD
+        bool _isLongerVesting
     ) external payable onlyActive nonReentrant {
         require(
             _amountIn == 0 || msg.value == 0,
@@ -317,13 +338,8 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             );
             inputAmount = _amountIn;
             IERC20(_token).safeTransferFrom(msg.sender, address(this), inputAmount);
-            if (_isEqualUSD) {
-                usdAmount = inputAmount;
-                duration = duration * 2;
-                lockId += 1;
-            } else {
-                usdAmount = _token == usdtAddress ? _amountIn : _dfiToUSD(_dusdToDFI(_amountIn));
-            }
+
+            usdAmount = _token == usdtAddress ? _amountIn : _dfiToUSD(_dusdToDFI(_amountIn));
             saleTokenType = _token == usdtAddress ? 1 : 2;
             bonus = _token == usdtAddress ? true : false;
         } else {
@@ -335,22 +351,20 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
 
         uint256 _tokensAmount = _calculateTokensAmount(usdAmount, false);
 
-        if (_isEqualUSD && _token == usdtAddress) {
-            _tokensAmount = (_tokensAmount * 1e18) / _getTokenToUSDPrice("dUSDT-DUSD");
+        if (_isLongerVesting) {
+            duration = duration * 2;
+            lockId += 1;
+            _tokensAmount = (_tokensAmount * _calculateFactorBonus(saleTokenType, false)) / 100;
         }
 
-        require(
-            token.balanceOf(address(this)) >= _tokensAmount,
-            "CommunityLaunch: Invalid amount for purchase"
-        );
+        require(_tokensAmount <= maxBagSize, "CommunityLaunch: Bag size limit exceeded");
 
         if (_amountIn != 0 && _token == dusdAddress) {
             require(
-                tokensAmountByType[0] >= _tokensAmount,
+                tokensAmountByType[0] >= _amountIn,
                 "CommunityLaunch: Invalid amount to purchase for the selected token"
             );
-
-            tokensAmountByType[0] -= _tokensAmount;
+            tokensAmountByType[0] -= _amountIn;
         }
         uint256 eventPrice = (usdAmount * 1e18) / _tokensAmount;
 
@@ -362,6 +376,11 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         }
 
         _tokensAmount += referralBonus;
+
+        require(
+            token.balanceOf(address(this)) >= _tokensAmount,
+            "CommunityLaunch: Invalid amount for purchase"
+        );
 
         _createVesting(
             msg.sender,
@@ -393,7 +412,7 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         uint128 duration = vestingParams.duration;
         uint256 lockId = vestingParams.lockId;
         if (_isBonus) {
-            _tokensAmount = (_tokensAmount * 1e18) / _getTokenToUSDPrice("dUSDT-DUSD");
+            _tokensAmount = (_tokensAmount * _calculateFactorBonus(1, true)) / 100;
             duration = duration * 2;
             lockId += 1;
         }
@@ -569,5 +588,21 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
         } else {
             return 0;
         }
+    }
+
+    function _calculateFactorBonus(
+        uint256 _tokenId,
+        bool _simulateBuy
+    ) private view returns (uint256) {
+        uint256[] memory factor = tokenFactor[_tokenId];
+
+        if (_simulateBuy && !isSaleActive) {
+            return factor[1];
+        }
+
+        (uint256 section, , ) = _calculateCurrentSection();
+        uint256 _decFactorPerSection = (factor[0] - factor[1]) / (sectionsNumber - 1);
+
+        return factor[0] - (_decFactorPerSection * (section - 1));
     }
 }
