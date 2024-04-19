@@ -89,17 +89,15 @@ describe("CommunityLaunchETH contract", () => {
         });
 
         it("Should revert when setTokensPerTrx", async () => {
-            await expect(
-                hhCommunityLaunch.connect(addr1).setTokensPerTrx(100),
-            ).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhCommunityLaunch.connect(addr1).setTokensPerTrx(100)).to.be.revertedWith(
+                ADMIN_ERROR,
+            );
         });
 
         it("Should setTokensPerTrx", async () => {
             await hhCommunityLaunch.setTokensPerTrx(ethers.parseEther("50"));
 
-            await expect(await hhCommunityLaunch.tokensPerTrx()).to.equal(
-                ethers.parseEther("50"),
-            );
+            await expect(await hhCommunityLaunch.tokensPerTrx()).to.equal(ethers.parseEther("50"));
         });
 
         it("Should revert when setUSDTAddress", async () => {
@@ -165,7 +163,7 @@ describe("CommunityLaunchETH contract", () => {
                 usdtAmount,
             );
             await expect(await hhCommunityLaunch.availableTokens()).to.be.equal(
-                availableTokensBefore - usdtAmount
+                availableTokensBefore - usdtAmount,
             );
         });
 

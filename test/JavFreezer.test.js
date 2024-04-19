@@ -670,8 +670,7 @@ describe("JavFreezer contract", () => {
 
             await erc20Token.mint(hhJavFreezer.target, amount);
 
-
-            const block = await ethers.provider.getBlockNumber() + 500;
+            const block = (await ethers.provider.getBlockNumber()) + 500;
 
             await hhJavFreezer
                 .connect(vesting)
@@ -686,9 +685,7 @@ describe("JavFreezer contract", () => {
 
             await hhJavFreezer.setPoolInfo(0, block, 0);
 
-            await expect(await hhJavFreezer.pendingRewardTotal(0, addr1.address)).to.be.equal(
-                0,
-            );
+            await expect(await hhJavFreezer.pendingRewardTotal(0, addr1.address)).to.be.equal(0);
         });
     });
 });
