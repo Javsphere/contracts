@@ -359,13 +359,6 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
 
         require(_tokensAmount <= maxBagSize, "CommunityLaunch: Bag size limit exceeded");
 
-        if (_amountIn != 0 && _token == dusdAddress) {
-            require(
-                tokensAmountByType[0] >= _amountIn,
-                "CommunityLaunch: Invalid amount to purchase for the selected token"
-            );
-            tokensAmountByType[0] -= _amountIn;
-        }
         uint256 eventPrice = (usdAmount * 1e18) / _tokensAmount;
 
         uint256 referralBonus = _calculateReferralBonus(_tokensAmount, _referrer, msg.sender);
@@ -381,6 +374,14 @@ contract CommunityLaunch is BaseUpgradable, ReentrancyGuardUpgradeable {
             token.balanceOf(address(this)) >= _tokensAmount,
             "CommunityLaunch: Invalid amount for purchase"
         );
+
+        if (_amountIn != 0 && _token == dusdAddress) {
+            require(
+                tokensAmountByType[0] >= _tokensAmount,
+                "CommunityLaunch: Invalid amount to purchase for the selected token"
+            );
+            tokensAmountByType[0] -= _tokensAmount;
+        }
 
         _createVesting(
             msg.sender,

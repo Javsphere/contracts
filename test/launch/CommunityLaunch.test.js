@@ -596,41 +596,6 @@ describe("CommunityLaunch contract", () => {
             );
         });
 
-        it("Should revert when buy jav tokens with dusd - tokensAmountByType < 0 ", async () => {
-            const usdtAmount = ethers.parseEther("120");
-            await erc20Token2.mint(addr1.address, usdtAmount);
-            await erc20Token2.connect(addr1).approve(hhCommunityLaunch.target, usdtAmount);
-            const firstTokenBalance = BigInt(313643539540840000000000);
-            const secondTokenBalance = BigInt(3988438984219900000000000);
-            await stateRelayer.updateDEXInfo(
-                ["dUSDT-DFI"],
-                [
-                    {
-                        primaryTokenPrice: ethers.parseEther("1"),
-                        volume24H: 0,
-                        totalLiquidity: 0,
-                        APR: 0,
-                        firstTokenBalance: firstTokenBalance,
-                        secondTokenBalance: secondTokenBalance,
-                        rewards: 0,
-                        commissions: 0,
-                    },
-                ],
-                0,
-                0,
-            );
-
-            await expect(
-                hhCommunityLaunch
-                    .connect(addr1)
-                    .buy(addr1.address, usdtAmount, erc20Token2.target, true, {
-                        value: 0,
-                    }),
-            ).to.be.revertedWith(
-                "CommunityLaunch: Invalid amount to purchase for the selected token",
-            );
-        });
-
         it("Should buy jav tokens with dusd _isLongerVesting =  false", async () => {
             await helpers.mine(10);
 
@@ -702,7 +667,7 @@ describe("CommunityLaunch contract", () => {
                 tokensBefore - amount,
             );
             await expect(await hhCommunityLaunch.tokensAmountByType(0)).to.be.equal(
-                availableDUSDAmount - dusdAmount,
+                availableDUSDAmount - amount,
             );
         });
 
@@ -776,6 +741,41 @@ describe("CommunityLaunch contract", () => {
 
             await expect(await hhCommunityLaunch.tokensBalance()).to.be.equal(
                 tokensBefore - amountTotal,
+            );
+        });
+
+        it("Should revert when buy jav tokens with dusd - tokensAmountByType < 0 ", async () => {
+            const usdtAmount = ethers.parseEther("120");
+            await erc20Token2.mint(addr1.address, usdtAmount);
+            await erc20Token2.connect(addr1).approve(hhCommunityLaunch.target, usdtAmount);
+            const firstTokenBalance = BigInt(313643539540840000000000);
+            const secondTokenBalance = BigInt(3988438984219900000000000);
+            await stateRelayer.updateDEXInfo(
+                ["dUSDT-DFI"],
+                [
+                    {
+                        primaryTokenPrice: ethers.parseEther("1"),
+                        volume24H: 0,
+                        totalLiquidity: 0,
+                        APR: 0,
+                        firstTokenBalance: firstTokenBalance,
+                        secondTokenBalance: secondTokenBalance,
+                        rewards: 0,
+                        commissions: 0,
+                    },
+                ],
+                0,
+                0,
+            );
+
+            await expect(
+                hhCommunityLaunch
+                    .connect(addr1)
+                    .buy(addr1.address, usdtAmount, erc20Token2.target, true, {
+                        value: 0,
+                    }),
+            ).to.be.revertedWith(
+                "CommunityLaunch: Invalid amount to purchase for the selected token",
             );
         });
 
