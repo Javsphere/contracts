@@ -28,4 +28,6 @@ contract JavFreezerMock is IJavFreezer {
     ) external view returns (uint256) {}
 
     function getUserLastDepositId(uint256 _pid, address _user) external view returns (uint256) {}
+
+    function addRewards(uint256 _pid, uint256 _amount) external {}
 }
