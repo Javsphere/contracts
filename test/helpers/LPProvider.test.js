@@ -3,19 +3,22 @@ const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const {
     deployTokenFixture,
-    deployUniswapFixture,
+    deployUniswapV2Fixture,
+    deployUniswapV3Fixture,
     deployToken2Fixture,
 } = require("../common/mocks");
 const { ADMIN_ERROR } = require("../common/constanst");
+const { encodeSqrtRatioX96 } = require("@uniswap/v3-sdk");
+const { mine } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("LPProvider contract", () => {
-    let hhLpProvider;
+    let hhLPProvider;
     let owner;
-    let addr1;
+    let bot;
     let addr2;
     let addr3;
     let nonZeroAddress;
-    let erc20Token;
+    let javToken;
     let erc20Token2;
     let wdfiToken;
     let uniswapFactory;
@@ -23,27 +26,50 @@ describe("LPProvider contract", () => {
     let uniswapPairContract;
     let basePair;
     let pair2;
+    let wdfiTokenV3;
+    let uniswapV3Factory;
+    let uniswapV3Router;
+    let uniswapV3Pool;
+    let nonfungiblePositionManager;
 
     before(async () => {
-        const lpProvider = await ethers.getContractFactory("LPProvider");
-        [owner, addr1, addr2, addr3, ...addrs] = await ethers.getSigners();
+        const LPProvider = await ethers.getContractFactory("LPProvider");
+        [owner, bot, addr2, addr3, ...addrs] = await ethers.getSigners();
         nonZeroAddress = ethers.Wallet.createRandom().address;
-        erc20Token = await helpers.loadFixture(deployTokenFixture);
+        javToken = await helpers.loadFixture(deployTokenFixture);
         erc20Token2 = await helpers.loadFixture(deployToken2Fixture);
-        const data = await helpers.loadFixture(deployUniswapFixture);
-        [wdfiToken, uniswapFactory, uniswapRouter, uniswapPairContract] = Object.values(data);
+        const dataV2 = await helpers.loadFixture(deployUniswapV2Fixture);
+        [wdfiToken, uniswapFactory, uniswapRouter, uniswapPairContract] = Object.values(dataV2);
 
-        hhLpProvider = await upgrades.deployProxy(lpProvider, [], {
-            initializer: "initialize",
-        });
+        const dataV3 = await helpers.loadFixture(deployUniswapV3Fixture);
+        [
+            wdfiTokenV3,
+            uniswapV3Factory,
+            uniswapV3Router,
+            uniswapV3Pool,
+            nonfungiblePositionManager,
+        ] = Object.values(dataV3);
+
+        hhLPProvider = await upgrades.deployProxy(
+            LPProvider,
+            [
+                nonfungiblePositionManager.target, //_nonfungiblePositionManager
+                uniswapRouter.target, //_routerAddressV2
+                uniswapV3Router.target, //_swapRouter
+                bot.address, //_botAddress
+            ],
+            {
+                initializer: "initialize",
+            },
+        );
 
         // create pairs
-        await uniswapFactory.createPair(erc20Token.target, wdfiToken.target);
+        await uniswapFactory.createPair(javToken.target, wdfiToken.target);
         let allPairsLength = await uniswapFactory.allPairsLength();
         const pairCreated = await uniswapFactory.allPairs(allPairsLength - BigInt(1));
         basePair = uniswapPairContract.attach(pairCreated);
 
-        await uniswapFactory.createPair(erc20Token.target, erc20Token2.target);
+        await uniswapFactory.createPair(javToken.target, erc20Token2.target);
         allPairsLength = await uniswapFactory.allPairsLength();
         const pairCreated2 = await uniswapFactory.allPairs(allPairsLength - BigInt(1));
         pair2 = uniswapPairContract.attach(pairCreated2);
@@ -52,16 +78,16 @@ describe("LPProvider contract", () => {
         // const amountWeth = ethers.parseEther("500");
         // const amount0 = ethers.parseEther("500");
         // await wdfiToken.deposit({ value: amountWeth });
-        // await erc20Token.mint(owner.address, amount0);
-        // await erc20Token.mint(owner.address, amount0);
+        // await javToken.mint(owner.address, amount0);
+        // await javToken.mint(owner.address, amount0);
         // await erc20Token2.mint(owner.address, amount0);
         //
         // await wdfiToken.approve(uniswapRouter.target, ethers.parseEther("100000"));
-        // await erc20Token.approve(uniswapRouter.target, ethers.parseEther("100000"));
+        // await javToken.approve(uniswapRouter.target, ethers.parseEther("100000"));
         // await erc20Token2.approve(uniswapRouter.target, ethers.parseEther("100000"));
         //
         // await uniswapRouter.addLiquidity(
-        //     erc20Token.target,
+        //     javToken.target,
         //     wdfiToken.target,
         //     amount0,
         //     amountWeth,
@@ -73,7 +99,7 @@ describe("LPProvider contract", () => {
         // );
         //
         // await uniswapRouter.addLiquidity(
-        //     erc20Token.target,
+        //     javToken.target,
         //     erc20Token2.target,
         //     amount0,
         //     amount0,
@@ -87,185 +113,262 @@ describe("LPProvider contract", () => {
 
     describe("Deployment", () => {
         it("Should set the right owner address", async () => {
-            await expect(await hhLpProvider.owner()).to.equal(owner.address);
+            await expect(await hhLPProvider.owner()).to.equal(owner.address);
         });
 
         it("Should set the right admin address", async () => {
-            await expect(await hhLpProvider.adminAddress()).to.equal(owner.address);
+            await expect(await hhLPProvider.adminAddress()).to.equal(owner.address);
         });
 
         it("Should set the _paused status", async () => {
-            await expect(await hhLpProvider.paused()).to.equal(false);
+            await expect(await hhLPProvider.paused()).to.equal(false);
         });
     });
 
     describe("Transactions", () => {
         it("Should revert when set pause", async () => {
-            await expect(hhLpProvider.connect(addr1).pause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhLPProvider.connect(bot).pause()).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should set pause", async () => {
-            await hhLpProvider.pause();
+            await hhLPProvider.pause();
 
-            await expect(await hhLpProvider.paused()).to.equal(true);
+            await expect(await hhLPProvider.paused()).to.equal(true);
         });
 
         it("Should revert when set unpause", async () => {
-            await expect(hhLpProvider.connect(addr1).unpause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhLPProvider.connect(bot).unpause()).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should set unpause", async () => {
-            await hhLpProvider.unpause();
+            await hhLPProvider.unpause();
 
-            await expect(await hhLpProvider.paused()).to.equal(false);
+            await expect(await hhLPProvider.paused()).to.equal(false);
         });
 
         it("Should revert when set the admin address", async () => {
             await expect(
-                hhLpProvider.connect(addr1).setAdminAddress(owner.address),
+                hhLPProvider.connect(bot).setAdminAddress(owner.address),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should set the admin address", async () => {
-            await hhLpProvider.setAdminAddress(owner.address);
+            await hhLPProvider.setAdminAddress(owner.address);
 
-            await expect(await hhLpProvider.adminAddress()).to.equal(owner.address);
+            await expect(await hhLPProvider.adminAddress()).to.equal(owner.address);
         });
 
-        it("Should revert when addLiquidity - admin error", async () => {
+        it("Should revert when addLiquidityV2 - admin error", async () => {
             await expect(
-                hhLpProvider
-                    .connect(addr1)
-                    .addLiquidity(
-                        pair2.target,
-                        owner.address,
-                        owner.address,
-                        owner.address,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                    ),
+                hhLPProvider
+                    .connect(bot)
+                    .addLiquidityV2(pair2.target, owner.address, owner.address, 0, 0),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
-        it("Should revert when addLiquidity - Invalid balance - tokenA", async () => {
+        it("Should revert when addLiquidityV2 - Invalid balance - tokenA", async () => {
             await expect(
-                hhLpProvider.addLiquidity(
+                hhLPProvider.addLiquidityV2(
                     pair2.target,
-                    uniswapRouter.target,
-                    erc20Token.target,
+                    javToken.target,
                     erc20Token2.target,
                     ethers.parseEther("100"),
-                    0,
-                    0,
-                    0,
                     0,
                 ),
             ).to.be.revertedWith("LPProvider: Invalid balance - tokenA");
         });
 
-        it("Should revert when addLiquidity - Invalid balance - tokenB", async () => {
+        it("Should revert when addLiquidityV2 - Invalid balance - tokenB", async () => {
             await expect(
-                hhLpProvider.addLiquidity(
+                hhLPProvider.addLiquidityV2(
                     pair2.target,
-                    uniswapRouter.target,
-                    erc20Token.target,
+                    javToken.target,
                     erc20Token2.target,
                     0,
                     ethers.parseEther("100"),
-                    0,
-                    0,
-                    0,
                 ),
             ).to.be.revertedWith("LPProvider: Invalid balance - tokenB");
         });
 
-        it("Should addLiquidity", async () => {
+        it("Should addLiquidityV2", async () => {
             const tokenAAmount = ethers.parseEther("50");
             const tokenBAmount = ethers.parseEther("100");
 
-            await erc20Token.mint(hhLpProvider.target, tokenAAmount);
-            await erc20Token2.mint(hhLpProvider.target, tokenBAmount);
+            await javToken.mint(hhLPProvider.target, tokenAAmount);
+            await erc20Token2.mint(hhLPProvider.target, tokenBAmount);
 
-            await hhLpProvider.addLiquidity(
+            await hhLPProvider.addLiquidityV2(
                 pair2.target,
-                uniswapRouter.target,
-                erc20Token.target,
+                javToken.target,
                 erc20Token2.target,
                 tokenAAmount,
                 tokenBAmount,
-                0,
-                0,
-                "999999999999999999999999999999",
             );
 
-            const lpBalance = await pair2.balanceOf(hhLpProvider.target);
-            await expect(await hhLpProvider.lpLockAmount(pair2.target)).to.be.equal(lpBalance);
+            const lpBalance = await pair2.balanceOf(hhLPProvider.target);
+            await expect(await hhLPProvider.lpLockAmountV2(pair2.target)).to.be.equal(lpBalance);
         });
 
         it("Should revert when addLiquidityETH - admin error", async () => {
             await expect(
-                hhLpProvider
-                    .connect(addr1)
-                    .addLiquidityETH(pair2.target, owner.address, owner.address, 0, 0, 0, 0, 0),
+                hhLPProvider.connect(bot).addLiquidityETHV2(pair2.target, owner.address, 0, 0),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
-        it("Should revert when addLiquidityETH - Invalid balance - amountETH", async () => {
+        it("Should revert when addLiquidityETHV2 - Invalid balance - amountETH", async () => {
             await expect(
-                hhLpProvider.addLiquidityETH(
+                hhLPProvider.addLiquidityETHV2(
                     pair2.target,
-                    uniswapRouter.target,
-                    erc20Token.target,
+                    javToken.target,
                     ethers.parseEther("100"),
-                    0,
-                    0,
-                    0,
                     0,
                 ),
             ).to.be.revertedWith("LPProvider: Invalid balance - amountETH");
         });
 
-        it("Should revert when addLiquidityETH - Invalid balance - amountTokenDesired", async () => {
+        it("Should revert when addLiquidityETHV2 - Invalid balance - amountTokenDesired", async () => {
             await expect(
-                hhLpProvider.addLiquidityETH(
+                hhLPProvider.addLiquidityETHV2(
                     pair2.target,
-                    uniswapRouter.target,
-                    erc20Token.target,
+                    javToken.target,
                     0,
                     ethers.parseEther("100"),
-                    0,
-                    0,
-                    0,
                 ),
             ).to.be.revertedWith("LPProvider: Invalid balance - amountTokenDesired");
         });
 
-        it("Should addLiquidityETH", async () => {
+        it("Should addLiquidityETHV2", async () => {
             const ETHAmount = ethers.parseEther("50");
             const tokenBAmount = ethers.parseEther("100");
 
-            await addr1.sendTransaction({
-                to: hhLpProvider.target,
+            await bot.sendTransaction({
+                to: hhLPProvider.target,
                 value: ETHAmount,
             });
-            await erc20Token.mint(hhLpProvider.target, tokenBAmount);
+            await javToken.mint(hhLPProvider.target, tokenBAmount);
 
-            await hhLpProvider.addLiquidityETH(
+            await hhLPProvider.addLiquidityETHV2(
                 basePair.target,
-                uniswapRouter.target,
-                erc20Token.target,
+                javToken.target,
                 ETHAmount,
                 tokenBAmount,
-                0,
-                0,
-                "999999999999999999999999999999",
             );
 
-            const lpBalance = await basePair.balanceOf(hhLpProvider.target);
-            await expect(await hhLpProvider.lpLockAmount(basePair.target)).to.be.equal(lpBalance);
+            const lpBalance = await basePair.balanceOf(hhLPProvider.target);
+            await expect(await hhLPProvider.lpLockAmountV2(basePair.target)).to.be.equal(lpBalance);
+        });
+
+        it("Should add pool and mintNewPosition", async () => {
+            //     fees 500 - 0.05%, 3000 - 0.30%, 10000 - 1%
+            const fee = 10000;
+            const amount0ToMint = ethers.parseEther("50");
+            const amount1ToMint = ethers.parseEther("50");
+
+            await uniswapV3Factory.createPool(javToken.target, wdfiTokenV3.target, fee);
+            const poolAddress = await uniswapV3Factory.getPool(
+                javToken.target,
+                wdfiTokenV3.target,
+                fee,
+            );
+            const pool = uniswapV3Pool.attach(poolAddress);
+            const price = encodeSqrtRatioX96(1, 1).toString();
+
+            await pool.initialize(price);
+            const tick = (await pool.slot0()).tick;
+            const tickSpacing = await pool.tickSpacing();
+
+            await mine(5);
+
+            await javToken.mint(hhLPProvider.target, amount0ToMint);
+            await wdfiTokenV3.deposit({ value: amount1ToMint });
+            await wdfiTokenV3.transfer(hhLPProvider.target, amount1ToMint);
+
+            await hhLPProvider.mintNewPosition(
+                javToken.target,
+                wdfiTokenV3.target,
+                fee,
+                amount0ToMint,
+                amount1ToMint,
+                tick - tickSpacing * BigInt(2),
+                tick + tickSpacing * BigInt(2),
+            );
+
+            const tokenId = await hhLPProvider.pairsTokenId(0);
+            await expect(tokenId).to.be.not.NaN;
+
+            const position = await nonfungiblePositionManager.positions(tokenId);
+
+            await expect(position[2]).to.be.equal(javToken.target);
+            await expect(position[3]).to.be.equal(wdfiTokenV3.target);
+            await expect(position[4]).to.be.equal(fee);
+            await expect(position[7]).to.be.equal(await hhLPProvider.lpLockAmountV3(tokenId));
+        });
+
+        it("Should add addLiquidityV3", async () => {
+            const fee = 10000;
+            const amount0 = ethers.parseEther("80");
+            const amount1 = ethers.parseEther("100");
+            const tokenId = await hhLPProvider.pairsTokenId(0);
+
+            await javToken.mint(hhLPProvider.target, amount0);
+            await wdfiTokenV3.deposit({ value: amount1 });
+            await wdfiTokenV3.transfer(hhLPProvider.target, amount1);
+
+            await hhLPProvider.addLiquidityV3(
+                tokenId,
+                javToken.target,
+                wdfiTokenV3.target,
+                amount0,
+                amount1,
+            );
+
+            const position = await nonfungiblePositionManager.positions(tokenId);
+
+            await expect(position[2]).to.be.equal(javToken.target);
+            await expect(position[3]).to.be.equal(wdfiTokenV3.target);
+            await expect(position[4]).to.be.equal(fee);
+            await expect(position[7]).to.be.equal(await hhLPProvider.lpLockAmountV3(tokenId));
+        });
+
+        it("Should swap", async () => {
+            const fee = 10000;
+            const amount = ethers.parseEther("1");
+
+            await javToken.mint(owner.address, amount);
+            await javToken.approve(uniswapV3Router.target, amount);
+
+            const javParams = {
+                tokenIn: javToken.target,
+                tokenOut: wdfiTokenV3.target,
+                fee: fee,
+                recipient: addr2.address,
+                deadline: 111111111111111,
+                amountIn: amount,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0,
+            };
+            await uniswapV3Router.exactInputSingle(javParams);
+
+            await wdfiTokenV3.deposit({ value: amount });
+            await wdfiTokenV3.approve(uniswapV3Router.target, amount);
+
+            const wdfiParams = {
+                tokenIn: wdfiTokenV3.target,
+                tokenOut: javToken.target,
+                fee: fee,
+                recipient: addr2.address,
+                deadline: 111111111111111,
+                amountIn: amount,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0,
+            };
+            await uniswapV3Router.exactInputSingle(wdfiParams);
+        });
+
+        it("Should claimAndDistributeRewards", async () => {
+            const tokenId = await hhLPProvider.pairsTokenId(0);
+
+            await hhLPProvider.connect(bot).claimAndDistributeRewards(tokenId);
         });
     });
 });

@@ -4,7 +4,7 @@ const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const {
     deployTokenFixture,
     deployToken2Fixture,
-    deployUniswapFixture,
+    deployUniswapV2Fixture,
     deployStateRelayerFixture,
 } = require("../common/mocks");
 const { ADMIN_ERROR } = require("../common/constanst");
@@ -65,7 +65,7 @@ describe("CommunityLaunch contract", () => {
         stateRelayer = await helpers.loadFixture(deployStateRelayerFixture);
         const vestingData = await deployVestingFixture();
 
-        const data = await helpers.loadFixture(deployUniswapFixture);
+        const data = await helpers.loadFixture(deployUniswapV2Fixture);
         [wdfiToken, uniswapFactory, uniswapRouter, uniswapPairContract] = Object.values(data);
         [vestingMock, freezerMock] = vestingData;
 
