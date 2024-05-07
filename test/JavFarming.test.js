@@ -2,7 +2,11 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { ADMIN_ERROR } = require("./common/constanst");
-const { deployTokenFixture, deployUniswapFixture, deployToken2Fixture } = require("./common/mocks");
+const {
+    deployTokenFixture,
+    deployUniswapV2Fixture,
+    deployToken2Fixture,
+} = require("./common/mocks");
 
 describe("JavFarming contract", () => {
     let hhJavFarming;
@@ -28,7 +32,7 @@ describe("JavFarming contract", () => {
         nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await helpers.loadFixture(deployTokenFixture);
         erc20Token2 = await helpers.loadFixture(deployToken2Fixture);
-        const data = await helpers.loadFixture(deployUniswapFixture);
+        const data = await helpers.loadFixture(deployUniswapV2Fixture);
         [wdfiToken, uniswapFactory, uniswapRouter, uniswapPairContract] = Object.values(data);
 
         const rewardPerBlock = ethers.parseEther("0.05");

@@ -10,7 +10,7 @@ contract RewardRateConfigurable is Initializable {
         uint256 updateBlocksInterval;
     }
 
-    uint256 public constant REWARD_PER_BLOCK_MULTIPLIER = 967742;
+    uint256 public constant REWARD_PER_BLOCK_MULTIPLIER = 1e6;
     uint256 public constant DIVIDER = 1e6;
 
     RewardsConfiguration private rewardsConfiguration;

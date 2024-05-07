@@ -1,11 +1,7 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const {
-    deployTokenFixture,
-    deployToken2Fixture,
-    deployUniswapFixture,
-} = require("../common/mocks");
+const { deployTokenFixture } = require("../common/mocks");
 const { ADMIN_ERROR } = require("../common/constanst");
 
 describe("CommunityLaunchETH contract", () => {

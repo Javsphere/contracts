@@ -7,7 +7,12 @@ async function main() {
     const Contract = await ethers.getContractFactory("LPProvider");
     const contract = await upgrades.deployProxy(
         Contract,
-        [],
+        [
+            nonfungiblePositionManager.target, //_nonfungiblePositionManager
+            "0x3E8C92491fc73390166BA00725B8F5BD734B8fba", //_routerAddressV2
+            uniswapV3Router.target, //_swapRouter
+            bot.address, //_botAddress
+        ],
 
         {
             initializer: "initialize",
