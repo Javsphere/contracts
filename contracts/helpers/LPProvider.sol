@@ -215,10 +215,7 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
         uint256 amountETH,
         uint256 amountTokenDesired
     ) external onlyAdmin {
-        require(
-            address(this).balance >= amountETH,
-            "LPProvider: Invalid balance - amountETH"
-        );
+        require(address(this).balance >= amountETH, "LPProvider: Invalid balance - amountETH");
         require(
             IERC20(token).balanceOf(address(this)) >= amountTokenDesired,
             "LPProvider: Invalid balance - amountTokenDesired"

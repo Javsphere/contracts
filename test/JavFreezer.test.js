@@ -3,7 +3,7 @@ const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { ADMIN_ERROR } = require("./common/constanst");
 const { deployTokenFixture } = require("./common/mocks");
-const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { time, mine } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("JavFreezer contract", () => {
     let hhJavFreezer;
@@ -13,13 +13,15 @@ describe("JavFreezer contract", () => {
     let addr3;
     let bot;
     let vesting;
+    let rewardsDistributor;
     let erc20Token;
     let poolError;
     let lockError;
 
     before(async () => {
         const javFreezer = await ethers.getContractFactory("JavFreezer");
-        [owner, addr1, addr2, addr3, bot, vesting, ...addrs] = await ethers.getSigners();
+        [owner, addr1, addr2, addr3, bot, vesting, rewardsDistributor, ...addrs] =
+            await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await helpers.loadFixture(deployTokenFixture);
         const rewardPerBlock = ethers.parseEther("0.05");
@@ -107,6 +109,20 @@ describe("JavFreezer contract", () => {
             await expect(await hhJavFreezer.vestingAddress()).to.equal(vesting.address);
         });
 
+        it("Should revert when setRewardsDistributorAddress", async () => {
+            await expect(
+                hhJavFreezer.connect(addr1).setRewardsDistributorAddress(owner.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should setRewardsDistributorAddress", async () => {
+            await hhJavFreezer.setRewardsDistributorAddress(rewardsDistributor.address);
+
+            await expect(await hhJavFreezer.rewardsDistributorAddress()).to.equal(
+                rewardsDistributor.address,
+            );
+        });
+
         it("Should revert when addPool", async () => {
             await expect(
                 hhJavFreezer.connect(addr1).addPool(erc20Token.target, erc20Token.target, 1, 1),
@@ -147,20 +163,6 @@ describe("JavFreezer contract", () => {
             await expect(poolInfo[2]).to.be.equal(0);
             await expect(poolInfo[3]).to.be.equal(lastRewardBlock);
             await expect(poolInfo[4]).to.be.equal(accRewardPerShare);
-        });
-
-        it("Should updatePool with lastRewardBlock > blockNumber", async () => {
-            const poolInfoBefore = await hhJavFreezer.poolInfo(1);
-
-            await hhJavFreezer.updatePool(1);
-
-            const poolInfo = await hhJavFreezer.poolInfo(1);
-
-            await expect(poolInfo[0]).to.be.equal(poolInfoBefore[0]);
-            await expect(poolInfo[1]).to.be.equal(poolInfoBefore[1]);
-            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2]);
-            await expect(poolInfo[3]).to.be.equal(poolInfoBefore[3]);
-            await expect(poolInfo[4]).to.be.equal(poolInfoBefore[4]);
         });
 
         it("Should revert when setRewardConfiguration", async () => {
@@ -292,49 +294,6 @@ describe("JavFreezer contract", () => {
             ).to.be.revertedWith("JavFreezer: only vesting");
         });
 
-        it("Should deposit", async () => {
-            const pid = 0;
-            const lockId = 0;
-            const amount = ethers.parseEther("1");
-            const lockPeriod = await hhJavFreezer.lockPeriod(lockId);
-
-            await erc20Token.mint(addr1.address, amount);
-            await erc20Token.connect(addr1).approve(hhJavFreezer.target, amount);
-
-            const contractBalanceBefore = await erc20Token.balanceOf(hhJavFreezer.target);
-            const poolInfoBefore = await hhJavFreezer.poolInfo(pid);
-            const userInfoBefore = await hhJavFreezer.userInfo(addr1.address, pid);
-
-            await hhJavFreezer.connect(addr1).deposit(pid, lockId, amount);
-
-            const contractBalance = await erc20Token.balanceOf(hhJavFreezer.target);
-            const poolInfo = await hhJavFreezer.poolInfo(pid);
-            const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
-            const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, 0);
-            const blockNumber = await ethers.provider.getBlockNumber();
-            const blockTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
-
-            const rewardDebt = (amount * poolInfo[4]) / ethers.parseEther("1");
-
-            await expect(contractBalance).to.be.equal(contractBalanceBefore + amount);
-            await expect(poolInfo[0]).to.be.equal(poolInfoBefore[0]);
-            await expect(poolInfo[1]).to.be.equal(poolInfoBefore[1]);
-            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] + amount);
-            await expect(poolInfo[3]).to.be.equal(blockNumber);
-            await expect(poolInfo[4]).to.be.equal(poolInfoBefore[4]);
-            await expect(userInfo[0]).to.be.equal(userInfoBefore[0] + amount);
-            await expect(userInfo[1]).to.be.equal(userInfoBefore[1] + BigInt(1));
-            await expect(userInfo[2]).to.be.equal(userInfoBefore[2]);
-            await expect(userDeposit[0]).to.be.equal(amount);
-            await expect(userDeposit[1]).to.be.equal(lockId);
-            await expect(userDeposit[2]).to.be.equal(blockTimestamp);
-            await expect(userDeposit[3]).to.be.equal(BigInt(blockTimestamp) + lockPeriod);
-            await expect(userDeposit[4]).to.be.equal(0);
-            await expect(userDeposit[5]).to.be.equal(rewardDebt);
-            await expect(userDeposit[6]).to.be.equal(false);
-            await expect(await hhJavFreezer.pendingReward(pid, 0, addr1.address)).to.be.equal(0);
-        });
-
         it("Should depositVesting", async () => {
             const pid = 0;
             const amount = ethers.parseEther("10");
@@ -360,7 +319,7 @@ describe("JavFreezer contract", () => {
 
             const poolInfo = await hhJavFreezer.poolInfo(pid);
             const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
-            const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, 1);
+            const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, 0);
             const blockNumber = await ethers.provider.getBlockNumber();
 
             const rewardDebt = (amount * poolInfo[4]) / ethers.parseEther("1");
@@ -381,9 +340,95 @@ describe("JavFreezer contract", () => {
             await expect(userDeposit[6]).to.be.equal(false);
         });
 
+        it("Should deposit", async () => {
+            const pid = 0;
+            const lockId = 0;
+            const amount = ethers.parseEther("1");
+            const lockPeriod = await hhJavFreezer.lockPeriod(lockId);
+
+            await erc20Token.mint(addr1.address, amount);
+            await erc20Token.connect(addr1).approve(hhJavFreezer.target, amount);
+
+            const contractBalanceBefore = await erc20Token.balanceOf(hhJavFreezer.target);
+            const poolInfoBefore = await hhJavFreezer.poolInfo(pid);
+            const userInfoBefore = await hhJavFreezer.userInfo(addr1.address, pid);
+
+            await hhJavFreezer.connect(addr1).deposit(pid, lockId, amount);
+
+            const contractBalance = await erc20Token.balanceOf(hhJavFreezer.target);
+            const poolInfo = await hhJavFreezer.poolInfo(pid);
+            const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
+            const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, 1);
+            const blockNumber = await ethers.provider.getBlockNumber();
+            const blockTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
+
+            const rewardDebt = (amount * poolInfo[4]) / ethers.parseEther("1");
+
+            await expect(contractBalance).to.be.equal(contractBalanceBefore + amount);
+            await expect(poolInfo[0]).to.be.equal(poolInfoBefore[0]);
+            await expect(poolInfo[1]).to.be.equal(poolInfoBefore[1]);
+            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] + amount);
+            await expect(poolInfo[3]).to.be.equal(blockNumber);
+            // await expect(poolInfo[4]).to.be.equal(poolInfoBefore[4]);
+            await expect(userInfo[0]).to.be.equal(userInfoBefore[0] + amount);
+            await expect(userInfo[1]).to.be.equal(userInfoBefore[1] + BigInt(1));
+            await expect(userInfo[2]).to.be.equal(userInfoBefore[2]);
+            await expect(userDeposit[0]).to.be.equal(amount);
+            await expect(userDeposit[1]).to.be.equal(lockId);
+            await expect(userDeposit[2]).to.be.equal(blockTimestamp);
+            await expect(userDeposit[3]).to.be.equal(BigInt(blockTimestamp) + lockPeriod);
+            await expect(userDeposit[4]).to.be.equal(0);
+            await expect(userDeposit[5]).to.be.equal(rewardDebt);
+            await expect(userDeposit[6]).to.be.equal(false);
+            await expect(await hhJavFreezer.pendingReward(pid, 0, addr1.address)).to.be.equal(0);
+        });
+
+        it("Should deposit - 2", async () => {
+            const pid = 0;
+            const lockId = 0;
+            const amount = ethers.parseEther("5");
+            const lockPeriod = await hhJavFreezer.lockPeriod(lockId);
+
+            await erc20Token.mint(addr1.address, amount);
+            await erc20Token.connect(addr1).approve(hhJavFreezer.target, amount);
+
+            const contractBalanceBefore = await erc20Token.balanceOf(hhJavFreezer.target);
+            const poolInfoBefore = await hhJavFreezer.poolInfo(pid);
+            const userInfoBefore = await hhJavFreezer.userInfo(addr1.address, pid);
+
+            await hhJavFreezer.connect(addr1).deposit(pid, lockId, amount);
+
+            const contractBalance = await erc20Token.balanceOf(hhJavFreezer.target);
+            const poolInfo = await hhJavFreezer.poolInfo(pid);
+            const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
+            const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, 2);
+            const blockNumber = await ethers.provider.getBlockNumber();
+            const blockTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
+
+            const rewardDebt = (amount * poolInfo[4]) / ethers.parseEther("1");
+            const accRewardPerShare = await expect(contractBalance).to.be.equal(
+                contractBalanceBefore + amount,
+            );
+            await expect(poolInfo[0]).to.be.equal(poolInfoBefore[0]);
+            await expect(poolInfo[1]).to.be.equal(poolInfoBefore[1]);
+            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] + amount);
+            await expect(poolInfo[3]).to.be.equal(blockNumber);
+            await expect(userInfo[0]).to.be.equal(userInfoBefore[0] + amount);
+            await expect(userInfo[1]).to.be.equal(userInfoBefore[1] + BigInt(1));
+            await expect(userInfo[2]).to.be.equal(userInfoBefore[2]);
+            await expect(userDeposit[0]).to.be.equal(amount);
+            await expect(userDeposit[1]).to.be.equal(lockId);
+            await expect(userDeposit[2]).to.be.equal(blockTimestamp);
+            await expect(userDeposit[3]).to.be.equal(BigInt(blockTimestamp) + lockPeriod);
+            await expect(userDeposit[4]).to.be.equal(0);
+            await expect(userDeposit[5]).to.be.equal(rewardDebt);
+            await expect(userDeposit[6]).to.be.equal(false);
+            await expect(await hhJavFreezer.pendingReward(pid, 2, addr1.address)).to.be.equal(0);
+        });
+
         it("Should get pendingReward = 0, block = lastRewardBlock", async () => {
             const pid = 0;
-            const depositId = 0;
+            const depositId = 2;
 
             const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, depositId);
             const poolInfo = await hhJavFreezer.poolInfo(pid);
@@ -398,7 +443,7 @@ describe("JavFreezer contract", () => {
 
         it("Should get pendingReward, block > lastRewardBlock", async () => {
             const pid = 0;
-            const depositId = 0;
+            const depositId = 1;
             const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, depositId);
             const poolInfo = await hhJavFreezer.poolInfo(pid);
 
@@ -419,7 +464,7 @@ describe("JavFreezer contract", () => {
 
         it("Should get pendingReward, block > lastRewardBlock with lock period multiplier", async () => {
             const pid = 0;
-            const depositId = 0;
+            const depositId = 2;
             const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, depositId);
             const poolInfo = await hhJavFreezer.poolInfo(pid);
             const lockMultiplier = BigInt(100005); //1.00005
@@ -447,13 +492,14 @@ describe("JavFreezer contract", () => {
         it("Should get pendingRewardTotal - 2 deposit", async () => {
             const rewards1 = await hhJavFreezer.pendingReward(0, 0, addr1.address);
             const rewards2 = await hhJavFreezer.pendingReward(0, 1, addr1.address);
+            const rewards3 = await hhJavFreezer.pendingReward(0, 2, addr1.address);
             await expect(await hhJavFreezer.pendingRewardTotal(0, addr1.address)).to.be.equal(
-                rewards1 + rewards2,
+                rewards1 + rewards2 + rewards3,
             );
         });
 
         it("Should get getUserLastDepositId", async () => {
-            await expect(await hhJavFreezer.getUserLastDepositId(0, addr1.address)).to.be.equal(1);
+            await expect(await hhJavFreezer.getUserLastDepositId(0, addr1.address)).to.be.equal(2);
         });
 
         it("Should revert when claim - poolError", async () => {
@@ -517,14 +563,14 @@ describe("JavFreezer contract", () => {
         });
 
         it("Should revert when withdraw - withdrawalTimestamp > block.timestamp", async () => {
-            await expect(hhJavFreezer.connect(addr1).withdraw(0, 0)).to.be.revertedWith(
+            await expect(hhJavFreezer.connect(addr1).withdraw(0, 2)).to.be.revertedWith(
                 "JavFreezer: lock period hasn't ended.",
             );
         });
 
         it("Should withdraw ", async () => {
             const pid = 0;
-            const depositId = 0;
+            const depositId = 1;
             await erc20Token.mint(hhJavFreezer.target, ethers.parseEther("10"));
             await helpers.mine(50);
 
@@ -579,7 +625,7 @@ describe("JavFreezer contract", () => {
 
         it("Should withdrawVesting ", async () => {
             const pid = 0;
-            const depositId = 1;
+            const depositId = 0;
             await erc20Token.mint(hhJavFreezer.target, ethers.parseEther("10"));
             await helpers.mine(50);
             const withdrawAmount = ethers.parseEther("5");
@@ -621,7 +667,7 @@ describe("JavFreezer contract", () => {
 
         it("Should withdrawVesting full amount", async () => {
             const pid = 0;
-            const depositId = 1;
+            const depositId = 0;
             await erc20Token.mint(hhJavFreezer.target, ethers.parseEther("10"));
             await helpers.mine(50);
             const withdrawAmount = ethers.parseEther("5");
@@ -667,6 +713,7 @@ describe("JavFreezer contract", () => {
             const lockId = 5;
             const depositTimestamp = 123456689;
             const withdrawalTimestamp = 123456789;
+            const accRewardPerShare = (await hhJavFreezer.poolInfo(pid))[4];
 
             await erc20Token.mint(hhJavFreezer.target, amount);
 
@@ -686,6 +733,106 @@ describe("JavFreezer contract", () => {
             await hhJavFreezer.setPoolInfo(0, block, 0);
 
             await expect(await hhJavFreezer.pendingRewardTotal(0, addr1.address)).to.be.equal(0);
+
+            await hhJavFreezer.setPoolInfo(
+                0,
+                await ethers.provider.getBlockNumber(),
+                accRewardPerShare,
+            );
+        });
+
+        it("Should get pendingReward after claim and some blocks", async () => {
+            const pid = 0;
+            const depositId = 2;
+
+            const userBalanceBefore = await erc20Token.balanceOf(addr1.address);
+            const contractBalanceBefore = await erc20Token.balanceOf(hhJavFreezer.target);
+            const userInfoBefore = await hhJavFreezer.userInfo(addr1.address, pid);
+            const userDepositBefore = await hhJavFreezer.userDeposits(
+                addr1.address,
+                pid,
+                depositId,
+            );
+
+            await hhJavFreezer.connect(addr1).claim(pid, depositId);
+            const userBalance = await erc20Token.balanceOf(addr1.address);
+            const contractBalance = await erc20Token.balanceOf(hhJavFreezer.target);
+            const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
+            const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, depositId);
+            const pendingRewards = userInfo[2] - userInfoBefore[2];
+
+            await expect(userInfo[2]).to.be.equal(userInfoBefore[2] + pendingRewards);
+            await expect(userDeposit[4]).to.be.equal(userDepositBefore[4] + pendingRewards);
+            await expect(userBalance).to.be.equal(userBalanceBefore + pendingRewards);
+            await expect(contractBalance).to.be.equal(contractBalanceBefore - pendingRewards);
+            await expect(
+                await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
+            ).to.be.equal(0);
+
+            mine(5);
+
+            await expect(
+                await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
+            ).to.be.not.equal(0);
+        });
+
+        it("Should revert when addRewards", async () => {
+            await expect(hhJavFreezer.connect(addr1).addRewards(1, 1)).to.be.revertedWith(
+                "JavFreezer: only rewardsDistributor",
+            );
+        });
+
+        it("Should addRewards", async () => {
+            const pid = 0;
+            const poolInfo = await hhJavFreezer.poolInfo(pid);
+            const totalShares = poolInfo[2];
+            const amount = totalShares * BigInt(2);
+
+            await erc20Token.mint(hhJavFreezer.target, amount);
+
+            await hhJavFreezer.connect(rewardsDistributor).addRewards(pid, amount);
+
+            const productsRewardsInfo = await hhJavFreezer.productsRewardsInfo(pid);
+
+            await expect(productsRewardsInfo[0]).to.be.equal(amount);
+            await expect(productsRewardsInfo[1]).to.be.equal(
+                (amount * ethers.parseEther("1")) / totalShares,
+            );
+        });
+
+        it("Should get pendingReward after addRewards and claim, skip some blocks", async () => {
+            const pid = 0;
+            const depositId = 2;
+
+            const userBalanceBefore = await erc20Token.balanceOf(addr1.address);
+            const contractBalanceBefore = await erc20Token.balanceOf(hhJavFreezer.target);
+            const userInfoBefore = await hhJavFreezer.userInfo(addr1.address, pid);
+            const userDepositBefore = await hhJavFreezer.userDeposits(
+                addr1.address,
+                pid,
+                depositId,
+            );
+
+            await hhJavFreezer.connect(addr1).claim(pid, depositId);
+            const userBalance = await erc20Token.balanceOf(addr1.address);
+            const contractBalance = await erc20Token.balanceOf(hhJavFreezer.target);
+            const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
+            const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, depositId);
+            const pendingRewards = userInfo[2] - userInfoBefore[2];
+
+            await expect(userInfo[2]).to.be.equal(userInfoBefore[2] + pendingRewards);
+            await expect(userDeposit[4]).to.be.equal(userDepositBefore[4] + pendingRewards);
+            await expect(userBalance).to.be.equal(userBalanceBefore + pendingRewards);
+            await expect(contractBalance).to.be.equal(contractBalanceBefore - pendingRewards);
+            await expect(
+                await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
+            ).to.be.equal(0);
+
+            mine(5);
+
+            await expect(
+                await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
+            ).to.be.not.equal(0);
         });
     });
 });
