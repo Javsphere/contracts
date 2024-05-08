@@ -11,7 +11,7 @@ async function main() {
             "0x274567C3B27F3981C4Ae7C951ECDe1C2aE70e6d0", //_nonfungiblePositionManager
             "0x3E8C92491fc73390166BA00725B8F5BD734B8fba", //_routerAddressV2
             "0x2A9c4EdE9994911359af815367187947eD1dDf02", //_swapRouter
-            bot.address, //_botAddress
+            "0x5B339C55eD738c47f5fd6D472b41ec878910AB69", //_botAddress
         ],
         {
             initializer: "initialize",
