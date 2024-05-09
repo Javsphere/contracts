@@ -349,6 +349,7 @@ contract JavFreezer is
         uint256 _amount
     ) external onlyRewardsDistributor nonReentrant {
         _updatePool(_pid, _amount);
+
         emit AddRewards(_pid, _amount);
     }
 
