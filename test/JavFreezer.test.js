@@ -165,6 +165,18 @@ describe("JavFreezer contract", () => {
             await expect(poolInfo[4]).to.be.equal(accRewardPerShare);
         });
 
+        it("Should revert when addPoolRewardsInfo", async () => {
+            await expect(hhJavFreezer.connect(addr1).addPoolRewardsInfo()).to.be.revertedWith(
+                ADMIN_ERROR,
+            );
+        });
+
+        it("Should revert when addPoolRewardsInfo - already exists", async () => {
+            await expect(hhJavFreezer.addPoolRewardsInfo()).to.be.revertedWith(
+                "JavFreezer: rewards pool already exists",
+            );
+        });
+
         it("Should revert when setRewardConfiguration", async () => {
             await expect(
                 hhJavFreezer.connect(addr1).setRewardConfiguration(1, 1),
