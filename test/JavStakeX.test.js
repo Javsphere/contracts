@@ -347,15 +347,15 @@ describe("JavStakeX contract", () => {
             );
         });
 
-        it("Should revert when unstake - user.shares = 0", async () => {
+        it("Should revert when unstake - invalid amount for unstake", async () => {
             const pid = 0;
 
-            await expect(hhJavStakeX.connect(addr3).unstake(pid)).to.be.revertedWith(
-                "JavStakeX: user amount is 0",
-            );
+            await expect(
+                hhJavStakeX.connect(addr3).unstake(pid, ethers.parseEther("1")),
+            ).to.be.revertedWith("JavStakeX: invalid amount for unstake");
         });
 
-        it("Should unstake", async () => {
+        it("Should unstake - full amount", async () => {
             const pid = 0;
 
             const balanceBeforeAddr1 = await erc20Token.balanceOf(addr1.address);
@@ -363,7 +363,7 @@ describe("JavStakeX contract", () => {
             const poolInfoBefore = await hhJavStakeX.poolInfo(pid);
             const userInfoBefore = await hhJavStakeX.userInfo(pid, addr1.address);
 
-            await hhJavStakeX.connect(addr1).unstake(pid);
+            await hhJavStakeX.connect(addr1).unstake(pid, userInfoBefore.shares);
 
             const userRewards =
                 (await erc20Token.balanceOf(addr1.address)) -

@@ -1,5 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0xfC112275F00139e237eEE242D4d5919326055DD6";
+const PROXY = "0x1738aF55fc86Af31ceBd6a1A56e8c4306da6dB3C";
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -25,7 +25,7 @@ async function main() {
     let newImplementationAddress = await upgrades.erc1967.getImplementationAddress(PROXY);
 
     try {
-        await run("verify:verify", { address: newImplementationAddress });
+        await run("verify:verify", { address: PROXY });
     } catch (error) {
         if (!error.message.includes("Reason: Already Verified")) {
             console.error(error);
