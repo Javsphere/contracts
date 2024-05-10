@@ -163,10 +163,11 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     /**
      * @notice Function to unstake users asserts from selected pool
      * @param _pid: pool id
+     * @param _amount: _amount for unstake
      */
-    function unstake(uint256 _pid) external nonReentrant {
+    function unstake(uint256 _pid, uint256 _amount) external nonReentrant {
         _updatePool(_pid, 0);
-        _unstake(_pid, msg.sender);
+        _unstake(_pid, msg.sender, _amount);
     }
 
     /**
@@ -254,16 +255,15 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
      * @param _pid: Pool id where user has assets
      * @param _user: Users address
      */
-    function _unstake(uint256 _pid, address _user) private {
+    function _unstake(uint256 _pid, address _user, uint256 _amount) private {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 _amount = user.shares;
-        require(_amount > 0, "JavStakeX: user amount is 0");
+        require(user.shares >= _amount, "JavStakeX: invalid amount for unstake");
 
         _claim(_pid, msg.sender);
-        user.shares = 0;
-        user.blockRewardDebt = 0;
-        user.productsRewardDebt = 0;
+        user.shares -= _amount;
+        user.blockRewardDebt = (user.shares * (pool.accRewardPerShare)) / (1e18);
+        user.productsRewardDebt = (user.shares * (pool.rewardsPerShare)) / (1e18);
 
         pool.totalShares -= _amount;
 
