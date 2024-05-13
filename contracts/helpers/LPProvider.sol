@@ -24,6 +24,7 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
     mapping(address => uint256) public lpLockAmountV2;
     mapping(uint256 => uint256) public lpLockAmountV3;
     uint256[] public pairsTokenId;
+    address public wdfiAddress;
 
     /* ========== EVENTS ========== */
     event SetBotAddress(address indexed _address);
@@ -31,6 +32,8 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
     event AddLiquidity(uint256 amountA, uint256 amountB, uint256 liquidity);
     event AddLiquidityETH(uint256 amountToken, uint256 amountETH, uint256 liquidity);
     event MintNewPosition(uint256 indexed tokenId);
+    event SetWDFIAddress(address indexed _address);
+    event SwapToWDFI(uint256 indexed amount);
 
     modifier onlyBot() {
         require(msg.sender == botAddress, "LPProvider: only bot");
@@ -73,13 +76,28 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
         emit SetStakingAddress(_address);
     }
 
+    function setWDFIAddress(address _address) external onlyAdmin {
+        wdfiAddress = _address;
+        emit SetStakingAddress(_address);
+    }
+
     function onERC721Received(
         address operator,
         address from,
         uint256 tokenId,
         bytes calldata
     ) external returns (bytes4) {
+        pairsTokenId.push(tokenId);
+
         return IERC721Receiver.onERC721Received.selector;
+    }
+
+    function swapToWDFI(uint256 _amount) external onlyAdmin {
+        require(address(this).balance >= _amount, "LPProvider: Invalid balance - dfi");
+
+        payable(wdfiAddress).transfer(_amount);
+
+        emit SwapToWDFI(_amount);
     }
 
     function mintNewPosition(
