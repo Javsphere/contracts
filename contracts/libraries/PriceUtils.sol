@@ -23,13 +23,9 @@ library PythUtils {
         uint8 priceDecimals = uint8(uint32(-1 * expo));
 
         if (targetDecimals >= priceDecimals) {
-            return
-                uint(uint64(price)) *
-                10 ** uint32(targetDecimals - priceDecimals);
+            return uint(uint64(price)) * 10 ** uint32(targetDecimals - priceDecimals);
         } else {
-            return
-                uint(uint64(price)) /
-                10 ** uint32(priceDecimals - targetDecimals);
+            return uint(uint64(price)) / 10 ** uint32(priceDecimals - targetDecimals);
         }
     }
 }
