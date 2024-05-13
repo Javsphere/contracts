@@ -8,7 +8,7 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            ["0x0000000000000000000000000000000000000000"], //_allowedAddresses_
+            ["0x8d64C3cbc9b8a261A906c304C4f19B8E6352Bd87"], //_allowedAddresses_
         ],
         {
             initializer: "initialize",
