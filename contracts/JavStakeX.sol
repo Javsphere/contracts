@@ -341,8 +341,10 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
         }
 
         uint256 blockRewards = ((user.shares * _accRewardPerShare) / 1e18) - user.blockRewardDebt;
-        uint256 productsRewards = ((user.shares * pool.rewardsPerShare) / 1e18) -
-            user.productsRewardDebt;
+        uint256 productsRewards = ((user.shares * pool.rewardsPerShare) / 1e18) >
+            user.productsRewardDebt
+            ? ((user.shares * pool.rewardsPerShare) / 1e18) - user.productsRewardDebt
+            : 0;
 
         return blockRewards + productsRewards;
     }

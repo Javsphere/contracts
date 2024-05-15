@@ -359,6 +359,17 @@ contract JavFreezer is
         return user.depositId - 1;
     }
 
+    function apr(uint256 _pid, uint256 _lockId) external view returns (uint256) {
+        PoolInfo memory pool = poolInfo[_pid];
+        ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
+        uint256 totalShares = pool.totalShares > 0 ? pool.totalShares : 1e18;
+        return
+            ((getRewardPerBlock() *
+                lockPeriodMultiplier[_lockId] *
+                1051200 +
+                productsRewInfo.rewardsAmount) * 1e18) / totalShares;
+    }
+
     /**
      * @notice View function to see pending reward on frontend.
      * @param _depositId: Staking pool id
@@ -535,8 +546,13 @@ contract JavFreezer is
 
         uint256 rewards = ((depositDetails.depositTokens * _accRewardPerShare) / 1e18) -
             depositDetails.rewardDebt;
-        uint256 productsRewards = ((depositDetails.depositTokens *
-            productsRewInfo.rewardsPerShare) / 1e18) - productsRewardsDebt[_user][_pid][_depositId];
+        uint256 productsRewards = (depositDetails.depositTokens * productsRewInfo.rewardsPerShare) /
+            1e18 >
+            productsRewardsDebt[_user][_pid][_depositId]
+            ? ((depositDetails.depositTokens * productsRewInfo.rewardsPerShare) / 1e18) -
+                productsRewardsDebt[_user][_pid][_depositId]
+            : 0;
+
         return
             ((rewards * lockPeriodMultiplier[depositDetails.stakePeriod]) / 1e5) + productsRewards;
     }

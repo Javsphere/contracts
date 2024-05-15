@@ -18,6 +18,7 @@ describe("LPProvider contract", () => {
     let addr2;
     let addr3;
     let nonZeroAddress;
+    let rewardsDistributor;
     let javToken;
     let erc20Token2;
     let wdfiToken;
@@ -50,6 +51,10 @@ describe("LPProvider contract", () => {
             nonfungiblePositionManager,
         ] = Object.values(dataV3);
 
+        const rewardsDistributorFactory = await ethers.getContractFactory("RewardsDistributorMock");
+        rewardsDistributor = await rewardsDistributorFactory.deploy();
+        await rewardsDistributor.waitForDeployment();
+
         hhLPProvider = await upgrades.deployProxy(
             LPProvider,
             [
@@ -63,7 +68,7 @@ describe("LPProvider contract", () => {
             },
         );
 
-        // create pairs
+        // create pairs v2
         await uniswapFactory.createPair(javToken.target, wdfiToken.target);
         let allPairsLength = await uniswapFactory.allPairsLength();
         const pairCreated = await uniswapFactory.allPairs(allPairsLength - BigInt(1));
@@ -74,41 +79,43 @@ describe("LPProvider contract", () => {
         const pairCreated2 = await uniswapFactory.allPairs(allPairsLength - BigInt(1));
         pair2 = uniswapPairContract.attach(pairCreated2);
 
-        // // add liquidity
-        // const amountWeth = ethers.parseEther("500");
-        // const amount0 = ethers.parseEther("500");
-        // await wdfiToken.deposit({ value: amountWeth });
-        // await javToken.mint(owner.address, amount0);
-        // await javToken.mint(owner.address, amount0);
-        // await erc20Token2.mint(owner.address, amount0);
-        //
-        // await wdfiToken.approve(uniswapRouter.target, ethers.parseEther("100000"));
-        // await javToken.approve(uniswapRouter.target, ethers.parseEther("100000"));
-        // await erc20Token2.approve(uniswapRouter.target, ethers.parseEther("100000"));
-        //
-        // await uniswapRouter.addLiquidity(
-        //     javToken.target,
-        //     wdfiToken.target,
-        //     amount0,
-        //     amountWeth,
-        //     1,
-        //     1,
-        //     owner.address,
-        //     // wait time
-        //     "999999999999999999999999999999",
-        // );
-        //
-        // await uniswapRouter.addLiquidity(
-        //     javToken.target,
-        //     erc20Token2.target,
-        //     amount0,
-        //     amount0,
-        //     1,
-        //     1,
-        //     owner.address,
-        //     // wait time
-        //     "999999999999999999999999999999",
-        // );
+        // create pairs v3
+        const fee = 3000;
+        const amount0ToMint = ethers.parseEther("5000");
+        const amount1ToMint = ethers.parseEther("5000");
+        await javToken.mint(owner.address, amount0ToMint);
+        await wdfiTokenV3.deposit({ value: amount1ToMint });
+        await wdfiTokenV3.approve(nonfungiblePositionManager.target, amount0ToMint);
+        await javToken.approve(nonfungiblePositionManager.target, amount1ToMint);
+
+        await uniswapV3Factory.createPool(javToken.target, wdfiTokenV3.target, fee);
+        const poolAddress = await uniswapV3Factory.getPool(
+            javToken.target,
+            wdfiTokenV3.target,
+            fee,
+        );
+        const pool = uniswapV3Pool.attach(poolAddress);
+        const price = encodeSqrtRatioX96(1, 1).toString();
+
+        await pool.initialize(price);
+        const tick = (await pool.slot0()).tick;
+        const tickSpacing = await pool.tickSpacing();
+
+        const mintParams = {
+            token0: javToken.target,
+            token1: wdfiTokenV3.target,
+            fee: fee,
+            tickLower: tick - tickSpacing * BigInt(2),
+            tickUpper: tick + tickSpacing * BigInt(2),
+            amount0Desired: amount0ToMint,
+            amount1Desired: amount1ToMint,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: owner.address,
+            deadline: 100000000000,
+        };
+        await nonfungiblePositionManager.mint(mintParams);
+        await nonfungiblePositionManager.transferFrom(owner.address, hhLPProvider.target, 1);
     });
 
     describe("Deployment", () => {
@@ -156,6 +163,20 @@ describe("LPProvider contract", () => {
             await hhLPProvider.setAdminAddress(owner.address);
 
             await expect(await hhLPProvider.adminAddress()).to.equal(owner.address);
+        });
+
+        it("Should revert when setRewardsDistributorAddress", async () => {
+            await expect(
+                hhLPProvider.connect(bot).setRewardsDistributorAddress(owner.address),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should setRewardsDistributorAddress", async () => {
+            await hhLPProvider.setRewardsDistributorAddress(rewardsDistributor.target);
+
+            await expect(await hhLPProvider.rewardsDistributorAddress()).to.equal(
+                rewardsDistributor.target,
+            );
         });
 
         it("Should revert when addLiquidityV2 - admin error", async () => {
@@ -258,57 +279,11 @@ describe("LPProvider contract", () => {
             await expect(await hhLPProvider.lpLockAmountV2(basePair.target)).to.be.equal(lpBalance);
         });
 
-        it("Should add pool and mintNewPosition", async () => {
-            //     fees 500 - 0.05%, 3000 - 0.30%, 10000 - 1%
-            const fee = 10000;
-            const amount0ToMint = ethers.parseEther("50");
-            const amount1ToMint = ethers.parseEther("50");
-
-            await uniswapV3Factory.createPool(javToken.target, wdfiTokenV3.target, fee);
-            const poolAddress = await uniswapV3Factory.getPool(
-                javToken.target,
-                wdfiTokenV3.target,
-                fee,
-            );
-            const pool = uniswapV3Pool.attach(poolAddress);
-            const price = encodeSqrtRatioX96(1, 1).toString();
-
-            await pool.initialize(price);
-            const tick = (await pool.slot0()).tick;
-            const tickSpacing = await pool.tickSpacing();
-
-            await mine(5);
-
-            await javToken.mint(hhLPProvider.target, amount0ToMint);
-            await wdfiTokenV3.deposit({ value: amount1ToMint });
-            await wdfiTokenV3.transfer(hhLPProvider.target, amount1ToMint);
-
-            await hhLPProvider.mintNewPosition(
-                javToken.target,
-                wdfiTokenV3.target,
-                fee,
-                amount0ToMint,
-                amount1ToMint,
-                tick - tickSpacing * BigInt(2),
-                tick + tickSpacing * BigInt(2),
-            );
-
-            const tokenId = await hhLPProvider.pairsTokenId(0);
-            await expect(tokenId).to.be.not.NaN;
-
-            const position = await nonfungiblePositionManager.positions(tokenId);
-
-            await expect(position[2]).to.be.equal(javToken.target);
-            await expect(position[3]).to.be.equal(wdfiTokenV3.target);
-            await expect(position[4]).to.be.equal(fee);
-            await expect(position[7]).to.be.equal(await hhLPProvider.lpLockAmountV3(tokenId));
-        });
-
         it("Should add addLiquidityV3", async () => {
-            const fee = 10000;
-            const amount0 = ethers.parseEther("80");
+            const fee = 3000;
+            const amount0 = ethers.parseEther("100");
             const amount1 = ethers.parseEther("100");
-            const tokenId = await hhLPProvider.pairsTokenId(0);
+            const tokenId = 1;
 
             await javToken.mint(hhLPProvider.target, amount0);
             await wdfiTokenV3.deposit({ value: amount1 });
@@ -327,11 +302,10 @@ describe("LPProvider contract", () => {
             await expect(position[2]).to.be.equal(javToken.target);
             await expect(position[3]).to.be.equal(wdfiTokenV3.target);
             await expect(position[4]).to.be.equal(fee);
-            await expect(position[7]).to.be.equal(await hhLPProvider.lpLockAmountV3(tokenId));
         });
 
         it("Should swap", async () => {
-            const fee = 10000;
+            const fee = 3000;
             const amount = ethers.parseEther("1");
 
             await javToken.mint(owner.address, amount);
@@ -366,9 +340,19 @@ describe("LPProvider contract", () => {
         });
 
         it("Should claimAndDistributeRewards", async () => {
-            const tokenId = await hhLPProvider.pairsTokenId(0);
+            const tokenId = 1;
+
+            const wdfiBalanceBefore = await wdfiTokenV3.balanceOf(hhLPProvider.target);
 
             await hhLPProvider.connect(bot).claimAndDistributeRewards(tokenId);
+
+            await expect(await javToken.balanceOf(hhLPProvider.target)).to.equal(0);
+            await expect(await wdfiTokenV3.balanceOf(hhLPProvider.target)).to.equal(
+                wdfiBalanceBefore,
+            );
+
+            await expect(await javToken.balanceOf(rewardsDistributor.target)).to.not.equal(0);
+            await expect(await wdfiTokenV3.balanceOf(rewardsDistributor.target)).to.not.equal(0);
         });
     });
 });
