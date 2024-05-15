@@ -6,6 +6,7 @@ import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/INonfungiblePositionManager.sol";
+import "../interfaces/IRewardsDistributor.sol";
 import "../interfaces/IVanillaRouter02.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../base/BaseUpgradable.sol";
@@ -25,13 +26,13 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
     mapping(uint256 => uint256) public lpLockAmountV3;
     uint256[] public pairsTokenId;
     address public wdfiAddress;
+    address public rewardsDistributorAddress;
 
     /* ========== EVENTS ========== */
     event SetBotAddress(address indexed _address);
-    event SetStakingAddress(address indexed _address);
+    event SetRewardsDistributorAddress(address indexed _address);
     event AddLiquidity(uint256 amountA, uint256 amountB, uint256 liquidity);
     event AddLiquidityETH(uint256 amountToken, uint256 amountETH, uint256 liquidity);
-    event MintNewPosition(uint256 indexed tokenId);
     event SetWDFIAddress(address indexed _address);
     event SwapToWDFI(uint256 indexed amount);
 
@@ -70,15 +71,15 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
         emit SetBotAddress(_address);
     }
 
-    function setStakingAddress(address _address) external onlyAdmin {
-        stakingAddress = _address;
+    function setRewardsDistributorAddress(address _address) external onlyAdmin {
+        rewardsDistributorAddress = _address;
 
-        emit SetStakingAddress(_address);
+        emit SetRewardsDistributorAddress(_address);
     }
 
     function setWDFIAddress(address _address) external onlyAdmin {
         wdfiAddress = _address;
-        emit SetStakingAddress(_address);
+        emit SetWDFIAddress(_address);
     }
 
     function onERC721Received(
@@ -87,8 +88,6 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
         uint256 tokenId,
         bytes calldata
     ) external returns (bytes4) {
-        pairsTokenId.push(tokenId);
-
         return IERC721Receiver.onERC721Received.selector;
     }
 
@@ -98,55 +97,6 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
         payable(wdfiAddress).transfer(_amount);
 
         emit SwapToWDFI(_amount);
-    }
-
-    function mintNewPosition(
-        address token0,
-        address token1,
-        uint24 _poolFee,
-        uint256 amount0ToMint,
-        uint256 amount1ToMint,
-        int24 tickLower,
-        int24 tickUpper
-    ) external onlyAdmin {
-        require(
-            IERC20(token0).balanceOf(address(this)) >= amount0ToMint,
-            "LPProvider: Invalid balance - token0"
-        );
-        require(
-            IERC20(token1).balanceOf(address(this)) >= amount1ToMint,
-            "LPProvider: Invalid balance - token1"
-        );
-
-        // Approve the position manager
-        IERC20(token0).safeIncreaseAllowance(address(nonfungiblePositionManager), amount0ToMint);
-        IERC20(token1).safeIncreaseAllowance(address(nonfungiblePositionManager), amount1ToMint);
-
-        INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager
-            .MintParams({
-                token0: token0,
-                token1: token1,
-                fee: _poolFee,
-                tickLower: tickLower,
-                tickUpper: tickUpper,
-                amount0Desired: amount0ToMint,
-                amount1Desired: amount1ToMint,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: address(this),
-                deadline: block.timestamp
-            });
-
-        (uint256 tokenId, uint128 liquidity, , ) = nonfungiblePositionManager.mint(params);
-
-        pairsTokenId.push(tokenId);
-
-        lpLockAmountV3[tokenId] += liquidity;
-
-        IERC20(token0).safeDecreaseAllowance(address(nonfungiblePositionManager), 0);
-        IERC20(token1).safeDecreaseAllowance(address(nonfungiblePositionManager), 0);
-
-        emit MintNewPosition(tokenId);
     }
 
     function addLiquidityV3(
@@ -252,17 +202,22 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
     }
 
     function claimAndDistributeRewards(uint256 _tokenId) external onlyBot {
-        //        (, , address token0, address token1, uint24 fee, , , , , , , ) = nonfungiblePositionManager
-        //            .positions(_tokenId);
-
+        (, , address token0, address token1, , , , , , , , ) = nonfungiblePositionManager.positions(
+            _tokenId
+        );
         _collectFees(_tokenId);
+
+        address[] memory _tokens = new address[](2);
+        _tokens[0] = token0;
+        _tokens[1] = token1;
+        IRewardsDistributor(rewardsDistributorAddress).distributeRewards(_tokens);
     }
 
     function _collectFees(uint256 tokenId) private {
         INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager
             .CollectParams({
                 tokenId: tokenId,
-                recipient: address(this),
+                recipient: rewardsDistributorAddress,
                 amount0Max: type(uint128).max,
                 amount1Max: type(uint128).max
             });
