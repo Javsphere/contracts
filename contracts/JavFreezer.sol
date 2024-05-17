@@ -76,8 +76,9 @@ contract JavFreezer is
         uint256 rewardsAmount;
         uint256 rewardsPerShare;
     }
-
     ProductsRewardsInfo[] public productsRewardsInfo;
+    mapping(uint256 => mapping(uint256 => uint256)) public tvl;
+
     /* ========== EVENTS ========== */
     event SetPoolInfo(uint256 _pid, uint256 _lastRewardBlock, uint256 _accRewardPerShare);
     event AddPool(
@@ -90,9 +91,9 @@ contract JavFreezer is
     event SetLockPeriodMultiplier(uint256 indexed _lockId, uint256 _multiplier);
     event SetVestingAddress(address indexed _address);
     event SetRewardsDistributorAddress(address indexed _address);
-    event ClaimUserReward(address indexed user, uint256 amount);
-    event Deposit(address indexed user, uint256 amount, uint256 indexed period);
-    event Withdraw(address indexed user, uint256 amount, uint256 indexed period);
+    event ClaimUserReward(address indexed user, uint256 amount, uint256 indexed pid, uint256 indexed period);
+    event Deposit(address indexed user, uint256 amount, uint256 indexed pid, uint256 indexed period);
+    event Withdraw(address indexed user, uint256 amount, uint256 indexed pid, uint256 indexed period);
     event AddRewards(uint256 indexed pid, uint256 amount);
 
     modifier validLockId(uint256 _lockId) {
@@ -132,6 +133,11 @@ contract JavFreezer is
         __RewardRateConfigurable_init(_rewardPerBlock, _rewardUpdateBlocksInterval);
 
         emit Initialized(msg.sender, block.number);
+    }
+
+    function setTvl(uint256 _pid, uint256 _lockId, uint256 _tvl) external onlyAdmin {
+        require(_lockId == 6 || _lockId == 7, "JavFreezer: invalid lock period");
+        tvl[_pid][_lockId] = _tvl;
     }
 
     /**
@@ -252,6 +258,7 @@ contract JavFreezer is
 
         user.totalDepositTokens += _amount;
         pool.totalShares += _amount;
+        tvl[_pid][_lockId] += _amount;
 
         uint256 rewardDebt = (_amount * (pool.accRewardPerShare)) / (1e18);
         UserDeposit memory depositDetails = UserDeposit({
@@ -266,7 +273,7 @@ contract JavFreezer is
         userDeposits[_holder][_pid].push(depositDetails);
         user.depositId = userDeposits[_holder][_pid].length;
 
-        emit Deposit(_holder, _amount, 0);
+        emit Deposit(_holder, _amount, _pid, _lockId);
     }
 
     /**
@@ -301,13 +308,14 @@ contract JavFreezer is
 
         user.totalDepositTokens -= _amount;
         pool.totalShares -= _amount;
+        tvl[_pid][depositDetails.stakePeriod] -= _amount;
 
         pool.baseToken.safeTransfer(_holder, _amount);
 
         if (depositDetails.depositTokens == 0) {
             depositDetails.is_finished = true;
         }
-        emit Withdraw(_holder, _amount, depositDetails.stakePeriod);
+        emit Withdraw(_holder, _amount, _pid, depositDetails.stakePeriod);
     }
 
     /**
@@ -328,6 +336,26 @@ contract JavFreezer is
     function claim(uint256 _pid, uint256 _depositId) external nonReentrant poolExists(_pid) {
         _updatePool(_pid, 0);
         _claim(msg.sender, _pid, _depositId);
+    }
+
+    /**
+     * @notice Claim All Rewards in one Transaction.
+     */
+    function claimAllByByLockId(
+        uint256 _pid,
+        uint256 _lockId
+    ) external nonReentrant poolExists(_pid) validLockId(_lockId) {
+        for (
+            uint256 _depositId = 0;
+            _depositId < userInfo[msg.sender][_pid].depositId;
+            ++_depositId
+        ) {
+            UserDeposit memory depositDetails = userDeposits[msg.sender][_pid][_depositId];
+            if (depositDetails.stakePeriod == _lockId) {
+                _updatePool(_pid, 0);
+                _claim(msg.sender, _pid, _depositId);
+            }
+        }
     }
 
     /**
@@ -366,7 +394,7 @@ contract JavFreezer is
         return
             ((getRewardPerBlock() *
                 lockPeriodMultiplier[_lockId] *
-                1051200 +
+                1051200 / 1e5 +
                 productsRewInfo.rewardsAmount) * 1e18) / totalShares;
     }
 
@@ -381,6 +409,27 @@ contract JavFreezer is
         address _user
     ) external view returns (uint256) {
         return _getPendingRewards(_pid, _depositId, _user);
+    }
+
+    /**
+     * @notice View function to see pending reward on frontend.
+     * @param _pid: Staking pool id
+     * @param _lockId: lock period id
+     * @param _user: User address
+     */
+    function pendingRewardByLockId(
+        uint256 _pid,
+        uint256 _lockId,
+        address _user
+    ) external view returns (uint256) {
+        uint256 rewards;
+        for (uint256 _depositId = 0; _depositId < userInfo[_user][_pid].depositId; ++_depositId) {
+            UserDeposit memory depositDetails = userDeposits[_user][_pid][_depositId];
+            if (depositDetails.stakePeriod == _lockId) {
+                rewards += _getPendingRewards(_pid, _depositId, _user);
+            }
+        }
+        return rewards;
     }
 
     /**
@@ -442,6 +491,7 @@ contract JavFreezer is
 
         user.totalDepositTokens += _depositAmount;
         pool.totalShares += _depositAmount;
+        tvl[_pid][_periodId] += _depositAmount;
 
         uint256 blockRewardDebt = (_depositAmount * (pool.accRewardPerShare)) / (1e18);
         uint256 productRewardDebt = (_depositAmount * (productsRewInfo.rewardsPerShare)) / (1e18);
@@ -458,7 +508,7 @@ contract JavFreezer is
         user.depositId = userDeposits[msg.sender][_pid].length;
         productsRewardsDebt[msg.sender][_pid][user.depositId - 1] = productRewardDebt;
 
-        emit Deposit(msg.sender, _depositAmount, _periodId);
+        emit Deposit(msg.sender, _depositAmount, _pid, _periodId);
     }
 
     /**
@@ -485,11 +535,12 @@ contract JavFreezer is
             (1e18);
         user.totalDepositTokens -= depositDetails.depositTokens;
         pool.totalShares -= depositDetails.depositTokens;
+        tvl[_pid][depositDetails.stakePeriod] -= depositDetails.depositTokens;
 
         pool.baseToken.safeTransfer(msg.sender, depositDetails.depositTokens);
 
         depositDetails.is_finished = true;
-        emit Withdraw(msg.sender, depositDetails.depositTokens, depositDetails.stakePeriod);
+        emit Withdraw(msg.sender, depositDetails.depositTokens, _pid, depositDetails.stakePeriod);
     }
 
     /*
@@ -516,7 +567,7 @@ contract JavFreezer is
 
             pool.rewardToken.safeTransfer(_user, pending);
 
-            emit ClaimUserReward(_user, pending);
+            emit ClaimUserReward(_user, pending, _pid, depositDetails.stakePeriod);
         }
     }
 
