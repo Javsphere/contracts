@@ -91,9 +91,24 @@ contract JavFreezer is
     event SetLockPeriodMultiplier(uint256 indexed _lockId, uint256 _multiplier);
     event SetVestingAddress(address indexed _address);
     event SetRewardsDistributorAddress(address indexed _address);
-    event ClaimUserReward(address indexed user, uint256 amount, uint256 indexed pid, uint256 indexed period);
-    event Deposit(address indexed user, uint256 amount, uint256 indexed pid, uint256 indexed period);
-    event Withdraw(address indexed user, uint256 amount, uint256 indexed pid, uint256 indexed period);
+    event ClaimUserReward(
+        address indexed user,
+        uint256 amount,
+        uint256 indexed pid,
+        uint256 indexed period
+    );
+    event Deposit(
+        address indexed user,
+        uint256 amount,
+        uint256 indexed pid,
+        uint256 indexed period
+    );
+    event Withdraw(
+        address indexed user,
+        uint256 amount,
+        uint256 indexed pid,
+        uint256 indexed period
+    );
     event AddRewards(uint256 indexed pid, uint256 amount);
 
     modifier validLockId(uint256 _lockId) {
@@ -392,9 +407,8 @@ contract JavFreezer is
         ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
         uint256 totalShares = pool.totalShares > 0 ? pool.totalShares : 1e18;
         return
-            ((getRewardPerBlock() *
-                lockPeriodMultiplier[_lockId] *
-                1051200 / 1e5 +
+            (((getRewardPerBlock() * lockPeriodMultiplier[_lockId] * 1051200) /
+                1e5 +
                 productsRewInfo.rewardsAmount) * 1e18) / totalShares;
     }
 

@@ -31,13 +31,11 @@ module.exports = {
         testnet: {
             chainId: 1131,
             url: "https://dmc.mydefichain.com/testnet",
-            // url: "https://eth.testnet.ocean.jellyfishsdk.com/",
             accounts: [process.env.OWNER_KEY],
         },
         mainnet: {
             chainId: 1130,
             url: "https://dmc.mydefichain.com/mainnet",
-            // url: "https://eth.mainnet.ocean.jellyfishsdk.com/",
             accounts: [process.env.OWNER_KEY],
         },
     },
@@ -51,30 +49,30 @@ module.exports = {
                 network: "testnet",
                 chainId: 1131,
                 urls: {
-                    // apiURL: "https://testnet-dmc.mydefichain.com/api",
                     apiURL: "https://blockscout.testnet.ocean.jellyfishsdk.com/api",
-                    // browserURL: "https://testnet-dmc.mydefichain.com",
+                    // apiURL: "https://testnet-dmc.mydefichain.com/api",
                     browserURL: "https://blockscout.testnet.ocean.jellyfishsdk.com",
+                    // browserURL: "https://testnet-dmc.mydefichain.com",
                 },
             },
             {
                 network: "mainnet",
                 chainId: 1130,
                 urls: {
-                    // apiURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com/api",
-                    apiURL: "https://mainnet-dmc.mydefichain.com/api",
-                    // browserURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com",
-                    browserURL: "https://mainnet-dmc.mydefichain.com",
+                    apiURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com/api",
+                    // apiURL: "https://mainnet-dmc.mydefichain.com/api",
+                    browserURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com",
+                    // browserURL: "https://mainnet-dmc.mydefichain.com",
                 },
             },
         ],
     },
     contractSizer: {
         alphaSort: true,
-        runOnCompile: true,
+        runOnCompile: false,
         disambiguatePaths: false,
     },
     gasReporter: {
-        enabled: true,
+        enabled: false,
     },
 };
