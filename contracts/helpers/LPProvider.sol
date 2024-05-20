@@ -9,6 +9,7 @@ import "../interfaces/INonfungiblePositionManager.sol";
 import "../interfaces/IRewardsDistributor.sol";
 import "../interfaces/IVanillaRouter02.sol";
 import "../interfaces/IERC20Extended.sol";
+import "../interfaces/IWDFI.sol";
 import "../base/BaseUpgradable.sol";
 
 contract LPProvider is IERC721Receiver, BaseUpgradable {
@@ -35,6 +36,9 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
     event AddLiquidityETH(uint256 amountToken, uint256 amountETH, uint256 liquidity);
     event SetWDFIAddress(address indexed _address);
     event SwapToWDFI(uint256 indexed amount);
+    event SwapToDFI(uint256 indexed amount);
+    event WithdrawDFI(address indexed to, uint256 amount);
+    event Withdraw(address indexed token, address indexed to, uint256 amount);
 
     modifier onlyBot() {
         require(msg.sender == botAddress, "LPProvider: only bot");
@@ -94,9 +98,41 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
     function swapToWDFI(uint256 _amount) external onlyAdmin {
         require(address(this).balance >= _amount, "LPProvider: Invalid balance - dfi");
 
-        payable(wdfiAddress).transfer(_amount);
+        IWDFI(wdfiAddress).deposit{value: _amount}();
 
         emit SwapToWDFI(_amount);
+    }
+
+    function swapToDFI(uint256 _amount) external onlyAdmin {
+        require(
+            IWDFI(wdfiAddress).balanceOf(address(this)) >= _amount,
+            "LPProvider: Invalid balance - dfi"
+        );
+
+        IWDFI(wdfiAddress).withdraw(_amount);
+
+        emit SwapToDFI(_amount);
+    }
+
+    /**
+     * @notice Functon to withdraw amount
+     * @param _token token address
+     * @param _to recipient address
+     * @param _amount amount
+     */
+    function withdraw(address _token, address _to, uint256 _amount) external onlyAdmin {
+        require(IERC20(_token).balanceOf(address(this)) >= _amount, "LPProvider: Invalid amount");
+        IERC20(_token).safeTransfer(_to, _amount);
+
+        emit Withdraw(_token, _to, _amount);
+    }
+
+    function withdrawDFI(address payable _to, uint256 _amount) external onlyAdmin {
+        require(address(this).balance >= _amount, "LPProvider: Invalid amount");
+
+        _to.transfer(_amount);
+
+        emit WithdrawDFI(_to, _amount);
     }
 
     function addLiquidityV3(
@@ -126,9 +162,9 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
                 tokenId: tokenId,
                 amount0Desired: amount0Desired,
                 amount1Desired: amount1Desired,
-                amount0Min: 0,
-                amount1Min: 0,
-                deadline: block.timestamp + 1000
+                amount0Min: amount0Desired,
+                amount1Min: amount1Desired,
+                deadline: block.timestamp + 10000
             });
 
         (uint128 liquidity, uint256 amount0, uint256 amount1) = nonfungiblePositionManager
