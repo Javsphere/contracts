@@ -25,4 +25,5 @@ interface IGeneralErrors {
     error AboveMax();
     error NotAuthorized();
     error WrongTradeType();
+    error GeneralPaused();
 }
