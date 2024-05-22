@@ -419,6 +419,6 @@ library Chainlink {
         address callbackAddress;
         bytes4 callbackFunctionId;
         uint256 nonce;
-        uint256 buf;
+        bytes32 buf;
     }
 }
