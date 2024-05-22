@@ -159,12 +159,9 @@ interface IJToken {
     error NotUnderCollateralized();
     error AboveInflationLimit();
 
-    // Ownable
-    error OwnableInvalidOwner(address owner);
-
     // ERC4626
-    error ERC4626ExceededMaxDeposit();
-    error ERC4626ExceededMaxMint();
-    error ERC4626ExceededMaxWithdraw();
-    error ERC4626ExceededMaxRedeem();
+    error ExceededMaxDeposit();
+    error ExceededMaxMint();
+    error ExceededMaxWithdraw();
+    error ExceededMaxRedeem();
 }
