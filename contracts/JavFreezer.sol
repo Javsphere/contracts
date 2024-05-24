@@ -101,7 +101,9 @@ contract JavFreezer is
         address indexed user,
         uint256 amount,
         uint256 indexed pid,
-        uint256 indexed period
+        uint256 indexed period,
+        uint256 depositTimestamp,
+        uint256 withdrawalTimestamp
     );
     event Withdraw(
         address indexed user,
@@ -288,7 +290,7 @@ contract JavFreezer is
         userDeposits[_holder][_pid].push(depositDetails);
         user.depositId = userDeposits[_holder][_pid].length;
 
-        emit Deposit(_holder, _amount, _pid, _lockId);
+        emit Deposit(_holder, _amount, _pid, _lockId, _depositTimestamp, _withdrawalTimestamp);
     }
 
     /**
@@ -522,7 +524,14 @@ contract JavFreezer is
         user.depositId = userDeposits[msg.sender][_pid].length;
         productsRewardsDebt[msg.sender][_pid][user.depositId - 1] = productRewardDebt;
 
-        emit Deposit(msg.sender, _depositAmount, _pid, _periodId);
+        emit Deposit(
+            msg.sender,
+            _depositAmount,
+            _pid,
+            _periodId,
+            block.timestamp,
+            block.timestamp + lockPeriod[_periodId]
+        );
     }
 
     /**
