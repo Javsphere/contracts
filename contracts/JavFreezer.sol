@@ -151,7 +151,7 @@ contract JavFreezer is
     }
 
     function setTvl(uint256 _pid, uint256 _lockId, uint256 _tvl) external onlyAdmin {
-        require(_lockId == 6 || _lockId == 7, "JavFreezer: invalid lock period");
+        require(_lockId == 5 || _lockId == 6, "JavFreezer: invalid lock period");
         tvl[_pid][_lockId] = _tvl;
     }
 
