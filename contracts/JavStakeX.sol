@@ -150,7 +150,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
      * @param _pid: pool id
      * @param _amount: token amount
      */
-    function stake(uint256 _pid, uint256 _amount) external nonReentrant {
+    function stake(uint256 _pid, uint256 _amount) external nonReentrant whenNotPaused {
         PoolInfo memory pool = poolInfo[_pid];
         require(pool.minStakeAmount <= _amount, "JavStakeX: invalid amount for stake");
         require(
@@ -165,7 +165,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
      * @param _pid: pool id
      * @param _amount: _amount for unstake
      */
-    function unstake(uint256 _pid, uint256 _amount) external nonReentrant {
+    function unstake(uint256 _pid, uint256 _amount) external nonReentrant whenNotPaused {
         _updatePool(_pid, 0);
         _unstake(_pid, msg.sender, _amount);
     }
@@ -174,7 +174,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
      * @notice Function to claim user rewards for selected pool
      * @param _pid: pool id
      */
-    function claim(uint256 _pid) external nonReentrant {
+    function claim(uint256 _pid) external nonReentrant whenNotPaused {
         _updatePool(_pid, 0);
         _claim(_pid, msg.sender);
     }
@@ -182,7 +182,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     /**
      * @notice Function to claim user rewards from all pools
      */
-    function claimAll() external nonReentrant {
+    function claimAll() external nonReentrant whenNotPaused {
         for (uint256 pid = 0; pid < getPoolLength(); ++pid) {
             _updatePool(pid, 0);
             _claim(pid, msg.sender);
