@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 
 /**
  * @custom:version 8
- * @dev Contains the types for the GNSReferrals facet
+ * @dev Contains the types for the JavReferrals facet
  */
 interface IReferrals {
     struct ReferralsStorage {
@@ -21,8 +21,8 @@ interface IReferrals {
     struct AllyDetails {
         address[] referrersReferred;
         uint256 volumeReferredUsd; // 1e18
-        uint256 pendingRewardsGns; // 1e18
-        uint256 totalRewardsGns; // 1e18
+        uint256 pendingRewardsJav; // 1e18
+        uint256 totalRewardsJav; // 1e18
         uint256 totalRewardsValueUsd; // 1e18
         bool active;
     }
@@ -31,8 +31,8 @@ interface IReferrals {
         address ally;
         address[] tradersReferred;
         uint256 volumeReferredUsd; // 1e18
-        uint256 pendingRewardsGns; // 1e18
-        uint256 totalRewardsGns; // 1e18
+        uint256 pendingRewardsJav; // 1e18
+        uint256 totalRewardsJav; // 1e18
         uint256 totalRewardsValueUsd; // 1e18
         bool active;
     }

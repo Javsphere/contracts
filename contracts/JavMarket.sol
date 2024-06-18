@@ -47,7 +47,7 @@ contract JavMarket is BaseUpgradable, ReentrancyGuardUpgradeable {
     EnumerableSet.UintSet private _openOrders;
     EnumerableSet.AddressSet private _tokens;
 
-    address public botAddress; // deprecated
+    address public botAddress; // @custom:deprecated
     address public treasuryAddress;
     uint256 public totalOrders;
     uint256 public totalAmount;

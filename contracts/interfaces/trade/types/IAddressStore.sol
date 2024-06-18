@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 
 /**
  * @custom:version 8
- * @dev Contains the types for the GNSAddressStore facet
+ * @dev Contains the types for the JavAddressStore facet
  */
 interface IAddressStore {
     enum Role {
@@ -14,8 +14,8 @@ interface IAddressStore {
     }
 
     struct Addresses {
-        address gns;
-        address gnsStaking;
+        address jav;
+        address rewardsDistributor;
     }
 
     struct AddressStore {

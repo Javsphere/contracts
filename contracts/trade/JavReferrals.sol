@@ -24,7 +24,7 @@ contract JavReferrals is JavAddressStore, IReferralsUtils {
         uint256 _startReferrerFeeP,
         uint256 _openFeeP,
         uint256 _targetVolumeUsd
-    ) external reinitializer(3) {
+    ) external reinitializer(2) {
         ReferralsUtils.initializeReferrals(
             _allyFeeP,
             _startReferrerFeeP,
@@ -93,14 +93,14 @@ contract JavReferrals is JavAddressStore, IReferralsUtils {
         address _trader,
         uint256 _volumeUsd,
         uint256 _pairOpenFeeP,
-        uint256 _gnsPriceUsd
+        uint256 _javPriceUsd
     ) external virtual onlySelf returns (uint256) {
         return
             ReferralsUtils.distributeReferralReward(
                 _trader,
                 _volumeUsd,
                 _pairOpenFeeP,
-                _gnsPriceUsd
+                _javPriceUsd
             );
     }
 

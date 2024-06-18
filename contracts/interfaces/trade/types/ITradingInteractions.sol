@@ -4,15 +4,15 @@ pragma solidity ^0.8.23;
 
 /**
  * @custom:version 8
- * @dev Contains the types for the GNSTradingInteractions facet
+ * @dev Contains the types for the JavTradingInteractions facet
  */
 interface ITradingInteractions {
+
+
+
     struct TradingInteractionsStorage {
-        address senderOverride; // 160 bits
-        uint16 marketOrdersTimeoutBlocks; // 16 bits
         uint80 __placeholder;
-        mapping(address => address) delegations;
-        mapping(address => bool) byPassTriggerLink;
         uint256[47] __gap;
     }
+
 }

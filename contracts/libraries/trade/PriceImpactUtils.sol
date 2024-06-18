@@ -10,7 +10,7 @@ import "./StorageUtils.sol";
 
 /**
  * @custom:version 8
- * @dev GNSPriceImpact facet internal library
+ * @dev JavPriceImpact facet internal library
  *
  * This is a library to help manage a price impact decay algorithm .
  *

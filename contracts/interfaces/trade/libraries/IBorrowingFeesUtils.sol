@@ -6,7 +6,7 @@ import "../types/IBorrowingFees.sol";
 
 /**
  * @custom:version 8
- * @dev Interface for GNSBorrowingFees facet (inherits types and also contains functions, events, and custom errors)
+ * @dev Interface for JavBorrowingFees facet (inherits types and also contains functions, events, and custom errors)
  */
 interface IBorrowingFeesUtils is IBorrowingFees {
     /**

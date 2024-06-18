@@ -9,7 +9,7 @@ import "./StorageUtils.sol";
 
 /**
  * @custom:version 8
- * @dev GNSFeeTiers facet internal library
+ * @dev JavFeeTiers facet internal library
  *
  * This is a library to apply fee tiers to trading fees based on a trailing point system.
  */

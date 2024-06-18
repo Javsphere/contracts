@@ -12,7 +12,7 @@ import "./StorageUtils.sol";
 
 /**
  * @custom:version 8
- * @dev GNSReferrals facet internal library
+ * @dev JavReferrals facet internal library
  */
 library ReferralsUtils {
     using SafeERC20 for IERC20;
@@ -155,7 +155,7 @@ library ReferralsUtils {
         address _trader,
         uint256 _volumeUsd, // 1e18
         uint256 _pairOpenFeeP,
-        uint256 _gnsPriceUsd // PRECISION (1e10)
+        uint256 _javPriceUsd // PRECISION (1e10)
     ) internal returns (uint256) {
         IReferralsUtils.ReferralsStorage storage s = _getStorage();
 
@@ -171,48 +171,46 @@ library ReferralsUtils {
             PRECISION /
             100;
 
-        uint256 referrerRewardGns = (referrerRewardValueUsd * PRECISION) / _gnsPriceUsd;
-
-        IERC20Extended(AddressStoreUtils.getAddresses().gns).mint(address(this), referrerRewardGns);
+        uint256 referrerRewardJav = (referrerRewardValueUsd * PRECISION) / _javPriceUsd;
 
         IReferralsUtils.AllyDetails storage a = s.allyDetails[r.ally];
 
         uint256 allyRewardValueUsd;
-        uint256 allyRewardGns;
+        uint256 allyRewardJav;
 
         if (a.active) {
             uint256 allyFeeP = s.allyFeeP;
 
             allyRewardValueUsd = (referrerRewardValueUsd * allyFeeP) / 100;
-            allyRewardGns = (referrerRewardGns * allyFeeP) / 100;
+            allyRewardJav = (referrerRewardJav * allyFeeP) / 100;
 
             a.volumeReferredUsd += _volumeUsd;
-            a.pendingRewardsGns += allyRewardGns;
-            a.totalRewardsGns += allyRewardGns;
+            a.pendingRewardsJav += allyRewardJav;
+            a.totalRewardsJav += allyRewardJav;
             a.totalRewardsValueUsd += allyRewardValueUsd;
 
             referrerRewardValueUsd -= allyRewardValueUsd;
-            referrerRewardGns -= allyRewardGns;
+            referrerRewardJav -= allyRewardJav;
 
             emit IReferralsUtils.AllyRewardDistributed(
                 r.ally,
                 _trader,
                 _volumeUsd,
-                allyRewardGns,
+                allyRewardJav,
                 allyRewardValueUsd
             );
         }
 
         r.volumeReferredUsd += _volumeUsd;
-        r.pendingRewardsGns += referrerRewardGns;
-        r.totalRewardsGns += referrerRewardGns;
+        r.pendingRewardsJav += referrerRewardJav;
+        r.totalRewardsJav += referrerRewardJav;
         r.totalRewardsValueUsd += referrerRewardValueUsd;
 
         emit IReferralsUtils.ReferrerRewardDistributed(
             referrer,
             _trader,
             _volumeUsd,
-            referrerRewardGns,
+            referrerRewardJav,
             referrerRewardValueUsd
         );
 
@@ -224,14 +222,14 @@ library ReferralsUtils {
      */
     function claimAllyRewards() internal {
         IReferralsUtils.AllyDetails storage a = _getStorage().allyDetails[msg.sender];
-        uint256 rewardsGns = a.pendingRewardsGns;
+        uint256 rewardsJav = a.pendingRewardsJav;
 
-        if (rewardsGns == 0) revert IReferralsUtils.NoPendingRewards();
+        if (rewardsJav == 0) revert IReferralsUtils.NoPendingRewards();
 
-        a.pendingRewardsGns = 0;
-        IERC20(AddressStoreUtils.getAddresses().gns).safeTransfer(msg.sender, rewardsGns);
+        a.pendingRewardsJav = 0;
+        IERC20(AddressStoreUtils.getAddresses().jav).safeTransfer(msg.sender, rewardsJav);
 
-        emit IReferralsUtils.AllyRewardsClaimed(msg.sender, rewardsGns);
+        emit IReferralsUtils.AllyRewardsClaimed(msg.sender, rewardsJav);
     }
 
     /**
@@ -239,14 +237,14 @@ library ReferralsUtils {
      */
     function claimReferrerRewards() internal {
         IReferralsUtils.ReferrerDetails storage r = _getStorage().referrerDetails[msg.sender];
-        uint256 rewardsGns = r.pendingRewardsGns;
+        uint256 rewardsJav = r.pendingRewardsJav;
 
-        if (rewardsGns == 0) revert IReferralsUtils.NoPendingRewards();
+        if (rewardsJav == 0) revert IReferralsUtils.NoPendingRewards();
 
-        r.pendingRewardsGns = 0;
-        IERC20(AddressStoreUtils.getAddresses().gns).safeTransfer(msg.sender, rewardsGns);
+        r.pendingRewardsJav = 0;
+        IERC20(AddressStoreUtils.getAddresses().jav).safeTransfer(msg.sender, rewardsJav);
 
-        emit IReferralsUtils.ReferrerRewardsClaimed(msg.sender, rewardsGns);
+        emit IReferralsUtils.ReferrerRewardsClaimed(msg.sender, rewardsJav);
     }
 
     /**

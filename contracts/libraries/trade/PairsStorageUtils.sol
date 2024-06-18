@@ -10,7 +10,7 @@ import "./StorageUtils.sol";
 
 /**
  * @custom:version 8
- * @dev GNSPairsStorage facet internal library
+ * @dev JavPairsStorage facet internal library
  */
 library PairsStorageUtils {
     uint256 private constant MIN_LEVERAGE = 2;
@@ -103,13 +103,13 @@ library PairsStorageUtils {
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
-    function pairJob(uint256 _pairIndex) internal view returns (string memory, string memory) {
+    function pairFeed(uint256 _pairIndex) internal view returns (bytes32) {
         IPairsStorage.PairsStorage storage s = _getStorage();
 
         IPairsStorage.Pair memory p = s.pairs[_pairIndex];
         if (!s.isPairListed[p.from][p.to]) revert IPairsStorageUtils.PairNotListed();
 
-        return (p.from, p.to);
+        return p.feedId;
     }
 
     /**
@@ -166,13 +166,6 @@ library PairsStorageUtils {
      */
     function pairCloseFeeP(uint256 _pairIndex) internal view returns (uint256) {
         return fees(pairs(_pairIndex).feeIndex).closeFeeP;
-    }
-
-    /**
-     * @dev Check IPairsStorageUtils interface for documentation
-     */
-    function pairOracleFeeP(uint256 _pairIndex) internal view returns (uint256) {
-        return fees(pairs(_pairIndex).feeIndex).oracleFeeP;
     }
 
     /**
@@ -325,7 +318,6 @@ library PairsStorageUtils {
         if (
             _fee.openFeeP == 0 ||
             _fee.closeFeeP == 0 ||
-            _fee.oracleFeeP == 0 ||
             _fee.triggerOrderFeeP == 0 ||
             _fee.minPositionSizeUsd == 0
         ) revert IPairsStorageUtils.WrongFees();
@@ -362,7 +354,6 @@ library PairsStorageUtils {
         IPairsStorage.Pair storage p = s.pairs[_pairIndex];
         if (!s.isPairListed[p.from][p.to]) revert IPairsStorageUtils.PairNotListed();
 
-        p.feed = _pair.feed;
         p.spreadP = _pair.spreadP;
         p.groupIndex = _pair.groupIndex;
         p.feeIndex = _pair.feeIndex;

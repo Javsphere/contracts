@@ -6,19 +6,19 @@ import "../types/ITradingStorage.sol";
 
 /**
  * @custom:version 8
- * @dev Interface for GNSTradingStorage facet (inherits types and also contains functions, events, and custom errors)
+ * @dev Interface for JavTradingStorage facet (inherits types and also contains functions, events, and custom errors)
  */
 interface ITradingStorageUtils is ITradingStorage {
     /**
      * @dev Initializes the trading storage facet
-     * @param _gns address of the gns token
-     * @param _gnsStaking address of the gns staking contract
+     * @param _jav address of the JAV token
+     * @param _rewardsDistributor address of the rewards distributor contract
      */
     function initializeTradingStorage(
-        address _gns,
-        address _gnsStaking,
+        address _jav,
+        address _rewardsDistributor,
         address[] memory _collaterals,
-        address[] memory _gTokens
+        address[] memory _jTokens
     ) external;
 
     /**
@@ -101,18 +101,10 @@ interface ITradingStorageUtils is ITradingStorage {
     function closeTrade(Id memory _tradeId) external;
 
     /**
-     * @dev Stores a new pending order
-     * @param _pendingOrder the pending order to be stored
+     * @dev Validation for trade struct (used by storeTrade and storePendingOrder for market open orders)
+     * @param _trade trade struct to validate
      */
-    function storePendingOrder(
-        PendingOrder memory _pendingOrder
-    ) external returns (PendingOrder memory);
-
-    /**
-     * @dev Closes a pending order
-     * @param _orderId the id of the pending order to be closed
-     */
-    function closePendingOrder(Id memory _orderId) external;
+    function validateTrade(Trade memory _trade) external;
 
     /**
      * @dev Returns collateral data by index
@@ -210,43 +202,13 @@ interface ITradingStorageUtils is ITradingStorage {
     ) external view returns (TradeInfo[] memory);
 
     /**
-     * @dev Returns a pending ordeer
-     * @param _orderId id of the pending order
-     */
-    function getPendingOrder(Id memory _orderId) external view returns (PendingOrder memory);
 
-    /**
-     * @dev Returns all pending orders for a trader
-     * @param _user address of the trader
-     */
-    function getPendingOrders(address _user) external view returns (PendingOrder[] memory);
-
-    /**
-     * @dev Returns all pending orders using a pagination system
-     * @param _offset index of first pendingOrder to return
-     * @param _limit index of last pendingOrder to return
-     */
-    function getAllPendingOrders(
-        uint256 _offset,
-        uint256 _limit
-    ) external view returns (PendingOrder[] memory);
-
-    /**
-     * @dev Returns the block number of the pending order for a trade (0 = doesn't exist)
-     * @param _tradeId id of the trade
-     * @param _orderType pending order type to check
-     */
-    function getTradePendingOrderBlock(
-        Id memory _tradeId,
-        PendingOrderType _orderType
-    ) external view returns (uint256);
 
     /**
      * @dev Returns the counters of a trader (currentIndex / open count for trades/tradeInfos and pendingOrders mappings)
      * @param _trader address of the trader
-     * @param _type the counter type (trade/pending order)
      */
-    function getCounters(address _trader, CounterType _type) external view returns (Counter memory);
+    function getCounters(address _trader) external view returns (Counter memory);
 
     /**
      * @dev Pure function that returns the pending order type (market open/limit open/stop open) for a trade type (trade/limit/stop)
@@ -258,7 +220,7 @@ interface ITradingStorageUtils is ITradingStorage {
      * @dev Returns the address of the gToken for a collateral stack
      * @param _collateralIndex the index of the supported collateral
      */
-    function getGToken(uint8 _collateralIndex) external view returns (address);
+    function getJToken(uint8 _collateralIndex) external view returns (address);
 
     /**
      * @dev Returns the current percent profit of a trade (1e10 precision)
@@ -358,18 +320,6 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param tradeId the trade id
      */
     event TradeClosed(Id tradeId);
-
-    /**
-     * @dev Emitted when a new pending order is stored
-     * @param pendingOrder the pending order stored
-     */
-    event PendingOrderStored(PendingOrder pendingOrder);
-
-    /**
-     * @dev Emitted when a pending order is closed
-     * @param orderId the id of the pending order closed
-     */
-    event PendingOrderClosed(Id orderId);
 
     error MissingCollaterals();
     error CollateralAlreadyActive();

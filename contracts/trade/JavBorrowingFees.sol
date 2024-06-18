@@ -9,7 +9,7 @@ import "../interfaces/trade/libraries/IBorrowingFeesUtils.sol";
 
 /**
  * @custom:version 8
- * @dev Facet #9: Borrowing Fees and open interests
+ * @dev Facet #8: Borrowing Fees and open interests
  */
 contract JavBorrowingFees is JavAddressStore, IBorrowingFeesUtils {
     // Initialization

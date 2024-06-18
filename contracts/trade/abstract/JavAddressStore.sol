@@ -19,6 +19,7 @@ abstract contract JavAddressStore is IJavAddressStore, BaseUpgradable {
         }
 
         _setRole(_rolesManager, Role.ROLES_MANAGER, true);
+        __Base_init();
     }
 
     // Addresses

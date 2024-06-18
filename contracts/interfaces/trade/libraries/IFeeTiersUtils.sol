@@ -6,7 +6,7 @@ import "../types/IFeeTiers.sol";
 
 /**
  * @custom:version 8
- * @dev Interface for GNSFeeTiers facet (inherits types and also contains functions, events, and custom errors)
+ * @dev Interface for JavFeeTiers facet (inherits types and also contains functions, events, and custom errors)
  */
 interface IFeeTiersUtils is IFeeTiers {
     /**

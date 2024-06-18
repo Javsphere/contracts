@@ -7,11 +7,10 @@ import "../../interfaces/trade/IJavMultiCollatDiamond.sol";
 import "./StorageUtils.sol";
 import "./AddressStoreUtils.sol";
 import "./CollateralUtils.sol";
-import "./ChainUtils.sol";
 
 /**
  * @custom:version 8
- * @dev GNSTradingStorage facet internal library
+ * @dev JavTradingStorage facet internal library
  */
 
 library TradingStorageUtils {
@@ -23,26 +22,27 @@ library TradingStorageUtils {
      * @dev Check ITradingStorageUtils interface for documentation
      */
     function initializeTradingStorage(
-        address _gns,
-        address _gnsStaking,
+        address _jav,
+        address rewardsDistributor,
         address[] memory _collaterals,
-        address[] memory _gTokens
+        address[] memory _jTokens
     ) internal {
-        if (_gns == address(0) || _gnsStaking == address(0)) revert IGeneralErrors.ZeroAddress();
+        if (_jav == address(0) || rewardsDistributor == address(0))
+            revert IGeneralErrors.ZeroAddress();
 
-        if (_collaterals.length < 3) revert ITradingStorageUtils.MissingCollaterals();
-        if (_collaterals.length != _gTokens.length) revert IGeneralErrors.WrongLength();
+        if (_collaterals.length < 2) revert ITradingStorageUtils.MissingCollaterals();
+        if (_collaterals.length != _jTokens.length) revert IGeneralErrors.WrongLength();
 
         // Set addresses
         IJavAddressStore.Addresses storage addresses = AddressStoreUtils.getAddresses();
-        addresses.gns = _gns;
-        addresses.gnsStaking = _gnsStaking;
+        addresses.jav = _jav;
+        addresses.rewardsDistributor = rewardsDistributor;
 
         emit IJavAddressStore.AddressesUpdated(addresses);
 
         // Add collaterals
         for (uint256 i; i < _collaterals.length; ++i) {
-            addCollateral(_collaterals[i], _gTokens[i]);
+            addCollateral(_collaterals[i], _jTokens[i]);
         }
 
         // Trading is paused by default for state copy
@@ -63,7 +63,6 @@ library TradingStorageUtils {
      */
     function addCollateral(address _collateral, address _gToken) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
-        address staking = AddressStoreUtils.getAddresses().gnsStaking;
 
         if (s.collateralIndex[_collateral] != 0) revert IGeneralErrors.AlreadyExists();
         if (_collateral == address(0) || _gToken == address(0)) revert IGeneralErrors.ZeroAddress();
@@ -84,10 +83,9 @@ library TradingStorageUtils {
 
         s.collateralIndex[_collateral] = index;
 
-        // Setup Staking and GToken approvals
+        // Setup JToken approvals
         IERC20 collateral = IERC20(_collateral);
         collateral.approve(_gToken, type(uint256).max);
-        collateral.approve(staking, type(uint256).max);
 
         emit ITradingStorageUtils.CollateralAdded(_collateral, index, _gToken);
     }
@@ -137,7 +135,7 @@ library TradingStorageUtils {
     ) internal returns (ITradingStorage.Trade memory) {
         ITradingStorage.TradingStorage storage s = _getStorage();
 
-        _validateTrade(_trade);
+        validateTrade(_trade);
 
         if (_trade.tradeType != ITradingStorage.TradeType.TRADE && _tradeInfo.maxSlippageP == 0)
             revert ITradingStorageUtils.MaxSlippageZero();
@@ -147,16 +145,14 @@ library TradingStorageUtils {
             _tradeInfo.collateralPriceUsd == 0
         ) revert ITradingStorageUtils.TradeInfoCollateralPriceUsdZero();
 
-        ITradingStorage.Counter memory counter = s.userCounters[_trade.user][
-            ITradingStorage.CounterType.TRADE
-        ];
+        ITradingStorage.Counter memory counter = s.userCounters[_trade.user];
 
         _trade.index = counter.currentIndex;
         _trade.isOpen = true;
         _trade.tp = _limitTpDistance(_trade.openPrice, _trade.leverage, _trade.tp, _trade.long);
         _trade.sl = _limitSlDistance(_trade.openPrice, _trade.leverage, _trade.sl, _trade.long);
 
-        _tradeInfo.createdBlock = uint32(ChainUtils.getBlockNumber());
+        _tradeInfo.createdBlock = uint32(block.number);
         _tradeInfo.tpLastUpdatedBlock = _tradeInfo.createdBlock;
         _tradeInfo.slLastUpdatedBlock = _tradeInfo.createdBlock;
         _tradeInfo.lastOiUpdateTs = uint48(block.timestamp);
@@ -166,7 +162,7 @@ library TradingStorageUtils {
 
         s.trades[_trade.user][_trade.index] = _trade;
         s.tradeInfos[_trade.user][_trade.index] = _tradeInfo;
-        s.userCounters[_trade.user][ITradingStorage.CounterType.TRADE] = counter;
+        s.userCounters[_trade.user] = counter;
 
         if (!s.traderStored[_trade.user]) {
             s.traders.push(_trade.user);
@@ -229,7 +225,7 @@ library TradingStorageUtils {
         t.sl = _sl;
 
         i.maxSlippageP = _maxSlippageP;
-        i.createdBlock = uint32(ChainUtils.getBlockNumber());
+        i.createdBlock = uint32(block.number);
         i.tpLastUpdatedBlock = i.createdBlock;
         i.slLastUpdatedBlock = i.createdBlock;
 
@@ -259,7 +255,7 @@ library TradingStorageUtils {
         _newTp = _limitTpDistance(t.openPrice, t.leverage, _newTp, t.long);
 
         t.tp = _newTp;
-        i.tpLastUpdatedBlock = uint32(ChainUtils.getBlockNumber());
+        i.tpLastUpdatedBlock = uint32(block.number);
 
         emit ITradingStorageUtils.TradeTpUpdated(_tradeId, _newTp);
     }
@@ -279,7 +275,7 @@ library TradingStorageUtils {
         _newSl = _limitSlDistance(t.openPrice, t.leverage, _newSl, t.long);
 
         t.sl = _newSl;
-        i.slLastUpdatedBlock = uint32(ChainUtils.getBlockNumber());
+        i.slLastUpdatedBlock = uint32(block.number);
 
         emit ITradingStorageUtils.TradeSlUpdated(_tradeId, _newSl);
     }
@@ -294,98 +290,9 @@ library TradingStorageUtils {
         if (!t.isOpen) revert IGeneralErrors.DoesntExist();
 
         t.isOpen = false;
-        s.userCounters[_tradeId.user][ITradingStorage.CounterType.TRADE].openCount--;
+        s.userCounters[_tradeId.user].openCount--;
 
         emit ITradingStorageUtils.TradeClosed(_tradeId);
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function storePendingOrder(
-        ITradingStorage.PendingOrder memory _pendingOrder
-    ) internal returns (ITradingStorage.PendingOrder memory) {
-        if (_pendingOrder.user == address(0)) revert IGeneralErrors.ZeroAddress();
-
-        ITradingStorage.TradingStorage storage s = _getStorage();
-        ITradingStorage.Trade storage t = s.trades[_pendingOrder.trade.user][
-            _pendingOrder.trade.index
-        ];
-
-        if (_pendingOrder.orderType == ITradingStorage.PendingOrderType.MARKET_OPEN) {
-            _validateTrade(_pendingOrder.trade);
-
-            if (_pendingOrder.maxSlippageP == 0) revert ITradingStorageUtils.MaxSlippageZero();
-        } else {
-            if (!t.isOpen) revert IGeneralErrors.DoesntExist();
-
-            if (
-                _pendingOrder.orderType == ITradingStorage.PendingOrderType.LIMIT_OPEN
-                    ? t.tradeType != ITradingStorage.TradeType.LIMIT
-                    : _pendingOrder.orderType == ITradingStorage.PendingOrderType.STOP_OPEN
-                    ? t.tradeType != ITradingStorage.TradeType.STOP
-                    : t.tradeType != ITradingStorage.TradeType.TRADE
-            ) revert IGeneralErrors.WrongTradeType();
-
-            if (_pendingOrder.orderType == ITradingStorage.PendingOrderType.SL_CLOSE && t.sl == 0)
-                revert ITradingInteractionsUtils.NoSl();
-
-            if (_pendingOrder.orderType == ITradingStorage.PendingOrderType.TP_CLOSE && t.tp == 0)
-                revert ITradingInteractionsUtils.NoTp();
-        }
-
-        uint256 blockNumber = ChainUtils.getBlockNumber();
-        ITradingStorage.Counter memory counter = s.userCounters[_pendingOrder.user][
-            ITradingStorage.CounterType.PENDING_ORDER
-        ];
-
-        _pendingOrder.index = counter.currentIndex;
-        _pendingOrder.isOpen = true;
-        _pendingOrder.createdBlock = uint32(blockNumber);
-
-        counter.currentIndex++;
-        counter.openCount++;
-
-        s.pendingOrders[_pendingOrder.user][_pendingOrder.index] = _pendingOrder;
-        s.userCounters[_pendingOrder.user][ITradingStorage.CounterType.PENDING_ORDER] = counter;
-
-        if (_pendingOrder.orderType != ITradingStorage.PendingOrderType.MARKET_OPEN) {
-            s.tradePendingOrderBlock[_pendingOrder.trade.user][_pendingOrder.trade.index][
-                _pendingOrder.orderType
-            ] = blockNumber;
-        }
-
-        if (!s.traderStored[_pendingOrder.user]) {
-            s.traders.push(_pendingOrder.user);
-            s.traderStored[_pendingOrder.user] = true;
-        }
-
-        emit ITradingStorageUtils.PendingOrderStored(_pendingOrder);
-
-        return _pendingOrder;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function closePendingOrder(ITradingStorage.Id memory _orderId) internal {
-        ITradingStorage.TradingStorage storage s = _getStorage();
-        ITradingStorage.PendingOrder storage pendingOrder = s.pendingOrders[_orderId.user][
-            _orderId.index
-        ];
-
-        if (!pendingOrder.isOpen) revert IGeneralErrors.DoesntExist();
-
-        pendingOrder.isOpen = false;
-        s.userCounters[_orderId.user][ITradingStorage.CounterType.PENDING_ORDER].openCount--;
-
-        if (pendingOrder.orderType != ITradingStorage.PendingOrderType.MARKET_OPEN) {
-            delete s.tradePendingOrderBlock[pendingOrder.trade.user][pendingOrder.trade.index][
-                pendingOrder.orderType
-            ];
-        }
-
-        emit ITradingStorageUtils.PendingOrderClosed(_orderId);
     }
 
     /**
@@ -469,10 +376,7 @@ library TradingStorageUtils {
         uint32 currentIndex;
         for (uint32 i = _offset; i <= _limit; ++i) {
             address trader = s.traders[i];
-            if (
-                s.userCounters[trader][ITradingStorage.CounterType.TRADE].openCount > 0 ||
-                s.userCounters[trader][ITradingStorage.CounterType.PENDING_ORDER].openCount > 0
-            ) {
+            if (s.userCounters[trader].openCount > 0) {
                 traders[currentIndex++] = trader;
             }
         }
@@ -495,9 +399,7 @@ library TradingStorageUtils {
      */
     function getTrades(address _trader) internal view returns (ITradingStorage.Trade[] memory) {
         ITradingStorage.TradingStorage storage s = _getStorage();
-        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader][
-            ITradingStorage.CounterType.TRADE
-        ];
+        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader];
         ITradingStorage.Trade[] memory trades = new ITradingStorage.Trade[](
             traderCounter.openCount
         );
@@ -561,9 +463,7 @@ library TradingStorageUtils {
         address _trader
     ) internal view returns (ITradingStorage.TradeInfo[] memory) {
         ITradingStorage.TradingStorage storage s = _getStorage();
-        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader][
-            ITradingStorage.CounterType.TRADE
-        ];
+        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader];
         ITradingStorage.TradeInfo[] memory tradeInfos = new ITradingStorage.TradeInfo[](
             traderCounter.openCount
         );
@@ -614,89 +514,8 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getPendingOrder(
-        ITradingStorage.Id memory _orderId
-    ) internal view returns (ITradingStorage.PendingOrder memory) {
-        return _getStorage().pendingOrders[_orderId.user][_orderId.index];
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getPendingOrders(
-        address _trader
-    ) internal view returns (ITradingStorage.PendingOrder[] memory) {
-        ITradingStorage.TradingStorage storage s = _getStorage();
-        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader][
-            ITradingStorage.CounterType.PENDING_ORDER
-        ];
-        ITradingStorage.PendingOrder[] memory pendingOrders = new ITradingStorage.PendingOrder[](
-            traderCounter.openCount
-        );
-
-        uint32 currentIndex;
-        for (uint32 i; i < traderCounter.currentIndex; ++i) {
-            if (s.pendingOrders[_trader][i].isOpen) {
-                pendingOrders[currentIndex++] = s.pendingOrders[_trader][i];
-            }
-        }
-
-        return pendingOrders;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getAllPendingOrders(
-        uint256 _offset,
-        uint256 _limit
-    ) internal view returns (ITradingStorage.PendingOrder[] memory) {
-        // Fetch all traders with open trades (no pagination, return size is not an issue here)
-        address[] memory traders = getTraders(0, 0);
-
-        uint256 currentPendingOrderIndex; // current global pending order index
-        uint256 currentArrayIndex; // current index in returned pending orders array
-
-        ITradingStorage.PendingOrder[] memory pendingOrders = new ITradingStorage.PendingOrder[](
-            _limit - _offset + 1
-        );
-
-        // Fetch all trades for each trader
-        for (uint256 i; i < traders.length; ++i) {
-            ITradingStorage.PendingOrder[] memory traderPendingOrders = getPendingOrders(
-                traders[i]
-            );
-
-            // Add trader trades to final trades array only if within _offset and _limit
-            for (uint256 j; j < traderPendingOrders.length; ++j) {
-                if (currentPendingOrderIndex >= _offset && currentPendingOrderIndex <= _limit) {
-                    pendingOrders[currentArrayIndex++] = traderPendingOrders[j];
-                }
-                currentPendingOrderIndex++;
-            }
-        }
-
-        return pendingOrders;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getTradePendingOrderBlock(
-        ITradingStorage.Id memory _tradeId,
-        ITradingStorage.PendingOrderType _orderType
-    ) internal view returns (uint256) {
-        return _getStorage().tradePendingOrderBlock[_tradeId.user][_tradeId.index][_orderType];
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getCounters(
-        address _trader,
-        ITradingStorage.CounterType _type
-    ) internal view returns (ITradingStorage.Counter memory) {
-        return _getStorage().userCounters[_trader][_type];
+    function getCounters(address _trader) internal view returns (ITradingStorage.Counter memory) {
+        return _getStorage().userCounters[_trader];
     }
 
     /**
@@ -716,7 +535,7 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getGToken(uint8 _collateralIndex) internal view returns (address) {
+    function getJToken(uint8 _collateralIndex) internal view returns (address) {
         return _getStorage().gTokens[_collateralIndex];
     }
 
@@ -836,7 +655,7 @@ library TradingStorageUtils {
      * @dev Validation for trade struct (used by storeTrade and storePendingOrder for market open orders)
      * @param _trade trade struct to validate
      */
-    function _validateTrade(ITradingStorage.Trade memory _trade) internal view {
+    function validateTrade(ITradingStorage.Trade memory _trade) internal view {
         if (_trade.user == address(0)) revert IGeneralErrors.ZeroAddress();
 
         if (!_getMultiCollatDiamond().isPairIndexListed(_trade.pairIndex))

@@ -6,7 +6,7 @@ import "../types/IPairsStorage.sol";
 
 /**
  * @custom:version 8
- * @dev Interface for GNSPairsStorage facet (inherits types and also contains functions, events, and custom errors)
+ * @dev Interface for JavPairsStorage facet (inherits types and also contains functions, events, and custom errors)
  */
 interface IPairsStorageUtils is IPairsStorage {
     /**
@@ -59,14 +59,10 @@ interface IPairsStorageUtils is IPairsStorage {
     ) external;
 
     /**
-     * @dev Returns data needed by price aggregator when doing a new price request
+     * @dev Returns pair feed fot get price
      * @param _pairIndex index of pair
-     * @return from pair from (eg. BTC)
-     * @return to pair to (eg. USD)
      */
-    function pairJob(
-        uint256 _pairIndex
-    ) external view returns (string memory from, string memory to);
+    function pairFeed(uint256 _pairIndex) external view returns (bytes32);
 
     /**
      * @dev Returns whether a pair is listed
@@ -115,12 +111,6 @@ interface IPairsStorageUtils is IPairsStorage {
      * @param _pairIndex index of pair
      */
     function pairCloseFeeP(uint256 _pairIndex) external view returns (uint256);
-
-    /**
-     * @dev Returns a pair's oracle fee % (1e10 precision)
-     * @param _pairIndex index of pair
-     */
-    function pairOracleFeeP(uint256 _pairIndex) external view returns (uint256);
 
     /**
      * @dev Returns a pair's trigger order fee % (1e10 precision)

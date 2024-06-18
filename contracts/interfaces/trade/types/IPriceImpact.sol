@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 
 /**
  * @custom:version 8
- * @dev Contains the types for the GNSPriceImpact facet
+ * @dev Contains the types for the JavPriceImpact facet
  */
 interface IPriceImpact {
     struct PriceImpactStorage {

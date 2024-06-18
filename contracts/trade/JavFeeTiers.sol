@@ -25,7 +25,7 @@ contract JavFeeTiers is JavAddressStore, IFeeTiersUtils {
         uint256[] calldata _groupVolumeMultipliers,
         uint256[] calldata _feeTiersIndices,
         IFeeTiersUtils.FeeTier[] calldata _feeTiers
-    ) external reinitializer(4) {
+    ) external reinitializer(5) {
         FeeTiersUtils.initializeFeeTiers(
             _groupIndices,
             _groupVolumeMultipliers,

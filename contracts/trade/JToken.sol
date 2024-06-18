@@ -23,7 +23,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
     using Math for uint256;
     using SafeERC20 for IERC20;
     // Contracts & Addresses (constant)
-    address public gnsToken;
     IJTokenLockedDepositNft public lockedDepositNft;
 
     // Contracts & Addresses (adjustable)
@@ -31,16 +30,14 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
     address public admin; // bypasses timelock, access to emergency functions
 
     address public pnlHandler;
-    IJTokenOpenPnlFeed public openTradesPnlFeed;
-    GnsPriceProvider public gnsPriceProvider;
+    JavPriceProvider public javPriceProvider;
 
     // Parameters (constant)
     uint256 constant PRECISION_18 = 1e18;
-    uint256 constant PRECISION_10 = 1e10; // 10 decimals (gns/asset oracle)
+    uint256 constant PRECISION_10 = 1e10; // 10 decimals (jav/asset oracle)
     uint256 constant MIN_DAILY_ACC_PNL_DELTA = PRECISION_18 / 10; // 0.1, price delta (1e18)
     uint256 constant MAX_SUPPLY_INCREASE_DAILY_P = 50 * PRECISION_18; // 50% / day, when under collat (1e18)
     uint256 constant MAX_LOSSES_BURN_P = 25 * PRECISION_18; // 25% of all losses (1e18)
-    uint256 constant MAX_GNS_SUPPLY_MINT_DAILY_P = PRECISION_18 / 20; // 0.05% / day => 18.25% / yr max (1e18)
     uint256 constant MAX_DISCOUNT_P = 10 * PRECISION_18; // 10% (1e18)
     uint256 public MIN_LOCK_DURATION; // min locked asset deposit duration
     uint256 constant MAX_LOCK_DURATION = 365 days; // max locked asset deposit duration
@@ -52,7 +49,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
     uint256[2] public withdrawLockThresholdsP; // PRECISION_18 (% of over collat, used with WITHDRAW_EPOCHS_LOCKS)
     uint256 public maxSupplyIncreaseDailyP; // PRECISION_18 (% per day, when under collat)
     uint256 public lossesBurnP; // PRECISION_18 (% of all losses)
-    uint256 public maxGnsSupplyMintDailyP; // PRECISION_18 (% of gns supply)
     uint256 public maxDiscountP; // PRECISION_18 (%, maximum discount for locked deposits)
     uint256 public maxDiscountThresholdP; // PRECISION_18 (maximum collat %, for locked deposits)
 
@@ -81,9 +77,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
     mapping(uint256 => LockedDeposit) public lockedDeposits;
 
     // Deplete / Refill state
-    uint256 public assetsToDeplete; // collateralConfig.precision
-    uint256 public dailyMintedGns; // 1e18
-    uint256 public lastDailyMintedGnsReset; // timestamp
 
     // Statistics (not used for contract logic)
     uint256 public totalDeposited; // collateralConfig.precision (assets)
@@ -92,14 +85,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
     int256 public totalLiability; // collateralConfig.precision (assets)
     uint256 public totalLockedDiscounts; // collateralConfig.precision (assets)
     uint256 public totalDiscounts; // collateralConfig.precision (assets)
-    uint256 public totalDepleted; // collateralConfig.precision (assets)
-    uint256 public totalDepletedGns; // 1e18 (gns)
-    uint256 public totalRefilled; // collateralConfig.precision (assets)
-    uint256 public totalRefilledGns; // 1e18 (gns)
-
-    /// @custom:deprecated acc values
-    uint256 public accBlockWeightedMarketCap;
-    uint256 public accBlockWeightedMarketCapLastStored;
 
     // Multi-Collat support
     CollateralUtils.CollateralConfig public collateralConfig;
@@ -114,7 +99,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
         uint256[2] memory _withdrawLockThresholdsP,
         uint256 _maxSupplyIncreaseDailyP,
         uint256 _lossesBurnP,
-        uint256 _maxGnsSupplyMintDailyP,
         uint256 _maxDiscountP,
         uint256 _maxDiscountThresholdP
     ) external initializer {
@@ -123,19 +107,14 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
                 _contractAddresses.owner != address(0) &&
                 _contractAddresses.manager != address(0) &&
                 _contractAddresses.admin != address(0) &&
-                _contractAddresses.owner != _contractAddresses.manager &&
-                _contractAddresses.manager != _contractAddresses.admin &&
-                _contractAddresses.gnsToken != address(0) &&
                 _contractAddresses.lockedDepositNft != address(0) &&
                 _contractAddresses.pnlHandler != address(0) &&
-                _contractAddresses.openTradesPnlFeed != address(0) &&
-                _contractAddresses.gnsPriceProvider.addr != address(0) &&
-                _contractAddresses.gnsPriceProvider.signature.length > 0 &&
+                _contractAddresses.javPriceProvider.addr != address(0) &&
+                _contractAddresses.javPriceProvider.signature.length > 0 &&
                 _maxDailyAccPnlDelta >= MIN_DAILY_ACC_PNL_DELTA &&
                 _withdrawLockThresholdsP[1] > _withdrawLockThresholdsP[0] &&
                 _maxSupplyIncreaseDailyP <= MAX_SUPPLY_INCREASE_DAILY_P &&
                 _lossesBurnP <= MAX_LOSSES_BURN_P &&
-                _maxGnsSupplyMintDailyP <= MAX_GNS_SUPPLY_MINT_DAILY_P &&
                 _maxDiscountP <= MAX_DISCOUNT_P &&
                 _maxDiscountThresholdP >= 100 * PRECISION_18)
         ) {
@@ -146,13 +125,11 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
         __ERC4626_init(IERC20(_contractAddresses.asset));
         _transferOwnership(_contractAddresses.owner);
 
-        gnsToken = _contractAddresses.gnsToken;
         lockedDepositNft = IJTokenLockedDepositNft(_contractAddresses.lockedDepositNft);
         manager = _contractAddresses.manager;
         admin = _contractAddresses.admin;
         pnlHandler = _contractAddresses.pnlHandler;
-        openTradesPnlFeed = IJTokenOpenPnlFeed(_contractAddresses.openTradesPnlFeed);
-        gnsPriceProvider = _contractAddresses.gnsPriceProvider;
+        javPriceProvider = _contractAddresses.javPriceProvider;
 
         MIN_LOCK_DURATION = _MIN_LOCK_DURATION;
 
@@ -161,7 +138,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
         withdrawLockThresholdsP = _withdrawLockThresholdsP;
         maxSupplyIncreaseDailyP = _maxSupplyIncreaseDailyP;
         lossesBurnP = _lossesBurnP;
-        maxGnsSupplyMintDailyP = _maxGnsSupplyMintDailyP;
         maxDiscountP = _maxDiscountP;
         maxDiscountThresholdP = _maxDiscountThresholdP;
 
@@ -171,7 +147,7 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
         WITHDRAW_EPOCHS_LOCKS = [3, 2, 1];
     }
 
-    function initializeV3() external reinitializer(3) {
+    function initializeV3() external reinitializer(2) {
         collateralConfig = CollateralUtils.getCollateralConfig(asset());
     }
 
@@ -208,11 +184,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
     }
 
     // Manage addresses
-    function transferOwnership(address newOwner) public override onlyOwner {
-        if (newOwner == address(0)) revert OwnableInvalidOwner(address(0));
-        if (newOwner == manager || newOwner == admin) revert WrongValue();
-        _transferOwnership(newOwner);
-    }
 
     function updateManager(address newValue) external onlyOwner {
         if (newValue == address(0)) revert AddressZero();
@@ -234,17 +205,11 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
         emit PnlHandlerUpdated(newValue);
     }
 
-    function updateGnsPriceProvider(GnsPriceProvider memory newValue) external onlyManager {
+    function updateJavPriceProvider(JavPriceProvider memory newValue) external onlyManager {
         if (newValue.addr == address(0)) revert AddressZero();
         if (newValue.signature.length == 0) revert BytesZero();
-        gnsPriceProvider = newValue;
-        emit GnsPriceProviderUpdated(newValue);
-    }
-
-    function updateOpenTradesPnlFeed(address newValue) external onlyOwner {
-        if (newValue == address(0)) revert AddressZero();
-        openTradesPnlFeed = IJTokenOpenPnlFeed(newValue);
-        emit OpenTradesPnlFeedUpdated(newValue);
+        javPriceProvider = newValue;
+        emit JavPriceProviderUpdated(newValue);
     }
 
     // Manage parameters
@@ -275,12 +240,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
         if (newValue > MAX_LOSSES_BURN_P) revert AboveMax();
         lossesBurnP = newValue;
         emit LossesBurnPUpdated(newValue);
-    }
-
-    function updateMaxGnsSupplyMintDailyP(uint256 newValue) external onlyManager {
-        if (newValue > MAX_GNS_SUPPLY_MINT_DAILY_P) revert AboveMax();
-        maxGnsSupplyMintDailyP = newValue;
-        emit MaxGnsSupplyMintDailyPUpdated(newValue);
     }
 
     function updateMaxDiscountP(uint256 newValue) external onlyManager {
@@ -314,17 +273,17 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
                 PRECISION_18) / _maxAccPnlPerToken;
     }
 
-    function gnsTokenToAssetsPrice() public view returns (uint256 price) {
+    function javTokenToAssetsPrice() public view returns (uint256 price) {
         // PRECISION_10
-        (bool success, bytes memory result) = gnsPriceProvider.addr.staticcall(
-            abi.encodeWithSelector(bytes4(gnsPriceProvider.signature), asset())
+        (bool success, bytes memory result) = javPriceProvider.addr.staticcall(
+            abi.encodeWithSelector(bytes4(javPriceProvider.signature), asset())
         );
 
-        if (!success) revert GnsPriceCallFailed();
+        if (!success) revert JavPriceCallFailed();
 
         (price) = abi.decode(result, (uint256));
 
-        if (price == 0) revert GnsTokenPriceZero();
+        if (price == 0) revert JavTokenPriceZero();
     }
 
     function withdrawEpochsTimelock() public view returns (uint256) {
@@ -379,16 +338,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
             lastDailyAccPnlDeltaReset = block.timestamp;
 
             emit DailyAccPnlDeltaReset();
-        }
-    }
-
-    function tryNewOpenPnlRequestOrEpoch() public {
-        // Fault tolerance so that activity can continue anyway
-        (bool success, ) = address(openTradesPnlFeed).call(
-            abi.encodeWithSignature("newOpenPnlRequestOrEpoch()")
-        );
-        if (!success) {
-            emit OpenTradesPnlFeedCallFailed();
         }
     }
 
@@ -464,10 +413,7 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
     }
 
     function maxRedeem(address owner) public view override returns (uint256) {
-        return
-            openTradesPnlFeed.nextEpochValuesRequestCount() == 0
-                ? Math.min(withdrawRequests[owner][currentEpoch], totalSupply() - 1)
-                : 0;
+        return Math.min(withdrawRequests[owner][currentEpoch], totalSupply() - 1);
     }
 
     function maxWithdraw(address owner) public view override returns (uint256) {
@@ -551,8 +497,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
 
     // Withdraw requests (need to be done before calling 'withdraw' / 'redeem')
     function makeWithdrawRequest(uint256 shares, address owner) external {
-        if (openTradesPnlFeed.nextEpochValuesRequestCount() > 0) revert EndOfEpoch();
-
         address sender = _msgSender();
         uint256 allowance = allowance(owner, sender);
 
@@ -731,7 +675,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
         totalLiability += int256(assets);
         totalClosedPnl += int256(assets);
 
-        tryNewOpenPnlRequestOrEpoch();
         tryUpdateCurrentMaxSupply();
 
         IERC20(_assetIERC20()).safeTransfer(receiver, assets);
@@ -747,7 +690,6 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
 
         if (accPnlPerTokenUsed < 0 && accPnlPerToken < 0) {
             uint256 depleteAmount = (assets * lossesBurnP) / PRECISION_18 / 100;
-            assetsToDeplete += depleteAmount;
             assetsLessDeplete -= depleteAmount;
         }
 
@@ -763,113 +705,9 @@ contract JToken is ERC20Upgradeable, ERC4626Upgradeable, IJToken, BaseUpgradable
         totalLiability -= int256(assetsLessDeplete);
         totalClosedPnl -= int256(assetsLessDeplete);
 
-        tryNewOpenPnlRequestOrEpoch();
         tryUpdateCurrentMaxSupply();
 
         emit AssetsReceived(sender, user, assets, assetsLessDeplete);
-    }
-
-    // GNS mint / burn mechanism
-    function deplete(uint256 assets) external {
-        if (assets > assetsToDeplete) revert AboveMax();
-        assetsToDeplete -= assets;
-
-        uint256 amountGns = assets.mulDiv(
-            collateralConfig.precisionDelta * PRECISION_10,
-            gnsTokenToAssetsPrice(),
-            Math.Rounding.Ceil
-        );
-
-        address sender = _msgSender();
-        IERC20Extended(gnsToken).burnFrom(sender, amountGns);
-
-        totalDepleted += assets;
-        totalDepletedGns += amountGns;
-
-        IERC20(_assetIERC20()).safeTransfer(sender, assets);
-
-        emit Depleted(sender, assets, amountGns);
-    }
-
-    function refill(uint256 assets) external {
-        if (accPnlPerTokenUsed <= 0) revert NotUnderCollateralized();
-
-        uint256 supply = totalSupply();
-        if (assets > (uint256(accPnlPerTokenUsed) * supply) / PRECISION_18) revert AboveMax();
-
-        if (block.timestamp - lastDailyMintedGnsReset >= 24 hours) {
-            dailyMintedGns = 0;
-            lastDailyMintedGnsReset = block.timestamp;
-        }
-
-        uint256 amountGns = (assets * collateralConfig.precisionDelta * PRECISION_10) /
-            gnsTokenToAssetsPrice();
-        dailyMintedGns += amountGns;
-
-        if (
-            dailyMintedGns >
-            (maxGnsSupplyMintDailyP * IERC20(gnsToken).totalSupply()) / PRECISION_18 / 100
-        ) revert AboveInflationLimit();
-
-        address sender = _msgSender();
-        IERC20(_assetIERC20()).safeTransferFrom(sender, address(this), assets);
-
-        int256 accPnlDelta = int256((assets * PRECISION_18) / supply);
-        accPnlPerToken -= accPnlDelta;
-        accPnlPerTokenUsed -= accPnlDelta;
-        updateShareToAssetsPrice();
-
-        totalRefilled += assets;
-        totalRefilledGns += amountGns;
-
-        IERC20Extended(gnsToken).mint(sender, amountGns);
-
-        emit Refilled(sender, assets, amountGns);
-    }
-
-    // Updates shareToAssetsPrice based on the new PnL and starts a new epoch
-    function updateAccPnlPerTokenUsed(
-        uint256 prevPositiveOpenPnl, // 1e18
-        uint256 newPositiveOpenPnl // 1e18
-    ) external returns (uint256) {
-        address sender = _msgSender();
-        if (sender != address(openTradesPnlFeed)) revert OnlyPnlFeed();
-
-        int256 delta = int256(newPositiveOpenPnl) - int256(prevPositiveOpenPnl); // 1e18
-        uint256 supply = totalSupply();
-
-        int256 maxDelta = int256(
-            Math.min(
-                (uint256(int256(maxAccPnlPerToken()) - accPnlPerToken) * supply) /
-                    collateralConfig.precision,
-                (maxAccOpenPnlDelta * supply) / collateralConfig.precision
-            )
-        ); // PRECISION_18
-
-        delta = delta > maxDelta ? maxDelta : delta;
-
-        accPnlPerToken += (delta * int256(uint256(collateralConfig.precision))) / int256(supply);
-        totalLiability += delta / int256(uint256(collateralConfig.precisionDelta));
-
-        accPnlPerTokenUsed = accPnlPerToken;
-        updateShareToAssetsPrice();
-
-        currentEpoch++;
-        currentEpochStart = block.timestamp;
-        currentEpochPositiveOpenPnl = uint256(int256(prevPositiveOpenPnl) + delta);
-
-        tryUpdateCurrentMaxSupply();
-
-        emit AccPnlPerTokenUsedUpdated(
-            sender,
-            currentEpoch,
-            prevPositiveOpenPnl,
-            newPositiveOpenPnl,
-            currentEpochPositiveOpenPnl,
-            accPnlPerTokenUsed
-        );
-
-        return currentEpochPositiveOpenPnl;
     }
 
     // Getters

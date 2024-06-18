@@ -8,11 +8,11 @@ import "./libraries/IReferralsUtils.sol";
 import "./libraries/IFeeTiersUtils.sol";
 import "./libraries/IPriceImpactUtils.sol";
 import "./libraries/ITradingStorageUtils.sol";
-import "./libraries/ITriggerRewardsUtils.sol";
 import "./libraries/ITradingInteractionsUtils.sol";
-import "./libraries/ITradingCallbacksUtils.sol";
+import "./libraries/ITradingProcessingUtils.sol";
 import "./libraries/IBorrowingFeesUtils.sol";
 import "./libraries/IPriceAggregatorUtils.sol";
+import "../libraries/IPriceUtils.sol";
 
 /**
  * @custom:version 8
@@ -27,11 +27,11 @@ interface IJavMultiCollatDiamond is
     IFeeTiersUtils,
     IPriceImpactUtils,
     ITradingStorageUtils,
-    ITriggerRewardsUtils,
     ITradingInteractionsUtils,
-    ITradingCallbacksUtils,
+    ITradingProcessingUtils,
     IBorrowingFeesUtils,
-    IPriceAggregatorUtils
+    IPriceAggregatorUtils,
+    IPriceUtils
 {
 
 }

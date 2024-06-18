@@ -7,7 +7,7 @@ pragma solidity ^0.8.23;
  * @dev Interface for GToken contract
  */
 interface IJToken {
-    struct GnsPriceProvider {
+    struct JavPriceProvider {
         address addr;
         bytes signature;
     }
@@ -26,11 +26,9 @@ interface IJToken {
         address owner; // 2-week timelock contract
         address manager; // 3-day timelock contract
         address admin; // bypasses timelock, access to emergency functions
-        address gnsToken;
         address lockedDepositNft;
         address pnlHandler;
-        address openTradesPnlFeed;
-        GnsPriceProvider gnsPriceProvider;
+        JavPriceProvider javPriceProvider;
     }
 
     struct Meta {
@@ -48,11 +46,6 @@ interface IJToken {
 
     function currentEpochPositiveOpenPnl() external view returns (uint256);
 
-    function updateAccPnlPerTokenUsed(
-        uint256 prevPositiveOpenPnl,
-        uint256 newPositiveOpenPnl
-    ) external returns (uint256);
-
     function getLockedDeposit(uint256 depositId) external view returns (LockedDeposit memory);
 
     function sendAssets(uint256 assets, address receiver) external;
@@ -69,13 +62,12 @@ interface IJToken {
     event AdminUpdated(address newValue);
     event PnlHandlerUpdated(address newValue);
     event OpenTradesPnlFeedUpdated(address newValue);
-    event GnsPriceProviderUpdated(GnsPriceProvider newValue);
+    event JavPriceProviderUpdated(JavPriceProvider newValue);
     event WithdrawLockThresholdsPUpdated(uint256[2] newValue);
     event MaxAccOpenPnlDeltaUpdated(uint256 newValue);
     event MaxDailyAccPnlDeltaUpdated(uint256 newValue);
     event MaxSupplyIncreaseDailyPUpdated(uint256 newValue);
     event LossesBurnPUpdated(uint256 newValue);
-    event MaxGnsSupplyMintDailyPUpdated(uint256 newValue);
     event MaxDiscountPUpdated(uint256 newValue);
     event MaxDiscountThresholdPUpdated(uint256 newValue);
 
@@ -123,9 +115,6 @@ interface IJToken {
         uint256 assetsLessDeplete
     );
 
-    event Depleted(address indexed sender, uint256 assets, uint256 amountGns);
-    event Refilled(address indexed sender, uint256 assets, uint256 amountGns);
-
     event AccPnlPerTokenUsedUpdated(
         address indexed sender,
         uint256 indexed newEpoch,
@@ -147,8 +136,8 @@ interface IJToken {
     error AboveMax();
     error WrongValue();
     error WrongValues();
-    error GnsPriceCallFailed();
-    error GnsTokenPriceZero();
+    error JavPriceCallFailed();
+    error JavTokenPriceZero();
     error PendingWithdrawal();
     error EndOfEpoch();
     error NotAllowed();

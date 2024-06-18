@@ -23,7 +23,7 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
     function initializePriceImpact(
         uint48 _windowsDuration,
         uint48 _windowsCount
-    ) external reinitializer(5) {
+    ) external reinitializer(3) {
         PriceImpactUtils.initializePriceImpact(_windowsDuration, _windowsCount);
     }
 

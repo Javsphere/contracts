@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 
 /**
  * @custom:version 8
- * @dev Contains the types for the GNSPairsStorage facet
+ * @dev Contains the types for the JavPairsStorage facet
  */
 interface IPairsStorage {
     struct PairsStorage {
@@ -13,29 +13,17 @@ interface IPairsStorage {
         mapping(uint256 => Fee) fees;
         mapping(string => mapping(string => bool)) isPairListed;
         mapping(uint256 => uint256) pairCustomMaxLeverage; // 0 decimal precision
-        uint256 currentOrderId; /// @custom:deprecated
         uint256 pairsCount;
         uint256 groupsCount;
         uint256 feesCount;
         uint256[41] __gap;
     }
 
-    enum FeedCalculation {
-        DEFAULT,
-        INVERT,
-        COMBINE
-    } /// @custom:deprecated
-    struct Feed {
-        address feed1;
-        address feed2;
-        FeedCalculation feedCalculation;
-        uint256 maxDeviationP;
-    } /// @custom:deprecated
 
     struct Pair {
         string from;
         string to;
-        Feed feed; /// @custom:deprecated
+        bytes32 feedId;
         uint256 spreadP; // PRECISION
         uint256 groupIndex;
         uint256 feeIndex;
@@ -43,7 +31,6 @@ interface IPairsStorage {
 
     struct Group {
         string name;
-        bytes32 job;
         uint256 minLeverage; // 0 decimal precision
         uint256 maxLeverage; // 0 decimal precision
     }
@@ -51,7 +38,6 @@ interface IPairsStorage {
         string name;
         uint256 openFeeP; // PRECISION (% of position size)
         uint256 closeFeeP; // PRECISION (% of position size)
-        uint256 oracleFeeP; // PRECISION (% of position size)
         uint256 triggerOrderFeeP; // PRECISION (% of position size)
         uint256 minPositionSizeUsd; // 1e18 (collateral x leverage, useful for min fee)
     }

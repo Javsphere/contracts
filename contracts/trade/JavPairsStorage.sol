@@ -68,8 +68,8 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     // Getters
 
     /// @inheritdoc IPairsStorageUtils
-    function pairJob(uint256 _pairIndex) external view returns (string memory, string memory) {
-        return PairsStorageUtils.pairJob(_pairIndex);
+    function pairFeed(uint256 _pairIndex) external view returns (bytes32) {
+        return PairsStorageUtils.pairFeed(_pairIndex);
     }
 
     /// @inheritdoc IPairsStorageUtils
@@ -110,11 +110,6 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     /// @inheritdoc IPairsStorageUtils
     function pairCloseFeeP(uint256 _pairIndex) external view returns (uint256) {
         return PairsStorageUtils.pairCloseFeeP(_pairIndex);
-    }
-
-    /// @inheritdoc IPairsStorageUtils
-    function pairOracleFeeP(uint256 _pairIndex) external view returns (uint256) {
-        return PairsStorageUtils.pairOracleFeeP(_pairIndex);
     }
 
     /// @inheritdoc IPairsStorageUtils

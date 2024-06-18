@@ -8,9 +8,8 @@ import "./IReferrals.sol";
 import "./IFeeTiers.sol";
 import "./IPriceImpact.sol";
 import "./ITradingStorage.sol";
-import "./ITriggerRewards.sol";
 import "./ITradingInteractions.sol";
-import "./ITradingCallbacks.sol";
+import "./ITradingProcessing.sol";
 import "./IBorrowingFees.sol";
 import "./IPriceAggregator.sol";
 
@@ -24,9 +23,8 @@ IReferrals,
 IFeeTiers,
 IPriceImpact,
 ITradingStorage,
-ITriggerRewards,
 ITradingInteractions,
-ITradingCallbacks,
+ITradingProcessing,
 IBorrowingFees,
 IPriceAggregator
 {

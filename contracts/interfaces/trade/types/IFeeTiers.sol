@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 
 /**
  * @custom:version 8
- * @dev Contains the types for the GNSFeeTiers facet
+ * @dev Contains the types for the JavFeeTiers facet
  */
 interface IFeeTiers {
     struct FeeTiersStorage {

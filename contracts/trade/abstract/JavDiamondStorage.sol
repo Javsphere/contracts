@@ -17,9 +17,8 @@ abstract contract JavDiamondStorage is JavAddressStore, ITypes {
     PriceImpactStorage private priceImpactStorage;
     DiamondStorage private diamondStorage;
     TradingStorage private tradingStorage;
-    TriggerRewardsStorage private triggerRewardsStorage;
     TradingInteractionsStorage private tradingInteractionsStorage;
-    TradingCallbacksStorage private tradingCallbacksStorage;
+    TradingProcessingStorage private tradingProcessingStorage;
     BorrowingFeesStorage private borrowingFeesStorage;
     PriceAggregatorStorage private priceAggregatorStorage;
 

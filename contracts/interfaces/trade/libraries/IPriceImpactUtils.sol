@@ -6,7 +6,7 @@ import "../types/IPriceImpact.sol";
 
 /**
  * @custom:version 8
- * @dev Interface for GNSPriceImpact facet (inherits types and also contains functions, events, and custom errors)
+ * @dev Interface for JavPriceImpact facet (inherits types and also contains functions, events, and custom errors)
  */
 interface IPriceImpactUtils is IPriceImpact {
     /**

@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 
 /**
  * @custom:version 8
- * @dev Contains the types for the GNSTradingStorage facet
+ * @dev Contains the types for the JavTradingStorage facet
  */
 interface ITradingStorage {
     struct TradingStorage {
@@ -16,9 +16,7 @@ interface ITradingStorage {
         mapping(address => uint8) collateralIndex;
         mapping(address => mapping(uint32 => Trade)) trades;
         mapping(address => mapping(uint32 => TradeInfo)) tradeInfos;
-        mapping(address => mapping(uint32 => mapping(PendingOrderType => uint256))) tradePendingOrderBlock;
-        mapping(address => mapping(uint32 => PendingOrder)) pendingOrders;
-        mapping(address => mapping(CounterType => Counter)) userCounters;
+        mapping(address => Counter) userCounters;
         address[] traders;
         mapping(address => bool) traderStored;
         uint256[39] __gap;
@@ -34,10 +32,6 @@ interface ITradingStorage {
         LIQ_CLOSE
     }
 
-    enum CounterType {
-        TRADE,
-        PENDING_ORDER
-    }
 
     enum TradeType {
         TRADE,
@@ -105,6 +99,8 @@ interface ITradingStorage {
         PendingOrderType orderType; // 8 bits
         uint32 createdBlock; // max: 4,294,967,295
         uint16 maxSlippageP; // 1e3 (%), max: 65.535%
+        //slot 5
+        uint64 price;
     }
 
     struct Counter {

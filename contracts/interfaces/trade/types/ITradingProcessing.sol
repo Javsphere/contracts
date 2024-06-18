@@ -2,23 +2,14 @@
 
 pragma solidity ^0.8.23;
 
-import "../types/ITradingStorage.sol";
-
 /**
  * @custom:version 8
- * @dev Contains the types for the GNSTradingCallbacks facet
+ * @dev Contains the types for the JavTradingInteractions facet
  */
-interface ITradingCallbacks {
-    struct TradingCallbacksStorage {
-        uint8 vaultClosingFeeP;
-        uint248 __placeholder;
-        mapping(uint8 => uint256) pendingGovFees; // collateralIndex => pending gov fee (collateral)
-        uint256[48] __gap;
-    }
+interface ITradingProcessing {
 
     enum CancelReason {
         NONE,
-        PAUSED, // deprecated
         MARKET_CLOSED,
         SLIPPAGE,
         TP_REACHED,
@@ -27,23 +18,13 @@ interface ITradingCallbacks {
         PRICE_IMPACT,
         MAX_LEVERAGE,
         NO_TRADE,
-        WRONG_TRADE, // deprecated
         NOT_HIT
-    }
-
-    struct AggregatorAnswer {
-        ITradingStorage.Id orderId;
-        uint256 spreadP;
-        uint64 price;
-        uint64 open;
-        uint64 high;
-        uint64 low;
     }
 
     // Useful to avoid stack too deep errors
     struct Values {
         uint256 positionSizeCollateral;
-        uint256 gnsPriceCollateral;
+        uint256 javPriceCollateral;
         int256 profitP;
         uint256 executionPrice;
         uint256 liqPrice;
@@ -55,4 +36,12 @@ interface ITradingCallbacks {
         uint256 collateralPriceUsd;
         bool exactExecution;
     }
+
+    struct TradingProcessingStorage {
+        uint8 vaultClosingFeeP; // 8 bits
+        uint80 __placeholder;
+        mapping(uint8 => uint256) pendingGovFees; // collateralIndex => pending gov fee (collateral)
+        uint256[47] __gap;
+    }
+
 }

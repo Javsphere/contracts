@@ -10,7 +10,7 @@ import "./ChainUtils.sol";
 /**
  * @custom:version 8
  *
- * @dev GNSBorrowingFees facet internal library
+ * @dev JavBorrowingFees facet internal library
  */
 library BorrowingFeesUtils {
     uint256 internal constant LIQ_THRESHOLD_P = 90; // -90% pnl
@@ -89,12 +89,12 @@ library BorrowingFeesUtils {
         (uint64 pairAccFeeLong, uint64 pairAccFeeShort) = _setPairPendingAccFees(
             _collateralIndex,
             _pairIndex,
-            ChainUtils.getBlockNumber()
+            block.number
         );
         (uint64 groupAccFeeLong, uint64 groupAccFeeShort) = _setGroupPendingAccFees(
             _collateralIndex,
             getBorrowingPairGroupIndex(_collateralIndex, _pairIndex),
-            ChainUtils.getBlockNumber()
+            block.number
         );
 
         _updatePairOi(_collateralIndex, _pairIndex, _long, _open, _positionSizeCollateral);
@@ -112,7 +112,7 @@ library BorrowingFeesUtils {
                 .BorrowingInitialAccFees(
                     _long ? pairAccFeeLong : pairAccFeeShort,
                     _long ? groupAccFeeLong : groupAccFeeShort,
-                    ChainUtils.getUint48BlockNumber(ChainUtils.getBlockNumber()),
+                    ChainUtils.getUint48BlockNumber(block.number),
                     0 // placeholder
                 );
 
@@ -231,7 +231,7 @@ library BorrowingFeesUtils {
                     ? _getBorrowingPairPendingAccFee(
                         _input.collateralIndex,
                         _input.pairIndex,
-                        ChainUtils.getBlockNumber(),
+                        block.number,
                         _input.long
                     )
                     : (_input.long ? firstPairGroup.pairAccFeeLong : firstPairGroup.pairAccFeeShort)
@@ -251,7 +251,7 @@ library BorrowingFeesUtils {
                     initialFees,
                     _input.pairIndex,
                     _input.long,
-                    ChainUtils.getBlockNumber()
+                    block.number
                 );
 
             borrowingFeeP += (deltaGroup > deltaPair ? deltaGroup : deltaPair);
@@ -668,7 +668,7 @@ library BorrowingFeesUtils {
         IBorrowingFees.BorrowingData storage p = s.pairs[_collateralIndex][_pairIndex];
 
         uint16 prevGroupIndex = getBorrowingPairGroupIndex(_collateralIndex, _pairIndex);
-        uint256 currentBlock = ChainUtils.getBlockNumber();
+        uint256 currentBlock = block.number;
 
         _setPairPendingAccFees(_collateralIndex, _pairIndex, currentBlock);
 
@@ -749,7 +749,7 @@ library BorrowingFeesUtils {
             revert IBorrowingFeesUtils.BorrowingWrongExponent();
         }
 
-        _setGroupPendingAccFees(_collateralIndex, _groupIndex, ChainUtils.getBlockNumber());
+        _setGroupPendingAccFees(_collateralIndex, _groupIndex, block.number);
 
         IBorrowingFees.BorrowingFeesStorage storage s = _getStorage();
         IBorrowingFees.BorrowingData storage group = s.groups[_collateralIndex][_groupIndex];

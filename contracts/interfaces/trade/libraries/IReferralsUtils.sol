@@ -6,7 +6,7 @@ import "../types/IReferrals.sol";
 
 /**
  * @custom:version 8
- * @dev Interface for GNSReferrals facet (inherits types and also contains functions, events, and custom errors)
+ * @dev Interface for JavReferrals facet (inherits types and also contains functions, events, and custom errors)
  */
 interface IReferralsUtils is IReferrals {
     /**
@@ -84,23 +84,23 @@ interface IReferralsUtils is IReferrals {
      * @param _trader trader address
      * @param _volumeUsd trading volume in usd (1e18 precision)
      * @param _pairOpenFeeP pair open fee in % (1e10 precision)
-     * @param _gnsPriceUsd token price in usd (1e10 precision)
+     * @param _javPriceUsd token price in usd (1e10 precision)
      * @return USD value of distributed reward (referrer + ally)
      */
     function distributeReferralReward(
         address _trader,
         uint256 _volumeUsd, // 1e18
         uint256 _pairOpenFeeP,
-        uint256 _gnsPriceUsd // 1e10
+        uint256 _javPriceUsd // 1e10
     ) external returns (uint256);
 
     /**
-     * @dev Claims pending GNS ally rewards of caller
+     * @dev Claims pending jav ally rewards of caller
      */
     function claimAllyRewards() external;
 
     /**
-     * @dev Claims pending GNS referrer rewards of caller
+     * @dev Claims pending jav referrer rewards of caller
      */
     function claimReferrerRewards() external;
 
@@ -229,14 +229,14 @@ interface IReferralsUtils is IReferrals {
      * @param ally address of ally
      * @param trader address of trader
      * @param volumeUsd trade volume in usd (1e18 precision)
-     * @param amountGns amount of GNS reward (1e18 precision)
-     * @param amountValueUsd USD value of GNS reward (1e18 precision)
+     * @param amountJav amount of JAV reward (1e18 precision)
+     * @param amountValueUsd USD value of Jav reward (1e18 precision)
      */
     event AllyRewardDistributed(
         address indexed ally,
         address indexed trader,
         uint256 volumeUsd,
-        uint256 amountGns,
+        uint256 amountJav,
         uint256 amountValueUsd
     );
 
@@ -245,30 +245,30 @@ interface IReferralsUtils is IReferrals {
      * @param referrer address of referrer
      * @param trader address of trader
      * @param volumeUsd trade volume in usd (1e18 precision)
-     * @param amountGns amount of GNS reward (1e18 precision)
-     * @param amountValueUsd USD value of GNS reward (1e18 precision)
+     * @param amountJav amount of Jav reward (1e18 precision)
+     * @param amountValueUsd USD value of Jav reward (1e18 precision)
      */
     event ReferrerRewardDistributed(
         address indexed referrer,
         address indexed trader,
         uint256 volumeUsd,
-        uint256 amountGns,
+        uint256 amountJav,
         uint256 amountValueUsd
     );
 
     /**
      * @dev Emitted when an ally claims his pending rewards
      * @param ally address of ally
-     * @param amountGns GNS pending rewards amount
+     * @param amountJav Jav pending rewards amount
      */
-    event AllyRewardsClaimed(address indexed ally, uint256 amountGns);
+    event AllyRewardsClaimed(address indexed ally, uint256 amountJav);
 
     /**
      * @dev Emitted when a referrer claims his pending rewards
      * @param referrer address of referrer
-     * @param amountGns GNS pending rewards amount
+     * @param amountJav Jav pending rewards amount
      */
-    event ReferrerRewardsClaimed(address indexed referrer, uint256 amountGns);
+    event ReferrerRewardsClaimed(address indexed referrer, uint256 amountJav);
 
     error NoPendingRewards();
     error AlreadyActive();

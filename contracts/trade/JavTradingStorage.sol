@@ -22,12 +22,17 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
 
     /// @inheritdoc ITradingStorageUtils
     function initializeTradingStorage(
-        address _gns,
-        address _gnsStaking,
+        address _jav,
+        address _rewardsDistributor,
         address[] memory _collaterals,
-        address[] memory _gTokens
+        address[] memory _jTokens
     ) external reinitializer(6) {
-        TradingStorageUtils.initializeTradingStorage(_gns, _gnsStaking, _collaterals, _gTokens);
+        TradingStorageUtils.initializeTradingStorage(
+            _jav,
+            _rewardsDistributor,
+            _collaterals,
+            _jTokens
+        );
     }
 
     // Management Setters
@@ -96,15 +101,8 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function storePendingOrder(
-        PendingOrder memory _pendingOrder
-    ) external virtual onlySelf returns (PendingOrder memory) {
-        return TradingStorageUtils.storePendingOrder(_pendingOrder);
-    }
-
-    /// @inheritdoc ITradingStorageUtils
-    function closePendingOrder(Id memory _orderId) external virtual onlySelf {
-        TradingStorageUtils.closePendingOrder(_orderId);
+    function validateTrade(Trade memory _trade) external virtual onlySelf {
+        return TradingStorageUtils.validateTrade(_trade);
     }
 
     // Getters
@@ -188,37 +186,8 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function getPendingOrder(Id memory _orderId) external view returns (PendingOrder memory) {
-        return TradingStorageUtils.getPendingOrder(_orderId);
-    }
-
-    /// @inheritdoc ITradingStorageUtils
-    function getPendingOrders(address _user) external view returns (PendingOrder[] memory) {
-        return TradingStorageUtils.getPendingOrders(_user);
-    }
-
-    /// @inheritdoc ITradingStorageUtils
-    function getAllPendingOrders(
-        uint256 _offset,
-        uint256 _limit
-    ) external view returns (PendingOrder[] memory) {
-        return TradingStorageUtils.getAllPendingOrders(_offset, _limit);
-    }
-
-    /// @inheritdoc ITradingStorageUtils
-    function getTradePendingOrderBlock(
-        Id memory _tradeId,
-        PendingOrderType _orderType
-    ) external view returns (uint256) {
-        return TradingStorageUtils.getTradePendingOrderBlock(_tradeId, _orderType);
-    }
-
-    /// @inheritdoc ITradingStorageUtils
-    function getCounters(
-        address _trader,
-        CounterType _type
-    ) external view returns (Counter memory) {
-        return TradingStorageUtils.getCounters(_trader, _type);
+    function getCounters(address _trader) external view returns (Counter memory) {
+        return TradingStorageUtils.getCounters(_trader);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -229,8 +198,8 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function getGToken(uint8 _collateralIndex) external view returns (address) {
-        return TradingStorageUtils.getGToken(_collateralIndex);
+    function getJToken(uint8 _collateralIndex) external view returns (address) {
+        return TradingStorageUtils.getJToken(_collateralIndex);
     }
 
     /// @inheritdoc ITradingStorageUtils

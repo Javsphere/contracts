@@ -9,7 +9,7 @@ import "./StorageUtils.sol";
 /**
  * @custom:version 8
  *
- * @dev GNSAddressStore facet internal library
+ * @dev JavAddressStore facet internal library
  */
 library AddressStoreUtils {
     /**
