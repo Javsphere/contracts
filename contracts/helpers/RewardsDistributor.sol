@@ -4,12 +4,12 @@ pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "../interfaces/IRewardsDistributor.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../interfaces/IJavFreezer.sol";
 import "../interfaces/IJavStakeX.sol";
 import "../base/BaseUpgradable.sol";
+import "../interfaces/ISwapRouter.sol";
 
 contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
     using SafeERC20 for IERC20;
@@ -127,7 +127,6 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
             tokenOut: _tokenOut,
             fee: uint24(_poolFee),
             recipient: address(this),
-            deadline: block.timestamp + 500,
             amountIn: _amount,
             amountOutMinimum: 0,
             sqrtPriceLimitX96: 0
