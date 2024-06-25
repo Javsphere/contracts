@@ -73,6 +73,13 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
         __Base_init();
     }
 
+    /**
+     * @notice Function to get allowed addresses
+     */
+    function getAllowedAddresses() external view returns (address[] memory) {
+        return _allowedAddresses.values();
+    }
+
     function addAllowedAddress(address _address) external onlyAdmin {
         _allowedAddresses.add(_address);
 
@@ -101,7 +108,7 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
     function distributeRewards(address[] memory _tokens) external onlyAllowedAddresses {
         for (uint256 i = 0; i < _tokens.length; i++) {
             address _tokenIn = _tokens[i];
-            if (_tokenIn != javAddress) {
+            if (_tokenIn != javAddress && _tokenIn != address(0)) {
                 _swapToken(
                     _tokenIn,
                     javAddress,
