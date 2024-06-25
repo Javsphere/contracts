@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./helpers/RewardRateConfigurable.sol";
+import "./interfaces/IERC20Extended.sol";
 import "./base/BaseUpgradable.sol";
 
 contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConfigurable {
@@ -41,6 +42,15 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
 
     address public rewardsDistributorAddress;
 
+    struct PoolFee {
+        uint64 depositFee; //* 1e4
+        uint64 withdrawFee; //* 1e4
+        uint64 claimFee; //* 1e4
+    }
+
+    /// Info of each pool fee.
+    PoolFee[] public poolFee;
+
     /* ========== EVENTS ========== */
     event AddPool(
         address indexed _baseToken,
@@ -59,6 +69,8 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     event Unstake(address indexed _address, uint256 _pid, uint256 _amount);
     event Claim(address indexed _token, address indexed _user, uint256 _amount);
     event AddRewards(uint256 indexed pid, uint256 amount);
+    event SetPoolFee(uint256 _pid, PoolFee _poolFee);
+    event Burn(address _token, uint256 _amount);
 
     modifier poolExists(uint256 _pid) {
         require(_pid < poolInfo.length, "JavStakeX: Unknown pool");
@@ -145,6 +157,16 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
         emit SetPoolInfo(pid, lastRewardBlock, accRewardPerShare);
     }
 
+    function addPoolFee(PoolFee memory _poolFee) external onlyAdmin {
+        poolFee.push(_poolFee);
+        emit SetPoolFee(poolFee.length - 1, _poolFee);
+    }
+
+    function setPoolFee(uint256 pid, PoolFee memory _poolFee) external onlyAdmin poolExists(pid) {
+        poolFee[pid] = _poolFee;
+        emit SetPoolFee(pid, _poolFee);
+    }
+
     /**
      * @notice Function to stake token for selected pool
      * @param _pid: pool id
@@ -222,7 +244,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     function apr(uint256 _pid) external view returns (uint256) {
         PoolInfo memory pool = poolInfo[_pid];
         uint256 totalShares = pool.totalShares > 0 ? pool.totalShares : 1e18;
-        return ((getRewardPerBlock() * 1051200 + pool.rewardsAmount) * 1e18) / totalShares;
+        return (getRewardPerBlock() * 1051200 * 1e18) / totalShares;
     }
 
     /**
@@ -233,6 +255,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     function _stake(uint256 _pid, address _user, uint256 _amount) private {
         UserInfo storage user = userInfo[_pid][_user];
         PoolInfo storage pool = poolInfo[_pid];
+        PoolFee memory fee = poolFee[_pid];
         _updatePool(_pid, 0);
 
         if (user.shares > 0) {
@@ -241,13 +264,15 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
 
         pool.baseToken.safeTransferFrom(_user, address(this), _amount);
 
-        pool.totalShares += _amount;
+        uint256 burnAmount = (_amount * fee.depositFee) / 1e4;
+        _burnToken(address(pool.baseToken), burnAmount);
+        pool.totalShares += _amount - burnAmount;
 
-        user.shares += _amount;
+        user.shares += _amount - burnAmount;
         user.blockRewardDebt = (user.shares * (pool.accRewardPerShare)) / (1e18);
         user.productsRewardDebt = (user.shares * (pool.rewardsPerShare)) / (1e18);
 
-        emit Stake(_user, _pid, _amount);
+        emit Stake(_user, _pid, _amount - burnAmount);
     }
 
     /**
@@ -258,6 +283,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     function _unstake(uint256 _pid, address _user, uint256 _amount) private {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
+        PoolFee memory fee = poolFee[_pid];
         require(user.shares >= _amount, "JavStakeX: invalid amount for unstake");
 
         _claim(_pid, msg.sender);
@@ -267,9 +293,12 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
 
         pool.totalShares -= _amount;
 
-        pool.baseToken.safeTransfer(_user, _amount);
+        uint256 burnAmount = (_amount * fee.withdrawFee) / 1e4;
 
-        emit Unstake(_user, _pid, _amount);
+        _burnToken(address(pool.baseToken), burnAmount);
+        pool.baseToken.safeTransfer(_user, _amount - burnAmount);
+
+        emit Unstake(_user, _pid, _amount - burnAmount);
     }
 
     /**
@@ -280,16 +309,20 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     function _claim(uint256 _pid, address _user) private {
         PoolInfo memory pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
+        PoolFee memory fee = poolFee[_pid];
 
         uint256 pending = _getPendingRewards(_pid, _user);
         if (pending > 0) {
-            user.totalClaims += pending;
-            pool.rewardToken.safeTransfer(_user, pending);
+            uint256 burnAmount = (pending * fee.claimFee) / 1e4;
+            user.totalClaims += pending - burnAmount;
+
+            _burnToken(address(pool.rewardToken), burnAmount);
+            pool.rewardToken.safeTransfer(_user, pending - burnAmount);
 
             user.blockRewardDebt = (user.shares * (pool.accRewardPerShare)) / (1e18);
             user.productsRewardDebt = (user.shares * (pool.rewardsPerShare)) / (1e18);
 
-            emit Claim(address(pool.rewardToken), _user, pending);
+            emit Claim(address(pool.rewardToken), _user, pending - burnAmount);
         }
     }
 
@@ -347,5 +380,11 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
             : 0;
 
         return blockRewards + productsRewards;
+    }
+
+    function _burnToken(address _token, uint256 _amount) private {
+        IERC20Extended(_token).burn(_amount);
+
+        emit Burn(_token, _amount);
     }
 }
