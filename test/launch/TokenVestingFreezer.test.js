@@ -76,6 +76,16 @@ describe("TokenVestingFreezer contract", () => {
             );
         });
 
+        it("Should addPoolFee freezer", async () => {
+            const fee = {
+                depositFee: 1 * 1e4,
+                withdrawFee: 1 * 1e4,
+                claimFee: 1 * 1e4,
+            };
+
+            await freezerMock.addPoolFee(fee);
+        });
+
         it("Should set vesting address", async () => {
             await freezerMock.setVestingAddress(hhTokenVesting.target);
         });

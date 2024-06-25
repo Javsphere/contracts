@@ -10,11 +10,14 @@ async function main() {
         [
             "0x66F3Cf265D2D146A0348F6fC67E3Da0835e0968E", // _javAddress,
             "0x2A9c4EdE9994911359af815367187947eD1dDf02", // _swapRouter,
-            "0x0000000000000000000000000000000000000000", // _stakingAddress,
+            "0xF923f0828c56b27C8f57bc698c99543f63091E9A", // _stakingAddress,
             "0x4e15D4225623D07Adb43e9D546E57E1E6097e869", // _freezerAddress,
             50, // _burnPercent,
             70, // _freezerPercent,
-            ["0x9065F4D6fB7B940D64941542c728f3883dE04FdC"], // _allowedAddresses_
+            [
+                "0x9065F4D6fB7B940D64941542c728f3883dE04FdC",
+                "0x51cdb3fe30E7fbEd9Df51EE7E0BF636f69137299",
+            ], // _allowedAddresses_
         ],
         {
             initializer: "initialize",
