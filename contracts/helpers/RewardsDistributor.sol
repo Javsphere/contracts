@@ -4,12 +4,12 @@ pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "../interfaces/IRewardsDistributor.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../interfaces/IJavFreezer.sol";
 import "../interfaces/IJavStakeX.sol";
 import "../base/BaseUpgradable.sol";
+import "../interfaces/ISwapRouter.sol";
 
 contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
     using SafeERC20 for IERC20;
@@ -73,6 +73,13 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
         __Base_init();
     }
 
+    /**
+     * @notice Function to get allowed addresses
+     */
+    function getAllowedAddresses() external view returns (address[] memory) {
+        return _allowedAddresses.values();
+    }
+
     function addAllowedAddress(address _address) external onlyAdmin {
         _allowedAddresses.add(_address);
 
@@ -101,7 +108,7 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
     function distributeRewards(address[] memory _tokens) external onlyAllowedAddresses {
         for (uint256 i = 0; i < _tokens.length; i++) {
             address _tokenIn = _tokens[i];
-            if (_tokenIn != javAddress) {
+            if (_tokenIn != javAddress && _tokenIn != address(0)) {
                 _swapToken(
                     _tokenIn,
                     javAddress,
@@ -127,7 +134,6 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
             tokenOut: _tokenOut,
             fee: uint24(_poolFee),
             recipient: address(this),
-            deadline: block.timestamp + 500,
             amountIn: _amount,
             amountOutMinimum: 0,
             sqrtPriceLimitX96: 0

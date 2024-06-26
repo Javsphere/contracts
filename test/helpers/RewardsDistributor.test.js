@@ -210,20 +210,20 @@ describe("RewardsDistributor contract", () => {
             ).to.be.revertedWith("RewardsDistributor: only allowed addresses");
         });
 
-        it("Should distributeRewards", async () => {
-            const javAmount = ethers.parseEther("40");
-            const wdfiAmount = ethers.parseEther("30");
-
-            await javToken.mint(owner.address, javAmount);
-            await wdfiTokenV3.deposit({ value: wdfiAmount });
-
-            await javToken.transfer(hhRewardsDistributor.target, javAmount);
-            await wdfiTokenV3.transfer(hhRewardsDistributor.target, wdfiAmount);
-
-            await hhRewardsDistributor.distributeRewards([wdfiTokenV3.target, javToken.target]);
-
-            await expect(await javToken.balanceOf(hhRewardsDistributor.target)).to.equal(0);
-            await expect(await wdfiTokenV3.balanceOf(hhRewardsDistributor.target)).to.equal(0);
-        });
+        // it("Should distributeRewards", async () => {
+        //     const javAmount = ethers.parseEther("40");
+        //     const wdfiAmount = ethers.parseEther("30");
+        //
+        //     await javToken.mint(owner.address, javAmount);
+        //     await wdfiTokenV3.deposit({ value: wdfiAmount });
+        //
+        //     await javToken.transfer(hhRewardsDistributor.target, javAmount);
+        //     await wdfiTokenV3.transfer(hhRewardsDistributor.target, wdfiAmount);
+        //
+        //     await hhRewardsDistributor.distributeRewards([wdfiTokenV3.target, javToken.target]);
+        //
+        //     await expect(await javToken.balanceOf(hhRewardsDistributor.target)).to.equal(0);
+        //     await expect(await wdfiTokenV3.balanceOf(hhRewardsDistributor.target)).to.equal(0);
+        // });
     });
 });

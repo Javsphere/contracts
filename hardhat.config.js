@@ -18,7 +18,6 @@ module.exports = {
                         enabled: true,
                         runs: 200,
                     },
-                    viaIR: true,
                 },
             },
             {
@@ -79,10 +78,10 @@ module.exports = {
     },
     contractSizer: {
         alphaSort: true,
-        runOnCompile: false,
+        runOnCompile: true,
         disambiguatePaths: false,
     },
     gasReporter: {
-        enabled: false,
+        enabled: true,
     },
 };

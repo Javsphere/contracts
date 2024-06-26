@@ -237,16 +237,34 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
         emit AddLiquidityETH(amountToken, amountETH_, liquidity);
     }
 
-    function claimAndDistributeRewards(uint256 _tokenId) external onlyBot {
-        (, , address token0, address token1, , , , , , , , ) = nonfungiblePositionManager.positions(
-            _tokenId
-        );
-        _collectFees(_tokenId);
-
-        address[] memory _tokens = new address[](2);
-        _tokens[0] = token0;
-        _tokens[1] = token1;
+    function claimAndDistributeRewards(uint256[] memory _tokenIds) external onlyBot {
+        address[] memory _tokens = new address[](_tokenIds.length * 2);
+        for (uint256 i = 0; i < _tokenIds.length; ++i) {
+            (, , address token0, address token1, , , , , , , , ) = nonfungiblePositionManager
+                .positions(_tokenIds[i]);
+            _collectFees(_tokenIds[i]);
+            _tokens = _insertToken(_tokens, token0);
+            _tokens = _insertToken(_tokens, token1);
+        }
         IRewardsDistributor(rewardsDistributorAddress).distributeRewards(_tokens);
+    }
+
+    function _insertToken(
+        address[] memory _tokens,
+        address _token
+    ) private pure returns (address[] memory) {
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            if (_tokens[i] == _token) {
+                return _tokens;
+            }
+
+            if (_tokens[i] != _token && _tokens[i] == address(0)) {
+                _tokens[i] = _token;
+
+                return _tokens;
+            }
+        }
+        return _tokens;
     }
 
     function _collectFees(uint256 tokenId) private {

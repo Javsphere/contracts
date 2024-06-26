@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./helpers/RewardRateConfigurable.sol";
 import "./base/BaseUpgradable.sol";
 import "./interfaces/IJavFreezer.sol";
+import "./interfaces/IERC20Extended.sol";
 
 contract JavFreezer is
     IJavFreezer,
@@ -79,6 +80,15 @@ contract JavFreezer is
     ProductsRewardsInfo[] public productsRewardsInfo;
     mapping(uint256 => mapping(uint256 => uint256)) public tvl;
 
+    struct PoolFee {
+        uint64 depositFee; //* 1e4
+        uint64 withdrawFee; //* 1e4
+        uint64 claimFee; //* 1e4
+    }
+
+    /// Info of each pool fee.
+    PoolFee[] public poolFee;
+
     /* ========== EVENTS ========== */
     event SetPoolInfo(uint256 _pid, uint256 _lastRewardBlock, uint256 _accRewardPerShare);
     event AddPool(
@@ -101,7 +111,9 @@ contract JavFreezer is
         address indexed user,
         uint256 amount,
         uint256 indexed pid,
-        uint256 indexed period
+        uint256 indexed period,
+        uint256 depositTimestamp,
+        uint256 withdrawalTimestamp
     );
     event Withdraw(
         address indexed user,
@@ -110,6 +122,8 @@ contract JavFreezer is
         uint256 indexed period
     );
     event AddRewards(uint256 indexed pid, uint256 amount);
+    event SetPoolFee(uint256 _pid, PoolFee _poolFee);
+    event Burn(address _token, uint256 _amount);
 
     modifier validLockId(uint256 _lockId) {
         require(lockPeriod[_lockId] != 0 && _lockId < 5, "JavFreezer: invalid lock period");
@@ -151,7 +165,7 @@ contract JavFreezer is
     }
 
     function setTvl(uint256 _pid, uint256 _lockId, uint256 _tvl) external onlyAdmin {
-        require(_lockId == 6 || _lockId == 7, "JavFreezer: invalid lock period");
+        require(_lockId == 5 || _lockId == 6, "JavFreezer: invalid lock period");
         tvl[_pid][_lockId] = _tvl;
     }
 
@@ -223,6 +237,16 @@ contract JavFreezer is
         emit SetPoolInfo(pid, lastRewardBlock, accRewardPerShare);
     }
 
+    function addPoolFee(PoolFee memory _poolFee) external onlyAdmin {
+        poolFee.push(_poolFee);
+        emit SetPoolFee(poolFee.length - 1, _poolFee);
+    }
+
+    function setPoolFee(uint256 pid, PoolFee memory _poolFee) external onlyAdmin poolExists(pid) {
+        poolFee[pid] = _poolFee;
+        emit SetPoolFee(pid, _poolFee);
+    }
+
     function setLockPeriod(uint256 _lockId, uint256 _duration) external onlyAdmin {
         lockPeriod[_lockId] = _duration;
 
@@ -288,7 +312,7 @@ contract JavFreezer is
         userDeposits[_holder][_pid].push(depositDetails);
         user.depositId = userDeposits[_holder][_pid].length;
 
-        emit Deposit(_holder, _amount, _pid, _lockId);
+        emit Deposit(_holder, _amount, _pid, _lockId, _depositTimestamp, _withdrawalTimestamp);
     }
 
     /**
@@ -404,12 +428,10 @@ contract JavFreezer is
 
     function apr(uint256 _pid, uint256 _lockId) external view returns (uint256) {
         PoolInfo memory pool = poolInfo[_pid];
-        ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
         uint256 totalShares = pool.totalShares > 0 ? pool.totalShares : 1e18;
         return
-            (((getRewardPerBlock() * lockPeriodMultiplier[_lockId] * 1051200) /
-                1e5 +
-                productsRewInfo.rewardsAmount) * 1e18) / totalShares;
+            (((getRewardPerBlock() * lockPeriodMultiplier[_lockId] * 1051200) / 1e5) * 1e18) /
+            totalShares;
     }
 
     /**
@@ -499,18 +521,23 @@ contract JavFreezer is
         UserInfo storage user = userInfo[msg.sender][_pid];
         PoolInfo storage pool = poolInfo[_pid];
         ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
+        PoolFee memory fee = poolFee[_pid];
         _updatePool(_pid, 0);
 
         pool.baseToken.safeTransferFrom(msg.sender, address(this), _depositAmount);
 
-        user.totalDepositTokens += _depositAmount;
-        pool.totalShares += _depositAmount;
-        tvl[_pid][_periodId] += _depositAmount;
+        uint256 burnAmount = (_depositAmount * fee.depositFee) / 1e4;
+        _burnToken(address(pool.baseToken), burnAmount);
+        uint256 _userAmount = _depositAmount - burnAmount;
 
-        uint256 blockRewardDebt = (_depositAmount * (pool.accRewardPerShare)) / (1e18);
-        uint256 productRewardDebt = (_depositAmount * (productsRewInfo.rewardsPerShare)) / (1e18);
+        user.totalDepositTokens += _userAmount;
+        pool.totalShares += _userAmount;
+        tvl[_pid][_periodId] += _userAmount;
+
+        uint256 blockRewardDebt = (_userAmount * (pool.accRewardPerShare)) / (1e18);
+        uint256 productRewardDebt = (_userAmount * (productsRewInfo.rewardsPerShare)) / (1e18);
         UserDeposit memory depositDetails = UserDeposit({
-            depositTokens: _depositAmount,
+            depositTokens: _userAmount,
             stakePeriod: _periodId,
             depositTimestamp: block.timestamp,
             withdrawalTimestamp: block.timestamp + lockPeriod[_periodId],
@@ -522,7 +549,14 @@ contract JavFreezer is
         user.depositId = userDeposits[msg.sender][_pid].length;
         productsRewardsDebt[msg.sender][_pid][user.depositId - 1] = productRewardDebt;
 
-        emit Deposit(msg.sender, _depositAmount, _pid, _periodId);
+        emit Deposit(
+            msg.sender,
+            _userAmount,
+            _pid,
+            _periodId,
+            depositDetails.depositTimestamp,
+            depositDetails.withdrawalTimestamp
+        );
     }
 
     /**
@@ -534,6 +568,7 @@ contract JavFreezer is
         PoolInfo storage pool = poolInfo[_pid];
         UserDeposit storage depositDetails = userDeposits[msg.sender][_pid][_depositId];
         ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
+        PoolFee memory fee = poolFee[_pid];
         require(
             depositDetails.withdrawalTimestamp < block.timestamp,
             "JavFreezer: lock period hasn't ended."
@@ -551,10 +586,18 @@ contract JavFreezer is
         pool.totalShares -= depositDetails.depositTokens;
         tvl[_pid][depositDetails.stakePeriod] -= depositDetails.depositTokens;
 
-        pool.baseToken.safeTransfer(msg.sender, depositDetails.depositTokens);
+        uint256 burnAmount = (depositDetails.depositTokens * fee.withdrawFee) / 1e4;
+
+        pool.baseToken.safeTransfer(msg.sender, depositDetails.depositTokens - burnAmount);
+        _burnToken(address(pool.baseToken), burnAmount);
 
         depositDetails.is_finished = true;
-        emit Withdraw(msg.sender, depositDetails.depositTokens, _pid, depositDetails.stakePeriod);
+        emit Withdraw(
+            msg.sender,
+            depositDetails.depositTokens - burnAmount,
+            _pid,
+            depositDetails.stakePeriod
+        );
     }
 
     /*
@@ -566,12 +609,14 @@ contract JavFreezer is
         UserDeposit storage depositDetails = userDeposits[_user][_pid][_depositId];
         PoolInfo memory pool = poolInfo[_pid];
         ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
+        PoolFee memory fee = poolFee[_pid];
 
         uint256 pending = _getPendingRewards(_pid, _depositId, _user);
 
         if (pending > 0) {
-            user.totalClaim += pending;
-            depositDetails.rewardsClaimed += pending;
+            uint256 burnAmount = (pending * fee.claimFee) / 1e4;
+            user.totalClaim += pending - burnAmount;
+            depositDetails.rewardsClaimed += pending - burnAmount;
             depositDetails.rewardDebt =
                 (depositDetails.depositTokens * (pool.accRewardPerShare)) /
                 (1e18);
@@ -579,7 +624,8 @@ contract JavFreezer is
                 (depositDetails.depositTokens * productsRewInfo.rewardsPerShare) /
                 (1e18);
 
-            pool.rewardToken.safeTransfer(_user, pending);
+            _burnToken(address(pool.rewardToken), burnAmount);
+            pool.rewardToken.safeTransfer(_user, pending - burnAmount);
 
             emit ClaimUserReward(_user, pending, _pid, depositDetails.stakePeriod);
         }
@@ -620,5 +666,11 @@ contract JavFreezer is
 
         return
             ((rewards * lockPeriodMultiplier[depositDetails.stakePeriod]) / 1e5) + productsRewards;
+    }
+
+    function _burnToken(address _token, uint256 _amount) private {
+        IERC20Extended(_token).burn(_amount);
+
+        emit Burn(_token, _amount);
     }
 }

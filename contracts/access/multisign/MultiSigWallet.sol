@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.23;
 
-/// @title Multisignature wallet - Allows multiple parties to agree on transactions before execution.
-/// @author Stefan George - <stefan.george@consensys.net>
+/**
+ * @title Multisignature wallet - Allows multiple parties to agree on transactions before execution.
+ * @custom:id 1
+ */
 contract MultiSigWallet {
     /*
      *  Events

@@ -1,5 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0x0000000000000000000000000000000000000000";
+const PROXY = "0xF923f0828c56b27C8f57bc698c99543f63091E9A";
 
 async function main() {
     const [owner] = await ethers.getSigners();

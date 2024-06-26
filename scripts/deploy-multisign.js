@@ -6,9 +6,9 @@ async function main() {
     console.log(`Deploying from ${owner.address}`);
 
     const owners = [
-        "0x8D50eE492c9c3a8174aA39c377839944dc546378",
-        "0xc6F5fA4a1039a041Fc41f634FC07641f87C8Cf2b",
-        "0x61878A8365C63eFe8db686e5c1101778aCcee815",
+        "0xFEeC64B26429C85e9B7176C718D53eb84e534669",
+        "0x0E8627A1E68dE2F6e657e7A1efaf4AFc0dB338B3",
+        "0x267A2a67a1E0c8be282D00C238b3F4bF17164f56",
     ];
     const minRequiredCount = 2;
 
