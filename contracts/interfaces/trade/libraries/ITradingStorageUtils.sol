@@ -18,7 +18,7 @@ interface ITradingStorageUtils is ITradingStorage {
         address _jav,
         address _rewardsDistributor,
         address[] memory _collaterals,
-        address[] memory _jTokens
+        uint8[] memory _collateralsIndexes
     ) external;
 
     /**
@@ -30,22 +30,15 @@ interface ITradingStorageUtils is ITradingStorage {
     /**
      * @dev Adds a new supported collateral
      * @param _collateral the address of the collateral
-     * @param _gToken the gToken contract of the collateral
+     * @param _index index of the collateral
      */
-    function addCollateral(address _collateral, address _gToken) external;
+    function addCollateral(address _collateral, uint8 _index) external;
 
     /**
      * @dev Toggles the active state of a supported collateral
      * @param _collateralIndex index of the collateral
      */
     function toggleCollateralActiveState(uint8 _collateralIndex) external;
-
-    /**
-     * @dev Updates the contracts of a supported collateral trading stack
-     * @param _collateral address of the collateral
-     * @param _gToken the gToken contract of the collateral
-     */
-    function updateGToken(address _collateral, address _gToken) external;
 
     /**
      * @dev Stores a new trade (trade/limit/stop)
@@ -217,10 +210,9 @@ interface ITradingStorageUtils is ITradingStorage {
     function getPendingOpenOrderType(TradeType _tradeType) external pure returns (PendingOrderType);
 
     /**
-     * @dev Returns the address of the gToken for a collateral stack
-     * @param _collateralIndex the index of the supported collateral
+     * @dev Returns the address of the liquidityProvider
      */
-    function getJToken(uint8 _collateralIndex) external view returns (address);
+    function getLiquidityProvider() external view returns (address);
 
     /**
      * @dev Returns the current percent profit of a trade (1e10 precision)
@@ -246,9 +238,8 @@ interface ITradingStorageUtils is ITradingStorage {
      * @dev Emitted when a new supported collateral is added
      * @param collateral the address of the collateral
      * @param index the index of the supported collateral
-     * @param gToken the gToken contract of the collateral
      */
-    event CollateralAdded(address collateral, uint8 index, address gToken);
+    event CollateralAdded(address collateral, uint8 index);
 
     /**
      * @dev Emitted when an existing supported collateral active state is updated
@@ -262,14 +253,6 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param index the index of the supported collateral
      */
     event CollateralDisabled(uint8 index);
-
-    /**
-     * @dev Emitted when the contracts of a supported collateral trading stack are updated
-     * @param collateral the address of the collateral
-     * @param index the index of the supported collateral
-     * @param gToken the gToken contract of the collateral
-     */
-    event GTokenUpdated(address collateral, uint8 index, address gToken);
 
     /**
      * @dev Emitted when a new trade is stored

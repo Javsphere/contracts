@@ -25,13 +25,13 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         address _jav,
         address _rewardsDistributor,
         address[] memory _collaterals,
-        address[] memory _jTokens
+        uint8[] memory _collateralsIndexes
     ) external reinitializer(6) {
         TradingStorageUtils.initializeTradingStorage(
             _jav,
             _rewardsDistributor,
             _collaterals,
-            _jTokens
+            _collateralsIndexes
         );
     }
 
@@ -43,17 +43,13 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function addCollateral(address _collateral, address _gToken) external onlyRole(Role.GOV) {
-        TradingStorageUtils.addCollateral(_collateral, _gToken);
+    function addCollateral(address _collateral, uint8 _index) external onlyRole(Role.GOV) {
+        TradingStorageUtils.addCollateral(_collateral, _index);
     }
 
     /// @inheritdoc ITradingStorageUtils
     function toggleCollateralActiveState(uint8 _collateralIndex) external onlyRole(Role.GOV) {
         TradingStorageUtils.toggleCollateralActiveState(_collateralIndex);
-    }
-
-    function updateGToken(address _collateral, address _gToken) external onlyRole(Role.GOV) {
-        TradingStorageUtils.updateGToken(_collateral, _gToken);
     }
 
     // Interactions
@@ -198,8 +194,8 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function getJToken(uint8 _collateralIndex) external view returns (address) {
-        return TradingStorageUtils.getJToken(_collateralIndex);
+    function getLiquidityProvider() external view returns (address) {
+        return TradingStorageUtils.getLiquidityProvider();
     }
 
     /// @inheritdoc ITradingStorageUtils

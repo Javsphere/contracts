@@ -25,13 +25,13 @@ library TradingStorageUtils {
         address _jav,
         address rewardsDistributor,
         address[] memory _collaterals,
-        address[] memory _jTokens
+        uint8[] memory _collateralsIndexes
     ) internal {
         if (_jav == address(0) || rewardsDistributor == address(0))
             revert IGeneralErrors.ZeroAddress();
 
         if (_collaterals.length < 2) revert ITradingStorageUtils.MissingCollaterals();
-        if (_collaterals.length != _jTokens.length) revert IGeneralErrors.WrongLength();
+        if (_collaterals.length != _collateralsIndexes.length) revert IGeneralErrors.WrongLength();
 
         // Set addresses
         IJavAddressStore.Addresses storage addresses = AddressStoreUtils.getAddresses();
@@ -42,7 +42,7 @@ library TradingStorageUtils {
 
         // Add collaterals
         for (uint256 i; i < _collaterals.length; ++i) {
-            addCollateral(_collaterals[i], _jTokens[i]);
+            addCollateral(_collaterals[i], _collateralsIndexes[i]);
         }
 
         // Trading is paused by default for state copy
@@ -61,33 +61,31 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function addCollateral(address _collateral, address _gToken) internal {
+    function addCollateral(address _collateral, uint8 _index) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
 
         if (s.collateralIndex[_collateral] != 0) revert IGeneralErrors.AlreadyExists();
-        if (_collateral == address(0) || _gToken == address(0)) revert IGeneralErrors.ZeroAddress();
+        if (_collateral == address(0)) revert IGeneralErrors.ZeroAddress();
 
         CollateralUtils.CollateralConfig memory collateralConfig = CollateralUtils
             .getCollateralConfig(_collateral);
 
-        uint8 index = ++s.lastCollateralIndex;
-
-        s.collaterals[index] = ITradingStorage.Collateral({
+        s.collaterals[_index] = ITradingStorage.Collateral({
             collateral: _collateral,
             isActive: true,
             __placeholder: 0,
             precision: collateralConfig.precision,
             precisionDelta: collateralConfig.precisionDelta
         });
-        s.gTokens[index] = _gToken;
 
-        s.collateralIndex[_collateral] = index;
+        s.collateralIndex[_collateral] = _index;
+        s.lastCollateralIndex = _index;
 
-        // Setup JToken approvals
+        // Setup collateral approvals
         IERC20 collateral = IERC20(_collateral);
-        collateral.approve(_gToken, type(uint256).max);
+        collateral.approve(_getMultiCollatDiamond().getLiquidityProvider(), type(uint256).max);
 
-        emit ITradingStorageUtils.CollateralAdded(_collateral, index, _gToken);
+        emit ITradingStorageUtils.CollateralAdded(_collateral, _index);
     }
 
     /**
@@ -103,27 +101,6 @@ library TradingStorageUtils {
         collateral.isActive = toggled;
 
         emit ITradingStorageUtils.CollateralUpdated(_collateralIndex, toggled);
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function updateGToken(address _collateral, address _gToken) internal {
-        ITradingStorage.TradingStorage storage s = _getStorage();
-
-        uint8 index = s.collateralIndex[_collateral];
-
-        if (index == 0) revert IGeneralErrors.DoesntExist();
-        if (_gToken == address(0)) revert IGeneralErrors.ZeroAddress();
-
-        // Revoke old vault and approve new vault
-        IERC20 collateral = IERC20(_collateral);
-        collateral.approve(s.gTokens[index], 0);
-        collateral.approve(_gToken, type(uint256).max);
-
-        s.gTokens[index] = _gToken;
-
-        emit ITradingStorageUtils.GTokenUpdated(_collateral, index, _gToken);
     }
 
     /**
@@ -535,8 +512,8 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getJToken(uint8 _collateralIndex) internal view returns (address) {
-        return _getStorage().gTokens[_collateralIndex];
+    function getLiquidityProvider() internal view returns (address) {
+        return _getStorage().liquidityProvider;
     }
 
     /**

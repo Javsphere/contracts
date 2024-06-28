@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../interfaces/trade/IJavMultiCollatDiamond.sol";
+import "../../interfaces/trade/IJavLiquidityProvider.sol";
 import "../../interfaces/IRewardsDistributor.sol";
-import "../../interfaces/trade/IJToken.sol";
 
 import "./StorageUtils.sol";
 import "./AddressStoreUtils.sol";
@@ -773,10 +773,12 @@ library TradingCloseUtils {
         _getMultiCollatDiamond().closeTrade(tradeId);
 
         // 5. jToken vault reward
-        IJToken vault = _getJToken(_trade.collateralIndex);
+        IJavLiquidityProvider liquidityProvider = IJavLiquidityProvider(
+            _getMultiCollatDiamond().getLiquidityProvider()
+        );
         uint256 vaultClosingFeeP = uint256(_getStorage().vaultClosingFeeP);
         v.reward2 = (_closingFeeCollateral * vaultClosingFeeP) / 100;
-        vault.distributeReward(v.reward2);
+        liquidityProvider.distributeReward(_trade.collateralIndex, v.reward2);
 
         emit ITradingProcessingUtils.JTokenFeeCharged(
             _trade.user,
@@ -795,7 +797,11 @@ library TradingCloseUtils {
         uint256 collateralLeftInStorage = _trade.collateralAmount - v.reward3 - v.reward2;
 
         if (tradeValueCollateral > collateralLeftInStorage) {
-            vault.sendAssets(tradeValueCollateral - collateralLeftInStorage, _trade.user);
+            liquidityProvider.sendAssets(
+                _trade.collateralIndex,
+                tradeValueCollateral - collateralLeftInStorage,
+                _trade.user
+            );
             _transferCollateralToAddress(
                 _trade.collateralIndex,
                 _trade.user,
@@ -942,7 +948,11 @@ library TradingCloseUtils {
         uint256 _amountCollateral,
         address _trader
     ) internal {
-        _getJToken(_collateralIndex).receiveAssets(_amountCollateral, _trader);
+        IJavLiquidityProvider(_getMultiCollatDiamond().getLiquidityProvider()).receiveAssets(
+            _collateralIndex,
+            _amountCollateral,
+            _trader
+        );
     }
 
     /**
@@ -996,15 +1006,6 @@ library TradingCloseUtils {
             _trade.pairIndex,
             _trade.long
         ); // price impact oi windows
-    }
-
-    /**
-     * @dev Returns gToken contract for a collateral index
-     * @param _collateralIndex Collateral index
-     * @return gToken contract
-     */
-    function _getJToken(uint8 _collateralIndex) internal view returns (IJToken) {
-        return IJToken(_getMultiCollatDiamond().getJToken(_collateralIndex));
     }
 
     /**
