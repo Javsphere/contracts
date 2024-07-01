@@ -23,20 +23,26 @@ library TradingStorageUtils {
      */
     function initializeTradingStorage(
         address _jav,
-        address rewardsDistributor,
+        address _rewardsDistributor,
+        address _borrowingProvider,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) internal {
-        if (_jav == address(0) || rewardsDistributor == address(0))
-            revert IGeneralErrors.ZeroAddress();
+        ITradingStorage.TradingStorage storage s = _getStorage();
+        if (
+            _jav == address(0) ||
+            _rewardsDistributor == address(0) ||
+            _borrowingProvider == address(0)
+        ) revert IGeneralErrors.ZeroAddress();
 
         if (_collaterals.length < 2) revert ITradingStorageUtils.MissingCollaterals();
         if (_collaterals.length != _collateralsIndexes.length) revert IGeneralErrors.WrongLength();
 
         // Set addresses
+        s.borrowingProvider = _borrowingProvider;
         IJavAddressStore.Addresses storage addresses = AddressStoreUtils.getAddresses();
         addresses.jav = _jav;
-        addresses.rewardsDistributor = rewardsDistributor;
+        addresses.rewardsDistributor = _rewardsDistributor;
 
         emit IJavAddressStore.AddressesUpdated(addresses);
 
@@ -83,7 +89,7 @@ library TradingStorageUtils {
 
         // Setup collateral approvals
         IERC20 collateral = IERC20(_collateral);
-        collateral.approve(_getMultiCollatDiamond().getLiquidityProvider(), type(uint256).max);
+        collateral.approve(_getMultiCollatDiamond().getBorrowingProvider(), type(uint256).max);
 
         emit ITradingStorageUtils.CollateralAdded(_collateral, _index);
     }
@@ -512,8 +518,8 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getLiquidityProvider() internal view returns (address) {
-        return _getStorage().liquidityProvider;
+    function getBorrowingProvider() internal view returns (address) {
+        return _getStorage().borrowingProvider;
     }
 
     /**

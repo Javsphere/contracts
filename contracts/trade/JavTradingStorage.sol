@@ -24,12 +24,14 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     function initializeTradingStorage(
         address _jav,
         address _rewardsDistributor,
+        address _borrowingProvider,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) external reinitializer(6) {
         TradingStorageUtils.initializeTradingStorage(
             _jav,
             _rewardsDistributor,
+            _borrowingProvider,
             _collaterals,
             _collateralsIndexes
         );
@@ -194,8 +196,8 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function getLiquidityProvider() external view returns (address) {
-        return TradingStorageUtils.getLiquidityProvider();
+    function getBorrowingProvider() external view returns (address) {
+        return TradingStorageUtils.getBorrowingProvider();
     }
 
     /// @inheritdoc ITradingStorageUtils

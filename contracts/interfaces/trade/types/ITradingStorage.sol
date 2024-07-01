@@ -11,7 +11,7 @@ interface ITradingStorage {
         TradingActivated tradingActivated; // 8 bits
         uint8 lastCollateralIndex; // 8 bits
         uint240 __placeholder; // 240 bits
-        address liquidityProvider;
+        address borrowingProvider;
         mapping(uint8 => Collateral) collaterals;
         mapping(address => uint8) collateralIndex;
         mapping(address => mapping(uint32 => Trade)) trades;

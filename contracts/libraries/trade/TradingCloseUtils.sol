@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../interfaces/trade/IJavMultiCollatDiamond.sol";
-import "../../interfaces/trade/IJavLiquidityProvider.sol";
+import "../../interfaces/trade/IJavBorrowingProvider.sol";
 import "../../interfaces/IRewardsDistributor.sol";
 
 import "./StorageUtils.sol";
@@ -773,12 +773,12 @@ library TradingCloseUtils {
         _getMultiCollatDiamond().closeTrade(tradeId);
 
         // 5. jToken vault reward
-        IJavLiquidityProvider liquidityProvider = IJavLiquidityProvider(
-            _getMultiCollatDiamond().getLiquidityProvider()
+        IJavBorrowingProvider borrowingProvider = IJavBorrowingProvider(
+            _getMultiCollatDiamond().getBorrowingProvider()
         );
         uint256 vaultClosingFeeP = uint256(_getStorage().vaultClosingFeeP);
         v.reward2 = (_closingFeeCollateral * vaultClosingFeeP) / 100;
-        liquidityProvider.distributeReward(_trade.collateralIndex, v.reward2);
+        borrowingProvider.distributeReward(_trade.collateralIndex, v.reward2);
 
         emit ITradingProcessingUtils.JTokenFeeCharged(
             _trade.user,
@@ -797,7 +797,7 @@ library TradingCloseUtils {
         uint256 collateralLeftInStorage = _trade.collateralAmount - v.reward3 - v.reward2;
 
         if (tradeValueCollateral > collateralLeftInStorage) {
-            liquidityProvider.sendAssets(
+            borrowingProvider.sendAssets(
                 _trade.collateralIndex,
                 tradeValueCollateral - collateralLeftInStorage,
                 _trade.user
@@ -948,7 +948,7 @@ library TradingCloseUtils {
         uint256 _amountCollateral,
         address _trader
     ) internal {
-        IJavLiquidityProvider(_getMultiCollatDiamond().getLiquidityProvider()).receiveAssets(
+        IJavBorrowingProvider(_getMultiCollatDiamond().getBorrowingProvider()).receiveAssets(
             _collateralIndex,
             _amountCollateral,
             _trader
@@ -966,11 +966,14 @@ library TradingCloseUtils {
         address _trader,
         uint256 _amountCollateral
     ) internal {
-        //      FIXME: staking rewards distribution
-        //        IJavStaking(AddressStoreUtils.getAddresses().gnsStaking).distributeReward(
-        //            _getMultiCollatDiamond().getCollateral(_collateralIndex).collateral,
-        //            _amountCollateral
-        //        );
+        address collateral = _getMultiCollatDiamond().getCollateral(_collateralIndex).collateral;
+        address rewardsDistributor = AddressStoreUtils.getAddresses().rewardsDistributor;
+        address[] memory _tokens = new address[](1);
+        _tokens[0] = collateral;
+
+        IERC20(collateral).safeTransferFrom(_trader, rewardsDistributor, _amountCollateral);
+
+        IRewardsDistributor(rewardsDistributor).distributeRewards(_tokens);
         emit ITradingProcessingUtils.RewardsFeeCharged(
             _trader,
             _collateralIndex,

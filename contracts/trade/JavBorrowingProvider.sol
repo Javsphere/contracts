@@ -8,12 +8,12 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../libraries/trade/PriceAggregatorUtils.sol";
 import "../base/BaseUpgradable.sol";
 
-import "../interfaces/trade/IJavLiquidityProvider.sol";
+import "../interfaces/trade/IJavBorrowingProvider.sol";
 import "../interfaces/IJavPriceAggregator.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../interfaces/ISwapRouter.sol";
 
-contract JavLiquidityProvider is IJavLiquidityProvider, ReentrancyGuardUpgradeable, BaseUpgradable {
+contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeable, BaseUpgradable {
     using Math for uint256;
     using SafeERC20 for IERC20;
     struct TokenInfo {

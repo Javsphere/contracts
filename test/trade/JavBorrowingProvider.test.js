@@ -10,8 +10,8 @@ const { ADMIN_ERROR } = require("../common/constanst");
 const { encodeSqrtRatioX96 } = require("@uniswap/v3-sdk");
 const { mine } = require("@nomicfoundation/hardhat-network-helpers");
 
-describe("JavLiquidityProvider contract", () => {
-    let hhJavLiquidityProvider;
+describe("JavBorrowingProvider contract", () => {
+    let hhJavBorrowingProvider;
     let owner;
     let bot;
     let addr2;
@@ -46,7 +46,7 @@ describe("JavLiquidityProvider contract", () => {
     }
 
     before(async () => {
-        const JavLiquidityProvider = await ethers.getContractFactory("JavLiquidityProvider");
+        const JavBorrowingProvider = await ethers.getContractFactory("JavBorrowingProvider");
         [owner, bot, addr2, addr3, ...addrs] = await ethers.getSigners();
         nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await helpers.loadFixture(deployTokenFixture);
@@ -62,8 +62,8 @@ describe("JavLiquidityProvider contract", () => {
             nonfungiblePositionManager,
         ] = Object.values(dataV3);
 
-        hhJavLiquidityProvider = await upgrades.deployProxy(
-            JavLiquidityProvider,
+        hhJavBorrowingProvider = await upgrades.deployProxy(
+            JavBorrowingProvider,
             [
                 javPriceAggregator.target, //  _priceAggregator,
                 uniswapV3Router.target, // _swapRouter,
@@ -225,15 +225,15 @@ describe("JavLiquidityProvider contract", () => {
 
     describe("Deployment", () => {
         it("Should set the right owner address", async () => {
-            await expect(await hhJavLiquidityProvider.owner()).to.equal(owner.address);
+            await expect(await hhJavBorrowingProvider.owner()).to.equal(owner.address);
         });
 
         it("Should set the right admin address", async () => {
-            await expect(await hhJavLiquidityProvider.adminAddress()).to.equal(owner.address);
+            await expect(await hhJavBorrowingProvider.adminAddress()).to.equal(owner.address);
         });
 
         it("Should set the _paused status", async () => {
-            await expect(await hhJavLiquidityProvider.paused()).to.equal(false);
+            await expect(await hhJavBorrowingProvider.paused()).to.equal(false);
         });
 
         it("Should set prices for JavPriceAggregator", async () => {
@@ -267,43 +267,43 @@ describe("JavLiquidityProvider contract", () => {
 
     describe("Transactions", () => {
         it("Should revert when set pause", async () => {
-            await expect(hhJavLiquidityProvider.connect(bot).pause()).to.be.revertedWith(
+            await expect(hhJavBorrowingProvider.connect(bot).pause()).to.be.revertedWith(
                 ADMIN_ERROR,
             );
         });
 
         it("Should set pause", async () => {
-            await hhJavLiquidityProvider.pause();
+            await hhJavBorrowingProvider.pause();
 
-            await expect(await hhJavLiquidityProvider.paused()).to.equal(true);
+            await expect(await hhJavBorrowingProvider.paused()).to.equal(true);
         });
 
         it("Should revert when set unpause", async () => {
-            await expect(hhJavLiquidityProvider.connect(bot).unpause()).to.be.revertedWith(
+            await expect(hhJavBorrowingProvider.connect(bot).unpause()).to.be.revertedWith(
                 ADMIN_ERROR,
             );
         });
 
         it("Should set unpause", async () => {
-            await hhJavLiquidityProvider.unpause();
+            await hhJavBorrowingProvider.unpause();
 
-            await expect(await hhJavLiquidityProvider.paused()).to.equal(false);
+            await expect(await hhJavBorrowingProvider.paused()).to.equal(false);
         });
 
         it("Should revert when set the admin address", async () => {
             await expect(
-                hhJavLiquidityProvider.connect(bot).setAdminAddress(owner.address),
+                hhJavBorrowingProvider.connect(bot).setAdminAddress(owner.address),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should set the admin address", async () => {
-            await hhJavLiquidityProvider.setAdminAddress(owner.address);
+            await hhJavBorrowingProvider.setAdminAddress(owner.address);
 
-            await expect(await hhJavLiquidityProvider.adminAddress()).to.equal(owner.address);
+            await expect(await hhJavBorrowingProvider.adminAddress()).to.equal(owner.address);
         });
 
         it("Should get tvl = 0", async () => {
-            await expect(await hhJavLiquidityProvider.tvl()).to.equal(0);
+            await expect(await hhJavBorrowingProvider.tvl()).to.equal(0);
         });
 
         it("Should get tvl with tokens", async () => {
@@ -311,38 +311,38 @@ describe("JavLiquidityProvider contract", () => {
             const amount2 = ethers.parseEther("50"); //100 usd
             const amount3 = ethers.parseEther("50"); //250 usd
 
-            await erc20Token.mint(hhJavLiquidityProvider.target, amount1);
-            await erc20Token2.mint(hhJavLiquidityProvider.target, amount2);
+            await erc20Token.mint(hhJavBorrowingProvider.target, amount1);
+            await erc20Token2.mint(hhJavBorrowingProvider.target, amount2);
             await wdfiTokenV3.deposit({ value: amount3 });
-            await wdfiTokenV3.transfer(hhJavLiquidityProvider.target, amount3);
+            await wdfiTokenV3.transfer(hhJavBorrowingProvider.target, amount3);
 
-            await expect(await hhJavLiquidityProvider.tvl()).to.equal(ethers.parseEther("400"));
+            await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("400"));
         });
 
         it("Should rebalance", async () => {
-            const tvlBefore = await hhJavLiquidityProvider.tvl();
-            const token1TvlBefore = await hhJavLiquidityProvider.tokenTvl(0);
-            const token2TvlBefore = await hhJavLiquidityProvider.tokenTvl(1);
-            const token3TvlBefore = await hhJavLiquidityProvider.tokenTvl(2);
+            const tvlBefore = await hhJavBorrowingProvider.tvl();
+            const token1TvlBefore = await hhJavBorrowingProvider.tokenTvl(0);
+            const token2TvlBefore = await hhJavBorrowingProvider.tokenTvl(1);
+            const token3TvlBefore = await hhJavBorrowingProvider.tokenTvl(2);
 
             console.log("token1TvlBefore", token1TvlBefore);
             console.log("token2TvlBefore", token2TvlBefore);
             console.log("token2TvlBefore", token3TvlBefore);
             console.log("tvlBefore", tvlBefore);
 
-            await hhJavLiquidityProvider.rebalanceTokens();
+            await hhJavBorrowingProvider.rebalanceTokens();
 
-            const tvl = await hhJavLiquidityProvider.tvl();
-            const token1Tvl = await hhJavLiquidityProvider.tokenTvl(0);
-            const token2Tvl = await hhJavLiquidityProvider.tokenTvl(1);
-            const token3Tvl = await hhJavLiquidityProvider.tokenTvl(2);
+            const tvl = await hhJavBorrowingProvider.tvl();
+            const token1Tvl = await hhJavBorrowingProvider.tokenTvl(0);
+            const token2Tvl = await hhJavBorrowingProvider.tokenTvl(1);
+            const token3Tvl = await hhJavBorrowingProvider.tokenTvl(2);
 
             console.log("token1Tvl", token1Tvl);
             console.log("token2Tvl", token2Tvl);
             console.log("token3Tvl", token3Tvl);
             console.log("tvl", tvl);
 
-            // await expect(await hhJavLiquidityProvider.tvl()).to.equal(ethers.parseEther("400"));
+            // await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("400"));
         });
     });
 });

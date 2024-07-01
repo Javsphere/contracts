@@ -17,6 +17,7 @@ interface ITradingStorageUtils is ITradingStorage {
     function initializeTradingStorage(
         address _jav,
         address _rewardsDistributor,
+        address _borrowingProvider,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) external;
@@ -212,7 +213,7 @@ interface ITradingStorageUtils is ITradingStorage {
     /**
      * @dev Returns the address of the liquidityProvider
      */
-    function getLiquidityProvider() external view returns (address);
+    function getBorrowingProvider() external view returns (address);
 
     /**
      * @dev Returns the current percent profit of a trade (1e10 precision)

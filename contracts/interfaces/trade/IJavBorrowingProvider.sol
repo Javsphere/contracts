@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.23;
 
-interface IJavLiquidityProvider {
+interface IJavBorrowingProvider {
     function distributeReward(uint8 _collateralIndex, uint256 assets) external;
 
     function sendAssets(uint8 _collateralIndex, uint256 assets, address receiver) external;
