@@ -1,11 +1,11 @@
-const {ethers, upgrades} = require("hardhat");
-const {logDeploy} = require("../utils");
+const { ethers, upgrades } = require("hardhat");
+const { logDeploy } = require("../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const managerAddress = "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb"
+    const managerAddress = "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb";
     // const managerAddress = "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
     const multiCollatDiamondFactory = await ethers.getContractFactory("JavMultiCollatDiamond");
     const multiCollatDiamond = await upgrades.deployProxy(

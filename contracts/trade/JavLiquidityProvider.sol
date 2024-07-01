@@ -89,12 +89,12 @@ contract JavLiquidityProvider is IJavLiquidityProvider, ReentrancyGuardUpgradeab
         buyFee = _buyFee;
         sellFee = _sellFee;
 
+        __Base_init();
+        __ReentrancyGuard_init();
+
         for (uint8 i = 0; i < _tokens.length; ++i) {
             addToken(_tokens[i]);
         }
-
-        __Base_init();
-        __ReentrancyGuard_init();
     }
 
     function addToken(TokenInfo memory tokenInfo) public onlyAdmin {
@@ -227,6 +227,11 @@ contract JavLiquidityProvider is IJavLiquidityProvider, ReentrancyGuardUpgradeab
 
     function tvl() external view returns (uint256) {
         return _calculateTotalTvlUsd();
+    }
+
+    function tokenTvl(uint256 _tokenId) external view validToken(_tokenId) returns (uint256) {
+        TokenInfo memory _token = tokens[_tokenId];
+        return _calculateTvlUsd(_token);
     }
 
     function jlpPrice() external view returns (uint256) {
