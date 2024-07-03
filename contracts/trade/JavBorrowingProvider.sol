@@ -103,6 +103,20 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         emit AddToken(tokenInfo);
     }
 
+    function initialBuy(
+        uint256 _inputToken,
+        uint256 _amount
+    ) external onlyAdmin validToken(_inputToken) {
+        require(IERC20(jlpToken).totalSupply() == 0, "JavBorrowingProvider: Purchase not available");
+        TokenInfo memory _token = tokens[_inputToken];
+        uint256 _jlpAmount = (_amount * _getUsdPrice(_token.priceFeed)) / 1e18;
+
+        IERC20(_token.asset).safeTransferFrom(msg.sender, address(this), _amount);
+        IERC20Extended(jlpToken).mint(msg.sender, _jlpAmount);
+
+        emit BuyJLP(msg.sender, _jlpAmount);
+    }
+
     /**
      * @notice Function to buy JLP token
      * @param _inputToken: input token id for buy
@@ -112,6 +126,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         uint256 _inputToken,
         uint256 _amount
     ) external nonReentrant whenNotPaused validToken(_inputToken) {
+        require(IERC20(jlpToken).totalSupply() > 0, "JavBorrowingProvider: Purchase not available");
         TokenInfo memory _token = tokens[_inputToken];
         require(
             IERC20(_token.asset).balanceOf(msg.sender) >= _amount,
@@ -130,6 +145,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         uint256 _outputToken,
         uint256 _amount
     ) external nonReentrant whenNotPaused validToken(_outputToken) {
+        require(IERC20(jlpToken).totalSupply() > 0, "JavBorrowingProvider: Sell not available");
         TokenInfo memory _token = tokens[_outputToken];
         require(
             IERC20(jlpToken).balanceOf(msg.sender) >= _amount,
