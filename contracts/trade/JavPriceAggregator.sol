@@ -44,7 +44,7 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
     // Interactions
 
     /// @inheritdoc IPriceAggregatorUtils
-    function getPrice(uint16 _pairIndex) external view virtual onlySelf returns (uint256) {
+    function getPrice(uint16 _pairIndex) external view virtual returns (uint256) {
         return PriceAggregatorUtils.getPrice(_pairIndex);
     }
 

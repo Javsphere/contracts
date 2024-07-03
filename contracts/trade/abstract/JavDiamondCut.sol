@@ -16,7 +16,6 @@ import "../../libraries/trade/DiamondUtils.sol";
  * @dev Manages all actions (calls, updates and initializations) related to the diamond and its facets.
  */
 abstract contract JavDiamondCut is JavAddressStore, IJavDiamondCut {
-    event TestEvent(uint256 value);
 
     /**
      * @dev Forwards call to the right facet using msg.sig using delegatecall. Reverts if signature is not known.

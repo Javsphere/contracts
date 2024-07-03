@@ -15,7 +15,7 @@ import "./AddressStoreUtils.sol";
  * @dev TradingClose facet internal library
  */
 
-library TradingCloseUtils {
+library TradingProcessingUtils {
     using SafeERC20 for IERC20;
 
     uint256 private constant PRECISION = 1e10;

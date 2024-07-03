@@ -34,7 +34,7 @@ interface ITradingProcessingUtils is ITradingProcessing {
     function getPendingGovFeesCollateral(uint8 _collateralIndex) external view returns (uint256);
 
     /**
-     * @dev Close open market order
+     * @dev Open market order
      */
     function openTradeMarketOrder(ITradingStorage.PendingOrder memory _pendingOrder) external;
 
