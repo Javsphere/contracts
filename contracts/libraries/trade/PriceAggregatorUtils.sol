@@ -34,6 +34,7 @@ library PriceAggregatorUtils {
      */
     function initializePriceAggregator(
         IJavPriceAggregator _oracle,
+        bytes32 _javUsdFeed,
         uint8[] calldata _collateralIndices,
         bytes32[] memory _collateralUsdPriceFeeds
     ) internal {
@@ -41,6 +42,7 @@ library PriceAggregatorUtils {
             revert IGeneralErrors.WrongLength();
 
         _getStorage().oracle = _oracle;
+        _getStorage().javUsdFeed = _javUsdFeed;
 
         for (uint8 i = 0; i < _collateralIndices.length; ++i) {
             updateCollateralUsdPriceFeed(_collateralIndices[i], _collateralUsdPriceFeeds[i]);

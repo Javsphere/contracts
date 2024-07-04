@@ -107,7 +107,10 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         uint256 _inputToken,
         uint256 _amount
     ) external onlyAdmin validToken(_inputToken) {
-        require(IERC20(jlpToken).totalSupply() == 0, "JavBorrowingProvider: Purchase not available");
+        require(
+            IERC20(jlpToken).totalSupply() == 0,
+            "JavBorrowingProvider: Purchase not available"
+        );
         TokenInfo memory _token = tokens[_inputToken];
         uint256 _jlpAmount = (_amount * _getUsdPrice(_token.priceFeed)) / 1e18;
 
