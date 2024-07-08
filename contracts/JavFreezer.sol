@@ -5,6 +5,7 @@ pragma solidity ^0.8.16;
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "./helpers/RewardRateConfigurable.sol";
 import "./base/BaseUpgradable.sol";
 import "./interfaces/IJavFreezer.sol";
@@ -88,6 +89,8 @@ contract JavFreezer is
 
     /// Info of each pool fee.
     PoolFee[] public poolFee;
+    uint256 public infinityPassPercent;
+    address public infinityPass;
 
     /* ========== EVENTS ========== */
     event SetPoolInfo(uint256 _pid, uint256 _lastRewardBlock, uint256 _accRewardPerShare);
@@ -124,6 +127,8 @@ contract JavFreezer is
     event AddRewards(uint256 indexed pid, uint256 amount);
     event SetPoolFee(uint256 _pid, PoolFee _poolFee);
     event Burn(address _token, uint256 _amount);
+    event SetInfinityPassPercent(uint256 indexed _percent);
+    event SetInfinityPass(address indexed _address);
 
     modifier validLockId(uint256 _lockId) {
         require(lockPeriod[_lockId] != 0 && _lockId < 5, "JavFreezer: invalid lock period");
@@ -257,6 +262,18 @@ contract JavFreezer is
         lockPeriodMultiplier[_lockId] = _multiplier;
 
         emit SetLockPeriodMultiplier(_lockId, _multiplier);
+    }
+
+    function setInfinityPassPercent(uint256 _percent) external onlyAdmin {
+        infinityPassPercent = _percent;
+
+        emit SetInfinityPassPercent(_percent);
+    }
+
+    function setInfinityPass(address _address) external onlyAdmin {
+        infinityPass = _address;
+
+        emit SetInfinityPass(_address);
     }
 
     /**
@@ -663,9 +680,13 @@ contract JavFreezer is
             ? ((depositDetails.depositTokens * productsRewInfo.rewardsPerShare) / 1e18) -
                 productsRewardsDebt[_user][_pid][_depositId]
             : 0;
+        uint256 blockRewards = ((rewards * lockPeriodMultiplier[depositDetails.stakePeriod]) / 1e5);
 
-        return
-            ((rewards * lockPeriodMultiplier[depositDetails.stakePeriod]) / 1e5) + productsRewards;
+        uint256 nftRewards = IERC721(infinityPass).balanceOf(_user) > 0
+            ? ((blockRewards + productsRewards) * infinityPassPercent) / 100
+            : 0;
+
+        return blockRewards + productsRewards + nftRewards;
     }
 
     function _burnToken(address _token, uint256 _amount) private {

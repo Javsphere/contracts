@@ -5,6 +5,7 @@ pragma solidity ^0.8.16;
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "./helpers/RewardRateConfigurable.sol";
 import "./interfaces/IERC20Extended.sol";
 import "./base/BaseUpgradable.sol";
@@ -50,6 +51,8 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
 
     /// Info of each pool fee.
     PoolFee[] public poolFee;
+    uint256 public infinityPassPercent;
+    address public infinityPass;
 
     /* ========== EVENTS ========== */
     event AddPool(
@@ -71,6 +74,8 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     event AddRewards(uint256 indexed pid, uint256 amount);
     event SetPoolFee(uint256 _pid, PoolFee _poolFee);
     event Burn(address _token, uint256 _amount);
+    event SetInfinityPassPercent(uint256 indexed _percent);
+    event SetInfinityPass(address indexed _address);
 
     modifier poolExists(uint256 _pid) {
         require(_pid < poolInfo.length, "JavStakeX: Unknown pool");
@@ -105,6 +110,18 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
         rewardsDistributorAddress = _address;
 
         emit SetRewardsDistributorAddress(_address);
+    }
+
+    function setInfinityPassPercent(uint256 _percent) external onlyAdmin {
+        infinityPassPercent = _percent;
+
+        emit SetInfinityPassPercent(_percent);
+    }
+
+    function setInfinityPass(address _address) external onlyAdmin {
+        infinityPass = _address;
+
+        emit SetInfinityPass(_address);
     }
 
     function setRewardConfiguration(
@@ -379,7 +396,11 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
             ? ((user.shares * pool.rewardsPerShare) / 1e18) - user.productsRewardDebt
             : 0;
 
-        return blockRewards + productsRewards;
+        uint256 nftRewards = IERC721(infinityPass).balanceOf(_user) > 0
+            ? ((blockRewards + productsRewards) * infinityPassPercent) / 100
+            : 0;
+
+        return blockRewards + productsRewards + nftRewards;
     }
 
     function _burnToken(address _token, uint256 _amount) private {
