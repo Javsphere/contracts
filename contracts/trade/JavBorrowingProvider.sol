@@ -257,6 +257,10 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         return _jlpPrice();
     }
 
+    function tokensCount() external view returns (uint256) {
+        return tokens.length;
+    }
+
     function _buyJLP(TokenInfo memory _inputToken, uint256 _amount) private {
         uint256 _inputAmountUsd = (_amount * _getUsdPrice(_inputToken.priceFeed)) / 1e18;
         // calculate jlp amount
