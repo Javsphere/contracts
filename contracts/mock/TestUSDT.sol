@@ -12,8 +12,8 @@ contract TestUSDT is ERC20BurnableUpgradeable, BaseUpgradable {
         _disableInitializers();
     }
 
-    function initialize() external initializer {
-        __ERC20_init("Test USDT", "USDT");
+    function initialize(string memory name_, string memory symbol_) external initializer {
+        __ERC20_init(name_, symbol_);
         __ERC20Burnable_init();
         __Base_init();
     }
@@ -23,7 +23,7 @@ contract TestUSDT is ERC20BurnableUpgradeable, BaseUpgradable {
      * @param account address for mint
      * @param amount Amount of tokens
      */
-    function mint(address account, uint256 amount) external onlyOwner {
+    function mint(address account, uint256 amount) external {
         _mint(account, amount);
     }
 }

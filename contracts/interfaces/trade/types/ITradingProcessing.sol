@@ -24,7 +24,6 @@ interface ITradingProcessing {
     // Useful to avoid stack too deep errors
     struct Values {
         uint256 positionSizeCollateral;
-        uint256 javPriceCollateral;
         int256 profitP;
         uint256 executionPrice;
         uint256 liqPrice;

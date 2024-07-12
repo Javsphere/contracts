@@ -474,9 +474,6 @@ library TradingProcessingUtils {
                     t.long,
                     t.leverage
                 );
-                v.javPriceCollateral = _getMultiCollatDiamond().getJavPriceCollateralIndex(
-                    t.collateralIndex
-                );
 
                 v.amountSentToTrader = _unregisterTrade(
                     t,
@@ -606,9 +603,6 @@ library TradingProcessingUtils {
         v.positionSizeCollateral = _getPositionSizeCollateral(
             _trade.collateralAmount,
             _trade.leverage
-        );
-        v.javPriceCollateral = _getMultiCollatDiamond().getJavPriceCollateralIndex(
-            _trade.collateralIndex
         );
 
         // 1. Before charging any fee, re-calculate current trader fee tier cache
@@ -1009,20 +1003,6 @@ library TradingProcessingUtils {
             _trade.pairIndex,
             _trade.long
         ); // price impact oi windows
-    }
-
-    /**
-     * @dev Converts collateral to JAV.
-     * @param _collateralAmount amount of collateral (collateral precision)
-     * @param _collateralPrecisionDelta precision delta of collateral (10^18/10^decimals)
-     * @param _javPriceCollateral price of JAV in collateral (1e10)
-     */
-    function _convertCollateralToJav(
-        uint256 _collateralAmount,
-        uint128 _collateralPrecisionDelta,
-        uint256 _javPriceCollateral
-    ) internal pure returns (uint256) {
-        return ((_collateralAmount * _collateralPrecisionDelta * PRECISION) / _javPriceCollateral);
     }
 
     /**

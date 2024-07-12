@@ -1,12 +1,18 @@
-const { ethers, upgrades } = require("hardhat");
-const { logDeploy } = require("../utils");
+const {ethers, upgrades} = require("hardhat");
+const {logDeploy} = require("../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const managerAddress = "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb";
-    // const managerAddress = "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+
+    const PackingUtils = await ethers.getContractFactory("PackingUtils");
+    const packlingUtils = await PackingUtils.deploy();
+
+    logDeploy("PackingUtils", packlingUtils.target);
+
+    // const managerAddress = "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb";
+    const managerAddress = "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
     const multiCollatDiamondFactory = await ethers.getContractFactory("JavMultiCollatDiamond");
     const multiCollatDiamond = await upgrades.deployProxy(
         multiCollatDiamondFactory,
@@ -59,7 +65,7 @@ async function main() {
     const tradingInteractionsFactory = await ethers.getContractFactory("JavTradingInteractions", {
         libraries: {
             "contracts/libraries/trade/PackingUtils.sol:PackingUtils":
-                "0x26F3b46eBf6bEE0Bfe5fE82c8EfD8CA2Fc769bE6",
+            packlingUtils.target,
         },
     });
     const tradingInteractions = await tradingInteractionsFactory.deploy();
@@ -86,6 +92,24 @@ async function main() {
     await priceAggregator.waitForDeployment();
 
     logDeploy("JavPriceAggregator", await priceAggregator.getAddress());
+
+    // // localhost
+    const tokenFactory = await ethers.getContractFactory("TestUSDT");
+    const token1 = await tokenFactory.deploy(["Test USDT", "USDT"]);
+    await token1.waitForDeployment();
+
+    logDeploy("TestUSDT", await token1.getAddress());
+
+    const token2 = await tokenFactory.deploy(["Test USDT1", "USDT1"]);
+    await token2.waitForDeployment();
+
+    logDeploy("TestUSDT1", await token2.getAddress());
+
+    const rewardsCollectorFactory = await ethers.getContractFactory("RewardsCollector");
+    const rewardsCollector = await rewardsCollectorFactory.deploy();
+    await rewardsCollector.waitForDeployment();
+
+    logDeploy("RewardsCollector", await rewardsCollector.getAddress());
 }
 
 main()

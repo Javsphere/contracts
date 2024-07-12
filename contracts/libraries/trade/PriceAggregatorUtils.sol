@@ -121,15 +121,6 @@ library PriceAggregatorUtils {
     }
 
     /**
-     * @dev Check IPriceAggregatorUtils interface for documentation
-     */
-    function getJavPriceCollateralIndex(
-        uint8 _collateralIndex
-    ) internal view returns (uint256 _price) {
-        return (getJavPriceUsd() * 1e8) / getCollateralPriceUsd(_collateralIndex);
-    }
-
-    /**
      * @dev Returns storage slot to use when fetching storage relevant to library
      */
     function _getSlot() internal pure returns (uint256) {

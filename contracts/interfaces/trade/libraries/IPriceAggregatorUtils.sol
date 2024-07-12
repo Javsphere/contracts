@@ -68,12 +68,6 @@ interface IPriceAggregatorUtils is IPriceAggregator {
     function getJavPriceUsd() external view returns (uint256);
 
     /**
-     * @dev Returns Jav/collateral price
-     * @param _collateralIndex index of collateral
-     */
-    function getJavPriceCollateralIndex(uint8 _collateralIndex) external view returns (uint256);
-
-    /**
      * @dev Emitted when collateral/USD price feed is updated
      * @param collateralIndex collateral index
      * @param value new value

@@ -81,11 +81,4 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
     function getJavPriceUsd() external view returns (uint256) {
         return PriceAggregatorUtils.getJavPriceUsd();
     }
-
-    /// @inheritdoc IPriceAggregatorUtils
-    function getJavPriceCollateralIndex(
-        uint8 _collateralIndex
-    ) external view virtual returns (uint256) {
-        return PriceAggregatorUtils.getJavPriceCollateralIndex(_collateralIndex);
-    }
 }
