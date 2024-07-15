@@ -34,6 +34,7 @@ library PriceAggregatorUtils {
      */
     function initializePriceAggregator(
         IJavPriceAggregator _oracle,
+        IJavPriceAggregator _alternativeOracle,
         bytes32 _javUsdFeed,
         uint8[] calldata _collateralIndices,
         bytes32[] memory _collateralUsdPriceFeeds
@@ -42,6 +43,7 @@ library PriceAggregatorUtils {
             revert IGeneralErrors.WrongLength();
 
         _getStorage().oracle = _oracle;
+        _getStorage().alternativeOracle = _alternativeOracle;
         _getStorage().javUsdFeed = _javUsdFeed;
 
         for (uint8 i = 0; i < _collateralIndices.length; ++i) {
@@ -68,9 +70,9 @@ library PriceAggregatorUtils {
      */
     function getPrice(uint16 _pairIndex) internal view returns (uint256) {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
-        IJavPriceAggregator.Price memory price = s.oracle.getPrice(
-            _getMultiCollatDiamond().pairFeed(_pairIndex)
-        );
+        IPairsStorage.Pair memory pair = _getMultiCollatDiamond().pairs(_pairIndex);
+        IJavPriceAggregator oracle = pair.altPriceOracle ? s.alternativeOracle : s.oracle;
+        IJavPriceAggregator.Price memory price = oracle.getPrice(pair.feedId);
         return PriceUtils.convertToUint(price.price, price.expo, 8);
     }
 
@@ -116,7 +118,7 @@ library PriceAggregatorUtils {
      */
     function getJavPriceUsd() internal view returns (uint256) {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
-        IJavPriceAggregator.Price memory price = s.oracle.getPrice(s.javUsdFeed);
+        IJavPriceAggregator.Price memory price = s.alternativeOracle.getPrice(s.javUsdFeed);
         return PriceUtils.convertToUint(price.price, price.expo, 8);
     }
 

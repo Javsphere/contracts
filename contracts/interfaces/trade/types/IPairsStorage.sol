@@ -27,6 +27,7 @@ interface IPairsStorage {
         uint256 spreadP; // PRECISION
         uint256 groupIndex;
         uint256 feeIndex;
+        bool altPriceOracle;
     }
 
     struct Group {

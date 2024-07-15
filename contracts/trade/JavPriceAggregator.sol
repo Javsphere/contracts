@@ -21,12 +21,14 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
     /// @inheritdoc IPriceAggregatorUtils
     function initializePriceAggregator(
         IJavPriceAggregator _oracle,
+        IJavPriceAggregator _alternativeOracle,
         bytes32 _javUsdFeed,
         uint8[] calldata _collateralIndices,
         bytes32[] memory _collateralUsdPriceFeeds
     ) external reinitializer(7) {
         PriceAggregatorUtils.initializePriceAggregator(
             _oracle,
+            _alternativeOracle,
             _javUsdFeed,
             _collateralIndices,
             _collateralUsdPriceFeeds

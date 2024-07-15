@@ -18,6 +18,7 @@ interface IPriceAggregator {
     struct PriceAggregatorStorage {
         // slot 1
         IJavPriceAggregator oracle;
+        IJavPriceAggregator alternativeOracle;
         mapping(uint8 => bytes32) collateralUsdPriceFeed;
         bytes32 javUsdFeed;
         uint96 __placeholder; // 96 bits
