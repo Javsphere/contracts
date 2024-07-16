@@ -59,8 +59,20 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
 
     /* ========== EVENTS ========== */
     event AddToken(TokenInfo tokenInfo);
-    event BuyJLP(address indexed user, uint256 amount);
-    event SellJLP(address indexed user, uint256 amount);
+    event BuyJLP(
+        address indexed user,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    );
+    event SellJLP(
+        address indexed user,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    );
 
     modifier validToken(uint256 _tokenId) {
         require(_tokenId < tokens.length, "JavBorrowingProvider: Invalid token");
@@ -117,7 +129,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         IERC20(_token.asset).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20Extended(jlpToken).mint(msg.sender, _jlpAmount);
 
-        emit BuyJLP(msg.sender, _jlpAmount);
+        emit BuyJLP(msg.sender, _token.asset, jlpToken, _amount, _jlpAmount);
     }
 
     /**
@@ -270,7 +282,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         IERC20(_inputToken.asset).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20Extended(jlpToken).mint(msg.sender, _jlpAmount);
 
-        emit BuyJLP(msg.sender, _jlpAmount);
+        emit BuyJLP(msg.sender, _inputToken.asset, jlpToken, _amount, _jlpAmount);
     }
 
     function _sellJLP(TokenInfo memory _outputToken, uint256 _amount) private {
@@ -283,7 +295,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         IERC20Extended(jlpToken).burnFrom(msg.sender, _amount);
         IERC20(_outputToken.asset).safeTransfer(msg.sender, _tokensAmount);
 
-        emit SellJLP(msg.sender, _amount);
+        emit SellJLP(msg.sender, jlpToken, _outputToken.asset, _amount, _tokensAmount);
     }
 
     function _getUsdPrice(bytes32 _priceFeed) private view returns (uint256) {
