@@ -75,6 +75,12 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
         return _latestPriceInfo[id];
     }
 
+    function getPriceUnsafe(
+        bytes32 id
+    ) external view returns (IJavPriceAggregator.Price memory price) {
+        return _latestPriceInfo[id];
+    }
+
     function updatePriceFeeds(UpdatePriceInfo[] memory _priceInfo) external onlyAllowedAddresses {
         for (uint256 i = 0; i < _priceInfo.length; i++) {
             _latestPriceInfo[_priceInfo[i].id] = IJavPriceAggregator.Price({

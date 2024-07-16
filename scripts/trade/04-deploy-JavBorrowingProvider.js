@@ -50,12 +50,45 @@ async function main() {
             },
         ], // _tokens
     ];
-    const contract = await upgrades.deployProxy(Contract, testnetArgs, {
+
+    const sepolia_baseArgs = [
+        "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729", //_priceAggregator,
+        "0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4", // _swapRouter,
+        "0x09542E14956b269E2534Da26AD60586980ef5A27", // _jlpToken,
+        "0x8835117E5911129286723c63F42899E99107E78e", // _pnlHandler,
+        5, // _buyFee,
+        5, // _sellFee,
+        [
+            {
+                asset: "0x4200000000000000000000000000000000000006", //weth
+                priceFeed: "0x7f981f906d7cfe93f618804f1de89e0199ead306edc022d3230b3e8305f391b0",
+                targetWeightage: 25,
+                isActive: true,
+            },
+            {
+                asset: "0xB86fBB7C463e189fE50529491E8bDc05714f6634", //tWBTC:
+                priceFeed: "0xc9d8b075a5c69303365ae23633d4e085199bf5c520a3b90fed1322a0342ffc33",
+                targetWeightage: 25,
+                isActive: true,
+            },
+            {
+                asset: "0xc34148F7240B444392974eB6736CB4A93ed6c293", //tUSDT:
+                priceFeed: "0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b",
+                targetWeightage: 25,
+                isActive: true,
+            },
+            {
+                asset: "0x66F3Cf265D2D146A0348F6fC67E3Da0835e0968E", //tUSDC:
+                priceFeed: "0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+                targetWeightage: 25,
+                isActive: true,
+            },
+        ], // _tokens
+    ];
+    const contract = await upgrades.deployProxy(Contract, sepolia_baseArgs, {
         initializer: "initialize",
         kind: "uups",
-        txOverrides: {
-            gasLimit: ethers.parseUnits("0.03", "gwei"),
-        },
+
     });
     await contract.waitForDeployment();
 

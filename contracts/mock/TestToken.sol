@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20Burnable
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../base/BaseUpgradable.sol";
 
-contract TestUSDT is ERC20BurnableUpgradeable, BaseUpgradable {
+contract TestToken is ERC20BurnableUpgradeable, BaseUpgradable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();

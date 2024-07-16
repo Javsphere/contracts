@@ -299,7 +299,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     }
 
     function _getUsdPrice(bytes32 _priceFeed) private view returns (uint256) {
-        IJavPriceAggregator.Price memory price = priceAggregator.getPrice(_priceFeed);
+        IJavPriceAggregator.Price memory price = priceAggregator.getPriceUnsafe(_priceFeed);
         return PriceUtils.convertToUint(price.price, price.expo, 18);
     }
 

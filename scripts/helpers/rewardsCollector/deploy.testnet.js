@@ -5,11 +5,11 @@ async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("contracts/helpers/JavPriceAggregator.sol:JavPriceAggregator");
+    const Contract = await ethers.getContractFactory("RewardsCollector");
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            ["0x8D50eE492c9c3a8174aA39c377839944dc546378"], //_allowedAddresses_
+            ["0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb"], // _allowedAddresses_
         ],
         {
             initializer: "initialize",
@@ -19,7 +19,7 @@ async function main() {
     );
     await contract.waitForDeployment();
 
-    logDeploy("JavPriceAggregator", await contract.getAddress());
+    logDeploy("RewardsCollector", await contract.getAddress());
 }
 
 main()

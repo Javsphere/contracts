@@ -1,11 +1,11 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0x69732876393acD817fA8F7330837cB7C4D5D9f7E";
+const PROXY = "0x0000000000000000000000000000000000000000";
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("contracts/helpers/JavPriceAggregator.sol:JavPriceAggregator");
+    const Contract = await ethers.getContractFactory("RewardsCollerctor");
 
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",
@@ -33,7 +33,7 @@ async function main() {
     }
 
     console.log(`New implementation Address: ${newImplementationAddress}`);
-    console.log(`JavPriceAggregator contract upgraded`);
+    console.log(`RewardsCollerctor contract upgraded`);
 }
 
 main()
