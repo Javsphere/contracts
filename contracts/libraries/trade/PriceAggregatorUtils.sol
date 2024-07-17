@@ -81,7 +81,7 @@ library PriceAggregatorUtils {
      */
     function getCollateralPriceUsd(uint8 _collateralIndex) internal view returns (uint256) {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
-        IJavPriceAggregator.Price memory price = s.oracle.getPrice(
+        IJavPriceAggregator.Price memory price = s.oracle.getPriceUnsafe(
             s.collateralUsdPriceFeed[_collateralIndex]
         );
         return PriceUtils.convertToUint(price.price, price.expo, 8);
