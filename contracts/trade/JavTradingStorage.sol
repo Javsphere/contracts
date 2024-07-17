@@ -22,14 +22,14 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
 
     /// @inheritdoc ITradingStorageUtils
     function initializeTradingStorage(
-        address _jav,
+        address _rewardsToken,
         address _rewardsDistributor,
         address _borrowingProvider,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) external reinitializer(6) {
         TradingStorageUtils.initializeTradingStorage(
-            _jav,
+            _rewardsToken,
             _rewardsDistributor,
             _borrowingProvider,
             _collaterals,

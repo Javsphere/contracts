@@ -11,11 +11,11 @@ import "../types/ITradingStorage.sol";
 interface ITradingStorageUtils is ITradingStorage {
     /**
      * @dev Initializes the trading storage facet
-     * @param _jav address of the JAV token
+     * @param _rewardsToken address of the rewards token
      * @param _rewardsDistributor address of the rewards distributor contract
      */
     function initializeTradingStorage(
-        address _jav,
+        address _rewardsToken,
         address _rewardsDistributor,
         address _borrowingProvider,
         address[] memory _collaterals,

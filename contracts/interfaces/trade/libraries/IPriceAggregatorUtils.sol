@@ -19,7 +19,7 @@ interface IPriceAggregatorUtils is IPriceAggregator {
     function initializePriceAggregator(
         IJavPriceAggregator _oracle,
         IJavPriceAggregator _alternativeOracle,
-        bytes32 _javUsdFeed,
+        bytes32 _rewardsTokenUsdFeed,
         uint8[] calldata _collateralIndices,
         bytes32[] memory _collateralUsdPriceFeeds
     ) external;
@@ -64,9 +64,9 @@ interface IPriceAggregatorUtils is IPriceAggregator {
     ) external view returns (uint256);
 
     /**
-     * @dev Returns JAV/USD price
+     * @dev Returns RewardsToken/USD price
      */
-    function getJavPriceUsd() external view returns (uint256);
+    function getRewardsTokenPriceUsd() external view returns (uint256);
 
     /**
      * @dev Emitted when collateral/USD price feed is updated

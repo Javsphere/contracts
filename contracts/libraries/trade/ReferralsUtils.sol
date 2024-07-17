@@ -227,7 +227,7 @@ library ReferralsUtils {
         if (rewardsJav == 0) revert IReferralsUtils.NoPendingRewards();
 
         a.pendingRewardsJav = 0;
-        IERC20(AddressStoreUtils.getAddresses().jav).safeTransfer(msg.sender, rewardsJav);
+        IERC20(AddressStoreUtils.getAddresses().rewardsToken).safeTransfer(msg.sender, rewardsJav);
 
         emit IReferralsUtils.AllyRewardsClaimed(msg.sender, rewardsJav);
     }
@@ -242,7 +242,7 @@ library ReferralsUtils {
         if (rewardsJav == 0) revert IReferralsUtils.NoPendingRewards();
 
         r.pendingRewardsJav = 0;
-        IERC20(AddressStoreUtils.getAddresses().jav).safeTransfer(msg.sender, rewardsJav);
+        IERC20(AddressStoreUtils.getAddresses().rewardsToken).safeTransfer(msg.sender, rewardsJav);
 
         emit IReferralsUtils.ReferrerRewardsClaimed(msg.sender, rewardsJav);
     }

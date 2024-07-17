@@ -35,7 +35,7 @@ library PriceAggregatorUtils {
     function initializePriceAggregator(
         IJavPriceAggregator _oracle,
         IJavPriceAggregator _alternativeOracle,
-        bytes32 _javUsdFeed,
+        bytes32 _rewardsTokenUsdFeed,
         uint8[] calldata _collateralIndices,
         bytes32[] memory _collateralUsdPriceFeeds
     ) internal {
@@ -44,7 +44,7 @@ library PriceAggregatorUtils {
 
         _getStorage().oracle = _oracle;
         _getStorage().alternativeOracle = _alternativeOracle;
-        _getStorage().javUsdFeed = _javUsdFeed;
+        _getStorage().rewardsTokenUsdFeed = _rewardsTokenUsdFeed;
 
         for (uint8 i = 0; i < _collateralIndices.length; ++i) {
             updateCollateralUsdPriceFeed(_collateralIndices[i], _collateralUsdPriceFeeds[i]);
@@ -116,9 +116,11 @@ library PriceAggregatorUtils {
     /**
      * @dev Check IPriceAggregatorUtils interface for documentation
      */
-    function getJavPriceUsd() internal view returns (uint256) {
+    function getRewardsTokenPriceUsd() internal view returns (uint256) {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
-        IJavPriceAggregator.Price memory price = s.alternativeOracle.getPrice(s.javUsdFeed);
+        IJavPriceAggregator.Price memory price = s.alternativeOracle.getPriceUnsafe(
+            s.rewardsTokenUsdFeed
+        );
         return PriceUtils.convertToUint(price.price, price.expo, 8);
     }
 

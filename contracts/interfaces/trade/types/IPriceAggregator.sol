@@ -20,7 +20,7 @@ interface IPriceAggregator {
         IJavPriceAggregator oracle;
         IJavPriceAggregator alternativeOracle;
         mapping(uint8 => bytes32) collateralUsdPriceFeed;
-        bytes32 javUsdFeed;
+        bytes32 rewardsTokenUsdFeed;
         uint96 __placeholder; // 96 bits
         uint256[41] __gap;
     }

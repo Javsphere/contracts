@@ -926,7 +926,7 @@ library TradingProcessingUtils {
                         _positionSizeCollateral
                     ),
                     _pairOpenFeeP,
-                    _getMultiCollatDiamond().getJavPriceUsd()
+                    _getMultiCollatDiamond().getRewardsTokenPriceUsd()
                 )
             );
     }

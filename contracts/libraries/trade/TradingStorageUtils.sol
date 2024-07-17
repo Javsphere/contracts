@@ -22,7 +22,7 @@ library TradingStorageUtils {
      * @dev Check ITradingStorageUtils interface for documentation
      */
     function initializeTradingStorage(
-        address _jav,
+        address _rewardsToken,
         address _rewardsDistributor,
         address _borrowingProvider,
         address[] memory _collaterals,
@@ -30,7 +30,7 @@ library TradingStorageUtils {
     ) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         if (
-            _jav == address(0) ||
+            _rewardsToken == address(0) ||
             _rewardsDistributor == address(0) ||
             _borrowingProvider == address(0)
         ) revert IGeneralErrors.ZeroAddress();
@@ -41,7 +41,7 @@ library TradingStorageUtils {
         // Set addresses
         s.borrowingProvider = _borrowingProvider;
         IJavAddressStore.Addresses storage addresses = AddressStoreUtils.getAddresses();
-        addresses.jav = _jav;
+        addresses.rewardsToken = _rewardsToken;
         addresses.rewardsDistributor = _rewardsDistributor;
 
         emit IJavAddressStore.AddressesUpdated(addresses);

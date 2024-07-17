@@ -14,7 +14,7 @@ interface IAddressStore {
     }
 
     struct Addresses {
-        address jav;
+        address rewardsToken;
         address rewardsDistributor;
     }
 

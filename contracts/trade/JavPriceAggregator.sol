@@ -22,14 +22,14 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
     function initializePriceAggregator(
         IJavPriceAggregator _oracle,
         IJavPriceAggregator _alternativeOracle,
-        bytes32 _javUsdFeed,
+        bytes32 _rewardsTokenUsdFeed,
         uint8[] calldata _collateralIndices,
         bytes32[] memory _collateralUsdPriceFeeds
     ) external reinitializer(7) {
         PriceAggregatorUtils.initializePriceAggregator(
             _oracle,
             _alternativeOracle,
-            _javUsdFeed,
+            _rewardsTokenUsdFeed,
             _collateralIndices,
             _collateralUsdPriceFeeds
         );
@@ -80,7 +80,7 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
     }
 
     /// @inheritdoc IPriceAggregatorUtils
-    function getJavPriceUsd() external view returns (uint256) {
-        return PriceAggregatorUtils.getJavPriceUsd();
+    function getRewardsTokenPriceUsd() external view returns (uint256) {
+        return PriceAggregatorUtils.getRewardsTokenPriceUsd();
     }
 }
