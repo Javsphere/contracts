@@ -73,7 +73,7 @@ library PriceAggregatorUtils {
         IPairsStorage.Pair memory pair = _getMultiCollatDiamond().pairs(_pairIndex);
         IJavPriceAggregator oracle = pair.altPriceOracle ? s.alternativeOracle : s.oracle;
         IJavPriceAggregator.Price memory price = oracle.getPriceUnsafe(pair.feedId);
-        return PriceUtils.convertToUint(price.price, price.expo, 8);
+        return PriceUtils.convertToUint(price.price, price.expo, 10);
     }
 
     /**
