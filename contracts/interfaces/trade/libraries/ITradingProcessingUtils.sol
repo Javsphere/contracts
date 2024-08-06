@@ -144,6 +144,7 @@ interface ITradingProcessingUtils is ITradingProcessing {
      */
     event TriggerOrderCanceled(
         address indexed triggerCaller,
+        uint32 index,
         ITradingStorage.PendingOrderType orderType,
         CancelReason cancelReason
     );

@@ -365,6 +365,7 @@ library TradingProcessingUtils {
         if (cancelReason != ITradingProcessing.CancelReason.NONE) {
             emit ITradingProcessingUtils.TriggerOrderCanceled(
                 _pendingOrder.user,
+                _pendingOrder.index,
                 _pendingOrder.orderType,
                 cancelReason
             );
@@ -505,6 +506,7 @@ library TradingProcessingUtils {
         if (cancelReason != ITradingProcessing.CancelReason.NONE) {
             emit ITradingProcessingUtils.TriggerOrderCanceled(
                 _pendingOrder.user,
+                _pendingOrder.index,
                 _pendingOrder.orderType,
                 cancelReason
             );
