@@ -78,6 +78,22 @@ interface IBorrowingFeesUtils is IBorrowingFees {
     ) external;
 
     /**
+     * @dev Resets a trade borrowing fee to 0 (useful when new trade opened or when partial trade executed)
+     * @param _collateralIndex index of the collateral
+     * @param _trader address of the trader
+     * @param _pairIndex index of the pair
+     * @param _index index of the trade
+     * @param _long true if trade is long, false if trade is short
+     */
+    function resetTradeBorrowingFees(
+        uint8 _collateralIndex,
+        address _trader,
+        uint16 _pairIndex,
+        uint32 _index,
+        bool _long
+    ) external;
+
+    /**
      * @dev Returns the pending acc borrowing fees for a pair on both sides
      * @param _collateralIndex index of the collateral
      * @param _pairIndex index of the pair
@@ -334,6 +350,7 @@ interface IBorrowingFeesUtils is IBorrowingFees {
         address indexed trader,
         uint16 indexed pairIndex,
         uint32 index,
+        bool long,
         uint64 initialPairAccFee,
         uint64 initialGroupAccFee
     );

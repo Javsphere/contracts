@@ -29,7 +29,10 @@ interface ITradingStorage {
         STOP_OPEN,
         TP_CLOSE,
         SL_CLOSE,
-        LIQ_CLOSE
+        LIQ_CLOSE,
+        UPDATE_LEVERAGE,
+        MARKET_PARTIAL_OPEN,
+        MARKET_PARTIAL_CLOSE
     }
 
 

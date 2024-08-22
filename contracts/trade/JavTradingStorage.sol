@@ -5,7 +5,6 @@ pragma solidity ^0.8.23;
 import "../interfaces/trade/libraries/ITradingStorageUtils.sol";
 
 import "../libraries/trade/TradingStorageUtils.sol";
-import "../libraries/trade/ChainUtils.sol";
 import "./abstract/JavAddressStore.sol";
 
 /**
@@ -70,6 +69,16 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         uint120 _collateralAmount
     ) external virtual onlySelf {
         TradingStorageUtils.updateTradeCollateralAmount(_tradeId, _collateralAmount);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function updateTradePosition(
+        ITradingStorage.Id memory _tradeId,
+        uint120 _collateralAmount,
+        uint24 _leverage,
+        uint64 _openPrice
+    ) external virtual onlySelf {
+        TradingStorageUtils.updateTradePosition(_tradeId, _collateralAmount, _leverage, _openPrice);
     }
 
     /// @inheritdoc ITradingStorageUtils

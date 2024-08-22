@@ -72,8 +72,36 @@ library PriceAggregatorUtils {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
         IPairsStorage.Pair memory pair = _getMultiCollatDiamond().pairs(_pairIndex);
         IJavPriceAggregator oracle = pair.altPriceOracle ? s.alternativeOracle : s.oracle;
-        IJavPriceAggregator.Price memory price = oracle.getPriceUnsafe(pair.feedId);
+        IJavPriceAggregator.Price memory price = oracle.getPrice(pair.feedId);
         return PriceUtils.convertToUint(price.price, price.expo, 10);
+    }
+
+    /**
+     * @dev Check IPriceAggregatorUtils interface for documentation
+     */
+    function updatePrices(bytes[][] calldata _priceUpdate, address _user) internal {
+        IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
+        uint256 _totalFee;
+        bytes[] memory _pythUpdateData = _priceUpdate[0];
+        bytes[] memory _javUpdateData = _priceUpdate[1];
+        if (_pythUpdateData.length > 0) {
+            IJavPriceAggregator oracle = s.oracle;
+            uint fee = oracle.getUpdateFee(_pythUpdateData);
+            require(msg.value >= fee, "JavPriceAggregator: Invalid fee amount");
+            oracle.updatePriceFeeds{value: fee}(_pythUpdateData);
+            _totalFee += fee;
+        }
+        if (_javUpdateData.length > 0) {
+            IJavPriceAggregator oracle = s.alternativeOracle;
+            uint fee = oracle.getUpdateFee(_javUpdateData);
+            require(msg.value - _totalFee >= fee, "JavPriceAggregator: Invalid fee amount");
+            oracle.updatePriceFeeds{value: fee}(_javUpdateData);
+            _totalFee += fee;
+        }
+        //  send unused eth back to user
+        if (msg.value > _totalFee) {
+            payable(_user).transfer(msg.value - _totalFee);
+        }
     }
 
     /**
@@ -81,7 +109,7 @@ library PriceAggregatorUtils {
      */
     function getCollateralPriceUsd(uint8 _collateralIndex) internal view returns (uint256) {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
-        IJavPriceAggregator.Price memory price = s.oracle.getPriceUnsafe(
+        IJavPriceAggregator.Price memory price = s.oracle.getPrice(
             s.collateralUsdPriceFeed[_collateralIndex]
         );
         return PriceUtils.convertToUint(price.price, price.expo, 8);
@@ -118,9 +146,7 @@ library PriceAggregatorUtils {
      */
     function getRewardsTokenPriceUsd() internal view returns (uint256) {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
-        IJavPriceAggregator.Price memory price = s.alternativeOracle.getPriceUnsafe(
-            s.rewardsTokenUsdFeed
-        );
+        IJavPriceAggregator.Price memory price = s.oracle.getPrice(s.rewardsTokenUsdFeed);
         return PriceUtils.convertToUint(price.price, price.expo, 8);
     }
 

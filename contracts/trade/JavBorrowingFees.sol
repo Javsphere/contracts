@@ -80,6 +80,23 @@ contract JavBorrowingFees is JavAddressStore, IBorrowingFeesUtils {
         );
     }
 
+    /// @inheritdoc IBorrowingFeesUtils
+    function resetTradeBorrowingFees(
+        uint8 _collateralIndex,
+        address _trader,
+        uint16 _pairIndex,
+        uint32 _index,
+        bool _long
+    ) external virtual onlySelf {
+        BorrowingFeesUtils.resetTradeBorrowingFees(
+            _collateralIndex,
+            _trader,
+            _pairIndex,
+            _index,
+            _long
+        );
+    }
+
     // Getters
 
     /// @inheritdoc IBorrowingFeesUtils

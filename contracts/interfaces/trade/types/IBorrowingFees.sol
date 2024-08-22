@@ -82,7 +82,8 @@ interface IBorrowingFees {
         uint64 openPrice; // 1e10
         bool long;
         uint256 collateral; // 1e18 | 1e6 (collateral)
-        uint24 leverage; // 1e3
+        uint256 leverage; // 1e3
+        bool useBorrowingFees;
     }
 
     struct PendingBorrowingAccFeesInput {

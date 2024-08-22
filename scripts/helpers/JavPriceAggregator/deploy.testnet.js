@@ -1,11 +1,13 @@
 const { ethers, upgrades } = require("hardhat");
-const {logDeploy} = require("../../utils");
+const { logDeploy } = require("../../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("contracts/helpers/JavPriceAggregator.sol:JavPriceAggregator");
+    const Contract = await ethers.getContractFactory(
+        "contracts/helpers/JavPriceAggregator.sol:JavPriceAggregator",
+    );
     const contract = await upgrades.deployProxy(
         Contract,
         [
@@ -14,7 +16,6 @@ async function main() {
         {
             initializer: "initialize",
             kind: "uups",
-
         },
     );
     await contract.waitForDeployment();

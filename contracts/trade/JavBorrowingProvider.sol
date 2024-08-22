@@ -43,7 +43,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     IJavPriceAggregator public priceAggregator;
     ISwapRouter public swapRouter;
     address public pnlHandler;
-    address public jlpToken;
+    address public llpToken;
     uint256 public buyFee; // * 1e4
     uint256 public sellFee; // * 1e4
 
@@ -59,14 +59,14 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
 
     /* ========== EVENTS ========== */
     event AddToken(TokenInfo tokenInfo);
-    event BuyJLP(
+    event BuyLLP(
         address indexed user,
         address tokenIn,
         address tokenOut,
         uint256 amountIn,
         uint256 amountOut
     );
-    event SellJLP(
+    event SellLLP(
         address indexed user,
         address tokenIn,
         address tokenOut,
@@ -88,7 +88,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     function initialize(
         address _priceAggregator,
         address _swapRouter,
-        address _jlpToken,
+        address _llpToken,
         address _pnlHandler,
         uint256 _buyFee,
         uint256 _sellFee,
@@ -97,7 +97,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         priceAggregator = IJavPriceAggregator(_priceAggregator);
         swapRouter = ISwapRouter(_swapRouter);
         pnlHandler = _pnlHandler;
-        jlpToken = _jlpToken;
+        llpToken = _llpToken;
         buyFee = _buyFee;
         sellFee = _sellFee;
 
@@ -120,54 +120,54 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         uint256 _amount
     ) external onlyAdmin validToken(_inputToken) {
         require(
-            IERC20(jlpToken).totalSupply() == 0,
+            IERC20(llpToken).totalSupply() == 0,
             "JavBorrowingProvider: Purchase not available"
         );
         TokenInfo memory _token = tokens[_inputToken];
-        uint256 _jlpAmount = (_amount * _getUsdPrice(_token.priceFeed)) / 1e18;
+        uint256 _llpAmount = (_amount * _getUsdPrice(_token.priceFeed)) / 1e18;
 
         IERC20(_token.asset).safeTransferFrom(msg.sender, address(this), _amount);
-        IERC20Extended(jlpToken).mint(msg.sender, _jlpAmount);
+        IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
 
-        emit BuyJLP(msg.sender, _token.asset, jlpToken, _amount, _jlpAmount);
+        emit BuyLLP(msg.sender, _token.asset, llpToken, _amount, _llpAmount);
     }
 
     /**
-     * @notice Function to buy JLP token
+     * @notice Function to buy LLP token
      * @param _inputToken: input token id for buy
      * @param _amount: amount
      */
-    function buyJLP(
+    function buyLLP(
         uint256 _inputToken,
         uint256 _amount
     ) external nonReentrant whenNotPaused validToken(_inputToken) {
-        require(IERC20(jlpToken).totalSupply() > 0, "JavBorrowingProvider: Purchase not available");
+        require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Purchase not available");
         TokenInfo memory _token = tokens[_inputToken];
         require(
             IERC20(_token.asset).balanceOf(msg.sender) >= _amount,
             "JavBorrowingProvider: invalid balance for buy"
         );
 
-        _buyJLP(_token, _amount);
+        _buyLLP(_token, _amount);
     }
 
     /**
-     * @notice Function to sell JLP token
+     * @notice Function to sell LLP token
      * @param _outputToken: input token id for buy
      * @param _amount: amount
      */
-    function sellJLP(
+    function sellLLP(
         uint256 _outputToken,
         uint256 _amount
     ) external nonReentrant whenNotPaused validToken(_outputToken) {
-        require(IERC20(jlpToken).totalSupply() > 0, "JavBorrowingProvider: Sell not available");
+        require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Sell not available");
         TokenInfo memory _token = tokens[_outputToken];
         require(
-            IERC20(jlpToken).balanceOf(msg.sender) >= _amount,
+            IERC20(llpToken).balanceOf(msg.sender) >= _amount,
             "JavBorrowingProvider: invalid balance for sell"
         );
 
-        _sellJLP(_token, _amount);
+        _sellLLP(_token, _amount);
     }
 
     function rebalanceTokens() external {
@@ -194,7 +194,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
 
         accRewardsPerToken[_collateralIndex] +=
             (assets * PRECISION_18) /
-            IERC20(jlpToken).totalSupply();
+            IERC20(llpToken).totalSupply();
 
         emit RewardDistributed(sender, assets);
     }
@@ -210,7 +210,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         if (sender != pnlHandler) revert OnlyTradingPnlHandler();
 
         int256 accPnlDelta = int256(
-            assets.mulDiv(PRECISION_18, IERC20(jlpToken).totalSupply(), Math.Rounding.Ceil)
+            assets.mulDiv(PRECISION_18, IERC20(llpToken).totalSupply(), Math.Rounding.Ceil)
         );
 
         accPnlPerToken[_collateralIndex] += accPnlDelta;
@@ -239,7 +239,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         }
 
         int256 accPnlDelta = int256(
-            (assetsLessDeplete * PRECISION_18) / IERC20(jlpToken).totalSupply()
+            (assetsLessDeplete * PRECISION_18) / IERC20(llpToken).totalSupply()
         );
         accPnlPerToken[_collateralIndex] -= accPnlDelta;
 
@@ -265,37 +265,37 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         return _calculateTvlUsd(_token);
     }
 
-    function jlpPrice() external view returns (uint256) {
-        return _jlpPrice();
+    function llpPrice() external view returns (uint256) {
+        return _llpPrice();
     }
 
     function tokensCount() external view returns (uint256) {
         return tokens.length;
     }
 
-    function _buyJLP(TokenInfo memory _inputToken, uint256 _amount) private {
+    function _buyLLP(TokenInfo memory _inputToken, uint256 _amount) private {
         uint256 _inputAmountUsd = (_amount * _getUsdPrice(_inputToken.priceFeed)) / 1e18;
-        // calculate jlp amount
+        // calculate llp amount
         uint256 _fee = (_inputAmountUsd * buyFee) / 1e4;
-        uint256 _jlpAmount = ((_inputAmountUsd - _fee) * 1e18) / _jlpPrice();
+        uint256 _llpAmount = ((_inputAmountUsd - _fee) * 1e18) / _llpPrice();
 
         IERC20(_inputToken.asset).safeTransferFrom(msg.sender, address(this), _amount);
-        IERC20Extended(jlpToken).mint(msg.sender, _jlpAmount);
+        IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
 
-        emit BuyJLP(msg.sender, _inputToken.asset, jlpToken, _amount, _jlpAmount);
+        emit BuyLLP(msg.sender, _inputToken.asset, llpToken, _amount, _llpAmount);
     }
 
-    function _sellJLP(TokenInfo memory _outputToken, uint256 _amount) private {
-        uint256 _inputAmountUsd = (_amount * _jlpPrice()) / 1e18;
+    function _sellLLP(TokenInfo memory _outputToken, uint256 _amount) private {
+        uint256 _inputAmountUsd = (_amount * _llpPrice()) / 1e18;
         // calculate tokens amount
         uint256 _fee = (_inputAmountUsd * sellFee) / 1e4;
         uint256 _tokenUsdPrice = _getUsdPrice(_outputToken.priceFeed);
         uint256 _tokensAmount = ((_inputAmountUsd - _fee) * 1e18) / _tokenUsdPrice;
 
-        IERC20Extended(jlpToken).burnFrom(msg.sender, _amount);
+        IERC20Extended(llpToken).burnFrom(msg.sender, _amount);
         IERC20(_outputToken.asset).safeTransfer(msg.sender, _tokensAmount);
 
-        emit SellJLP(msg.sender, jlpToken, _outputToken.asset, _amount, _tokensAmount);
+        emit SellLLP(msg.sender, llpToken, _outputToken.asset, _amount, _tokensAmount);
     }
 
     function _getUsdPrice(bytes32 _priceFeed) private view returns (uint256) {
@@ -319,9 +319,9 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
             (IERC20(_token.asset).balanceOf(address(this)) * _getUsdPrice(_token.priceFeed)) / 1e18;
     }
 
-    function _jlpPrice() private view returns (uint256) {
+    function _llpPrice() private view returns (uint256) {
         return
-            ((_calculateTotalTvlUsd() + rewardsAmountUsd) * 1e18) / IERC20(jlpToken).totalSupply();
+            ((_calculateTotalTvlUsd() + rewardsAmountUsd) * 1e18) / IERC20(llpToken).totalSupply();
     }
 
     function _rebalance() private {

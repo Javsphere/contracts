@@ -4,12 +4,20 @@ pragma solidity ^0.8.23;
 
 import "../types/ITradingProcessing.sol";
 import "../types/ITradingStorage.sol";
+import "./IUpdateLeverageUtils.sol";
+import "./IUpdatePositionSizeUtils.sol";
+import "./ITradingCommonUtils.sol";
 
 /**
  * @custom:version 8
  * @dev Interface for JavTradingClose facet (inherits types and also contains functions, events, and custom errors)
  */
-interface ITradingProcessingUtils is ITradingProcessing {
+interface ITradingProcessingUtils is
+    ITradingProcessing,
+    IUpdateLeverageUtils,
+    IUpdatePositionSizeUtils,
+    ITradingCommonUtils
+{
     function initializeTradingProcessing(uint8 _valueP) external;
 
     /**
@@ -155,43 +163,7 @@ interface ITradingProcessingUtils is ITradingProcessing {
      * @param collateralIndex index of the collateral
      * @param amountCollateral amount charged (collateral precision)
      */
-    event GovFeeCharged(
-        address indexed trader,
-        uint8 indexed collateralIndex,
-        uint256 amountCollateral
-    );
-
-    /**
-     *
-     * @param trader address of the trader
-     * @param collateralIndex index of the collateral
-     * @param amountCollateral amount charged (collateral precision)
-     */
-    event ReferralFeeCharged(
-        address indexed trader,
-        uint8 indexed collateralIndex,
-        uint256 amountCollateral
-    );
-
-    /**
-     *
-     * @param trader address of the trader
-     * @param collateralIndex index of the collateral
-     * @param amountCollateral amount charged (collateral precision)
-     */
     event JTokenFeeCharged(
-        address indexed trader,
-        uint8 indexed collateralIndex,
-        uint256 amountCollateral
-    );
-
-    /**
-     *
-     * @param trader address of the trader
-     * @param collateralIndex index of the collateral
-     * @param amountCollateral amount charged (collateral precision)
-     */
-    event RewardsFeeCharged(
         address indexed trader,
         uint8 indexed collateralIndex,
         uint256 amountCollateral

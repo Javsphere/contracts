@@ -9,6 +9,9 @@ import "../../interfaces/IRewardsDistributor.sol";
 import "./AddressStoreUtils.sol";
 import "./StorageUtils.sol";
 import "./PackingUtils.sol";
+import "./TradingCommonUtils.sol";
+import "./updateLeverage/UpdateLeverageUtils.sol";
+import "./updatePositionSize/UpdatePositionSizeUtils.sol";
 
 /**
  * @custom:version 8
@@ -45,20 +48,33 @@ library TradingInteractionsUtils {
     }
 
     /**
+     * @dev Modifier to perform price update
+     */
+    modifier onlyWithPriceUpdate(bytes[][] calldata _priceUpdate) {
+        require(_priceUpdate.length == 2, "JavTradingInteractions: invalid priceUpdate data");
+        _getMultiCollatDiamond().updatePrices{value: msg.value}(_priceUpdate, msg.sender);
+        _;
+    }
+
+    /**
      * @dev Check ITradingInteractionsUtils interface for documentation
      */
     function openTrade(
         ITradingStorage.Trade memory _trade,
         uint16 _maxSlippageP,
-        address _referrer
-    ) internal tradingActivated {
+        address _referrer,
+        bytes[][] calldata _priceUpdate
+    ) internal tradingActivated onlyWithPriceUpdate(_priceUpdate) {
         _openTrade(_trade, _maxSlippageP, _referrer, false);
     }
 
     /**
      * @dev Check ITradingInteractionsUtils interface for documentation
      */
-    function closeTradeMarket(uint32 _index) internal tradingActivatedOrCloseOnly {
+    function closeTradeMarket(
+        uint32 _index,
+        bytes[][] calldata _priceUpdate
+    ) internal tradingActivatedOrCloseOnly onlyWithPriceUpdate(_priceUpdate) {
         ITradingStorage.Trade memory t = _getMultiCollatDiamond().getTrade(msg.sender, _index);
 
         ITradingStorage.PendingOrder memory pendingOrder;
@@ -142,7 +158,65 @@ library TradingInteractionsUtils {
     /**
      * @dev Check ITradingInteractionsUtils interface for documentation
      */
-    function triggerOrder(uint256 _packed) internal {
+    function updateLeverage(
+        uint32 _index,
+        uint24 _newLeverage,
+        bytes[][] calldata _priceUpdate
+    ) internal tradingActivated onlyWithPriceUpdate(_priceUpdate) {
+        UpdateLeverageUtils.updateLeverage(
+            IUpdateLeverage.UpdateLeverageInput(msg.sender, _index, _newLeverage)
+        );
+    }
+
+    /**
+     * @dev Check ITradingInteractionsUtils interface for documentation
+     */
+    function increasePositionSize(
+        uint32 _index,
+        uint120 _collateralDelta,
+        uint24 _leverageDelta,
+        uint64 _expectedPrice,
+        uint16 _maxSlippageP,
+        bytes[][] calldata _priceUpdate
+    ) internal tradingActivated onlyWithPriceUpdate(_priceUpdate) {
+        UpdatePositionSizeUtils.increasePositionSize(
+            IUpdatePositionSize.IncreasePositionSizeInput(
+                msg.sender,
+                _index,
+                _collateralDelta,
+                _leverageDelta,
+                _expectedPrice,
+                _maxSlippageP
+            )
+        );
+    }
+
+    /**
+     * @dev Check ITradingInteractionsUtils interface for documentation
+     */
+    function decreasePositionSize(
+        uint32 _index,
+        uint120 _collateralDelta,
+        uint24 _leverageDelta,
+        bytes[][] calldata _priceUpdate
+    ) internal tradingActivatedOrCloseOnly onlyWithPriceUpdate(_priceUpdate) {
+        UpdatePositionSizeUtils.decreasePositionSize(
+            IUpdatePositionSize.DecreasePositionSizeInput(
+                msg.sender,
+                _index,
+                _collateralDelta,
+                _leverageDelta
+            )
+        );
+    }
+
+    /**
+     * @dev Check ITradingInteractionsUtils interface for documentation
+     */
+    function triggerOrder(
+        uint256 _packed,
+        bytes[][] calldata _priceUpdate
+    ) internal onlyWithPriceUpdate(_priceUpdate) {
         (uint8 _orderType, address _trader, uint32 _index) = _packed.unpackTriggerOrder();
 
         ITradingStorage.PendingOrderType orderType = ITradingStorage.PendingOrderType(_orderType);
@@ -176,7 +250,8 @@ library TradingInteractionsUtils {
                     t.openPrice,
                     t.long,
                     t.collateralAmount,
-                    t.leverage
+                    t.leverage,
+                    true
                 )
             );
 

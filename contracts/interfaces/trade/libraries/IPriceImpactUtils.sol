@@ -41,30 +41,38 @@ interface IPriceImpactUtils is IPriceImpact {
     ) external;
 
     /**
-     * @dev Adds open interest to a window
-     * @param _openInterestUsd open interest of trade in USD (1e18 precision)
-     * @param _pairIndex index of pair
-     * @param _long true for long, false for short
+     * @dev Adds open interest to current window
+     * @param _trader trader address
+     * @param _index trade index
+     * @param _oiDeltaCollateral open interest to add (collateral precision)
      */
     function addPriceImpactOpenInterest(
-        uint256 _openInterestUsd,
-        uint256 _pairIndex,
-        bool _long
+        address _trader,
+        uint32 _index,
+        uint256 _oiDeltaCollateral
     ) external;
 
     /**
-     * @dev Removes open interest from a window
-     * @param _openInterestUsd open interest of trade in USD (1e18 precision)
-     * @param _pairIndex index of pair
-     * @param _long true for long, false for short
-     * @param _addTs timestamp of when the trade open interest was added (to remove from same window)
+     * @dev Removes open interest from trade last OI update window
+     * @param _trader trader address
+     * @param _index trade index
+     * @param _oiDeltaCollateral open interest to remove (collateral precision)
      */
     function removePriceImpactOpenInterest(
-        uint256 _openInterestUsd, // 1e18 USD
-        uint256 _pairIndex,
-        bool _long,
-        uint48 _addTs
+        address _trader,
+        uint32 _index,
+        uint256 _oiDeltaCollateral
     ) external;
+
+    /**
+     * @dev Returns last OI delta in USD for a trade (1e18 precision)
+     * @param _trader trader address
+     * @param _index trade index
+     */
+    function getTradeLastWindowOiUsd(
+        address _trader,
+        uint32 _index
+    ) external view returns (uint128);
 
     /**
      * @dev Returns active open interest used in price impact calculation for a pair and side (long/short)
@@ -153,8 +161,9 @@ interface IPriceImpactUtils is IPriceImpact {
     /**
      * @dev Triggered when OI is added to a window.
      * @param oiWindowUpdate OI window update details (windowsDuration, pairIndex, windowId, etc.)
+     * @param isPartial true if partial add
      */
-    event PriceImpactOpenInterestAdded(IPriceImpact.OiWindowUpdate oiWindowUpdate);
+    event PriceImpactOpenInterestAdded(IPriceImpact.OiWindowUpdate oiWindowUpdate, bool isPartial);
 
     /**
      * @dev Triggered when OI is (tentatively) removed from a window.

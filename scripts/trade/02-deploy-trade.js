@@ -1,5 +1,5 @@
-const {ethers, upgrades} = require("hardhat");
-const {logDeploy} = require("../utils");
+const { ethers, upgrades } = require("hardhat");
+const { logDeploy } = require("../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -11,8 +11,18 @@ async function main() {
 
     logDeploy("PackingUtils", packlingUtils.target);
 
+    const UpdateLeverageUtils = await ethers.getContractFactory("UpdateLeverageUtils");
+    const updateLeverageUtils = await UpdateLeverageUtils.deploy();
+
+    logDeploy("UpdateLeverageUtils", updateLeverageUtils.target);
+
+    const UpdatePositionSizeUtils = await ethers.getContractFactory("UpdatePositionSizeUtils");
+    const updatePositionSizeUtils = await UpdatePositionSizeUtils.deploy();
+
+    logDeploy("UpdatePositionSizeUtils", updatePositionSizeUtils.target);
+
     // const managerAddress = "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb";
-    const managerAddress = "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+    const managerAddress = "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199";
     const multiCollatDiamondFactory = await ethers.getContractFactory("JavMultiCollatDiamond");
     const multiCollatDiamond = await upgrades.deployProxy(
         multiCollatDiamondFactory,
@@ -64,12 +74,16 @@ async function main() {
 
     const tradingInteractionsFactory = await ethers.getContractFactory("JavTradingInteractions", {
         libraries: {
-            "contracts/libraries/trade/PackingUtils.sol:PackingUtils":
-            packlingUtils.target,
+            "contracts/libraries/trade/PackingUtils.sol:PackingUtils": packlingUtils.target,
+            "contracts/libraries/trade/updateLeverage/UpdateLeverageUtils.sol:UpdateLeverageUtils":
+                updateLeverageUtils.target,
+            "contracts/libraries/trade/updatePositionSize/UpdatePositionSizeUtils.sol:UpdatePositionSizeUtils":
+                updatePositionSizeUtils.target,
         },
     });
     const tradingInteractions = await tradingInteractionsFactory.deploy();
     await tradingInteractions.waitForDeployment();
+    ``;
 
     logDeploy("JavTradingInteractions", await tradingInteractions.getAddress());
 
@@ -93,8 +107,8 @@ async function main() {
 
     logDeploy("JavPriceAggregator", await priceAggregator.getAddress());
 
-    // // localhost
-    const tokenFactory = await ethers.getContractFactory("TestUSDT");
+    // localhost
+    const tokenFactory = await ethers.getContractFactory("TestToken");
     const token1 = await tokenFactory.deploy(["Test USDT", "USDT"]);
     await token1.waitForDeployment();
 

@@ -6,6 +6,8 @@ import "../../interfaces/trade/IJavMultiCollatDiamond.sol";
 
 import "./StorageUtils.sol";
 import "./ChainUtils.sol";
+import "./ConstantsUtils.sol";
+import "./TradingCommonUtils.sol";
 
 /**
  * @custom:version 8
@@ -86,47 +88,17 @@ library BorrowingFeesUtils {
         bool _open,
         bool _long
     ) internal validCollateralIndex(_collateralIndex) {
-        (uint64 pairAccFeeLong, uint64 pairAccFeeShort) = _setPairPendingAccFees(
-            _collateralIndex,
-            _pairIndex,
-            block.number
-        );
-        (uint64 groupAccFeeLong, uint64 groupAccFeeShort) = _setGroupPendingAccFees(
-            _collateralIndex,
-            getBorrowingPairGroupIndex(_collateralIndex, _pairIndex),
-            block.number
-        );
+        // 1. Store pair and group pending acc fees until now
+        uint16 groupIndex = getBorrowingPairGroupIndex(_collateralIndex, _pairIndex);
+        _setPairPendingAccFees(_collateralIndex, _pairIndex, block.number);
+        _setGroupPendingAccFees(_collateralIndex, groupIndex, block.number);
 
+        // 2. Update pair and group OIs
         _updatePairOi(_collateralIndex, _pairIndex, _long, _open, _positionSizeCollateral);
+        _updateGroupOi(_collateralIndex, groupIndex, _long, _open, _positionSizeCollateral);
 
-        _updateGroupOi(
-            _collateralIndex,
-            getBorrowingPairGroupIndex(_collateralIndex, _pairIndex),
-            _long,
-            _open,
-            _positionSizeCollateral
-        );
-
-        if (_open) {
-            IBorrowingFees.BorrowingInitialAccFees memory initialFees = IBorrowingFees
-                .BorrowingInitialAccFees(
-                    _long ? pairAccFeeLong : pairAccFeeShort,
-                    _long ? groupAccFeeLong : groupAccFeeShort,
-                    ChainUtils.getUint48BlockNumber(block.number),
-                    0 // placeholder
-                );
-
-            _getStorage().initialAccFees[_collateralIndex][_trader][_index] = initialFees;
-
-            emit IBorrowingFeesUtils.BorrowingInitialAccFeesStored(
-                _collateralIndex,
-                _trader,
-                _pairIndex,
-                _index,
-                initialFees.accPairFee,
-                initialFees.accGroupFee
-            );
-        }
+        // 3. If open, initialize trade initial acc fees
+        if (_open) resetTradeBorrowingFees(_collateralIndex, _trader, _pairIndex, _index, _long);
 
         emit IBorrowingFeesUtils.TradeBorrowingCallbackHandled(
             _collateralIndex,
@@ -136,6 +108,50 @@ library BorrowingFeesUtils {
             _open,
             _long,
             _positionSizeCollateral
+        );
+    }
+
+    /**
+     * @dev Check IBorrowingFeesUtils interface for documentation
+     */
+    function resetTradeBorrowingFees(
+        uint8 _collateralIndex,
+        address _trader,
+        uint16 _pairIndex,
+        uint32 _index,
+        bool _long
+    ) internal validCollateralIndex(_collateralIndex) {
+        uint256 currentBlock = block.number;
+
+        (uint64 pairAccFeeLong, uint64 pairAccFeeShort, ) = getBorrowingPairPendingAccFees(
+            _collateralIndex,
+            _pairIndex,
+            currentBlock
+        );
+        (uint64 groupAccFeeLong, uint64 groupAccFeeShort, ) = getBorrowingGroupPendingAccFees(
+            _collateralIndex,
+            getBorrowingPairGroupIndex(_collateralIndex, _pairIndex),
+            currentBlock
+        );
+
+        IBorrowingFees.BorrowingInitialAccFees memory initialFees = IBorrowingFees
+            .BorrowingInitialAccFees(
+                _long ? pairAccFeeLong : pairAccFeeShort,
+                _long ? groupAccFeeLong : groupAccFeeShort,
+                ChainUtils.getUint48BlockNumber(currentBlock),
+                0 // placeholder
+            );
+
+        _getStorage().initialAccFees[_collateralIndex][_trader][_index] = initialFees;
+
+        emit IBorrowingFeesUtils.BorrowingInitialAccFeesStored(
+            _collateralIndex,
+            _trader,
+            _pairIndex,
+            _index,
+            _long,
+            initialFees.accPairFee,
+            initialFees.accGroupFee
         );
     }
 
@@ -273,23 +289,37 @@ library BorrowingFeesUtils {
     function getTradeLiquidationPrice(
         IBorrowingFees.LiqPriceInput calldata _input
     ) internal view returns (uint256) {
+        uint256 closingFeesCollateral = (TradingCommonUtils.getPositionSizeCollateralBasis(
+            _input.collateralIndex,
+            _input.pairIndex,
+            (_input.collateral * _input.leverage) / 1e3
+        ) *
+            (_getMultiCollatDiamond().pairCloseFeeP(_input.pairIndex) +
+                _getMultiCollatDiamond().pairTriggerOrderFeeP(_input.pairIndex))) /
+            ConstantsUtils.P_10 /
+            100;
+
+        uint256 borrowingFeesCollateral = _input.useBorrowingFees
+            ? getTradeBorrowingFee(
+                IBorrowingFees.BorrowingFeeInput(
+                    _input.collateralIndex,
+                    _input.trader,
+                    _input.pairIndex,
+                    _input.index,
+                    _input.long,
+                    _input.collateral,
+                    _input.leverage
+                )
+            )
+            : 0;
+
         return
             _getTradeLiquidationPrice(
                 _input.openPrice,
                 _input.long,
                 _input.collateral,
                 _input.leverage,
-                getTradeBorrowingFee(
-                    IBorrowingFees.BorrowingFeeInput(
-                        _input.collateralIndex,
-                        _input.trader,
-                        _input.pairIndex,
-                        _input.index,
-                        _input.long,
-                        _input.collateral,
-                        _input.leverage
-                    )
-                ),
+                borrowingFeesCollateral + closingFeesCollateral,
                 _getMultiCollatDiamond().getCollateral(_input.collateralIndex).precisionDelta
             );
     }

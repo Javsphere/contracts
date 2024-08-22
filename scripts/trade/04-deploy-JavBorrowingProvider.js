@@ -88,7 +88,6 @@ async function main() {
     const contract = await upgrades.deployProxy(Contract, sepolia_baseArgs, {
         initializer: "initialize",
         kind: "uups",
-
     });
     await contract.waitForDeployment();
 

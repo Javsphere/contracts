@@ -2,11 +2,12 @@
 
 pragma solidity ^0.8.23;
 
-import "../../interfaces/trade/libraries/IPriceImpactUtils.sol";
-import "../../interfaces/trade/types/IPriceImpact.sol";
-import "../../interfaces/trade/IGeneralErrors.sol";
+import "../../interfaces/trade/IJavMultiCollatDiamond.sol";
 
 import "./StorageUtils.sol";
+import "./ConstantsUtils.sol";
+import "./TradingCommonUtils.sol";
+import "./TradingStorageUtils.sol";
 
 /**
  * @custom:version 8
@@ -124,32 +125,76 @@ library PriceImpactUtils {
      * @dev Check IPriceImpactUtils interface for documentation
      */
     function addPriceImpactOpenInterest(
-        uint128 _openInterestUsd,
-        uint256 _pairIndex,
-        bool _long
+        address _trader,
+        uint32 _index,
+        uint256 _oiDeltaCollateral
     ) internal {
-        IPriceImpact.PriceImpactStorage storage priceImpactStorage = _getStorage();
-        IPriceImpact.OiWindowsSettings storage settings = priceImpactStorage.oiWindowsSettings;
+        // 1. Prepare variables
+        IPriceImpact.OiWindowsSettings storage settings = _getStorage().oiWindowsSettings;
+        ITradingStorage.Trade memory trade = _getMultiCollatDiamond().getTrade(_trader, _index);
+        ITradingStorage.TradeInfo storage tradeInfo = TradingStorageUtils._getStorage().tradeInfos[
+            _trader
+        ][_index];
+        IPriceImpact.TradePriceImpactInfo storage tradePriceImpactInfo = _getStorage()
+            .tradePriceImpactInfos[_trader][_index];
 
         uint256 currentWindowId = _getCurrentWindowId(settings);
-        IPriceImpact.PairOi storage pairOi = priceImpactStorage.windows[settings.windowsDuration][
-            _pairIndex
-        ][currentWindowId];
+        uint256 currentCollateralPriceUsd = _getMultiCollatDiamond().getCollateralPriceUsd(
+            trade.collateralIndex
+        );
+        uint128 oiDeltaUsd = uint128(
+            TradingCommonUtils.convertCollateralToUsd(
+                _oiDeltaCollateral,
+                _getMultiCollatDiamond().getCollateral(trade.collateralIndex).precisionDelta,
+                currentCollateralPriceUsd
+            )
+        );
 
-        if (_long) {
-            pairOi.oiLongUsd += _openInterestUsd;
-        } else {
-            pairOi.oiShortUsd += _openInterestUsd;
+        // 2. Handle logic for partials when last OI delta is still in an active window
+        bool isPartial = tradeInfo.lastOiUpdateTs > 0;
+        if (
+            isPartial &&
+            _getWindowId(tradeInfo.lastOiUpdateTs, settings) >=
+            _getEarliestActiveWindowId(currentWindowId, settings.windowsCount)
+        ) {
+            // 2.1 Fetch last OI delta for trade
+            uint128 lastWindowOiUsd = getTradeLastWindowOiUsd(_trader, _index);
+
+            // 2.2 Remove it from existing window
+            removePriceImpactOpenInterest(_trader, _index, lastWindowOiUsd);
+
+            // 2.3 Add it to current window, scaling it to the current collateral/usd price
+            oiDeltaUsd += uint128(
+                (currentCollateralPriceUsd * lastWindowOiUsd) / tradeInfo.collateralPriceUsd
+            );
         }
+
+        // 3. Add OI to current window
+        IPriceImpact.PairOi storage currentWindow = _getStorage().windows[settings.windowsDuration][
+            trade.pairIndex
+        ][currentWindowId];
+        if (trade.long) {
+            currentWindow.oiLongUsd += oiDeltaUsd;
+        } else {
+            currentWindow.oiShortUsd += oiDeltaUsd;
+        }
+
+        // 4. Update trade info
+        tradeInfo.lastOiUpdateTs = uint48(block.timestamp);
+        tradeInfo.collateralPriceUsd = uint48(currentCollateralPriceUsd);
+        tradePriceImpactInfo.lastWindowOiUsd = oiDeltaUsd;
 
         emit IPriceImpactUtils.PriceImpactOpenInterestAdded(
             IPriceImpact.OiWindowUpdate(
+                _trader,
+                _index,
                 settings.windowsDuration,
-                _pairIndex,
+                trade.pairIndex,
                 currentWindowId,
-                _long,
-                _openInterestUsd
-            )
+                trade.long,
+                oiDeltaUsd
+            ),
+            isPartial
         );
     }
 
@@ -157,51 +202,105 @@ library PriceImpactUtils {
      * @dev Check IPriceImpactUtils interface for documentation
      */
     function removePriceImpactOpenInterest(
-        uint128 _openInterestUsd,
-        uint256 _pairIndex,
-        bool _long,
-        uint48 _addTs
+        address _trader,
+        uint32 _index,
+        uint256 _oiDeltaCollateral
     ) internal {
-        // If trade opened before update, OI wasn't stored in any window so we return
-        if (_openInterestUsd == 0 || _addTs == 0) {
+        // 1. Prepare vars
+        ITradingStorage.Trade memory trade = _getMultiCollatDiamond().getTrade(_trader, _index);
+        ITradingStorage.TradeInfo memory tradeInfo = _getMultiCollatDiamond().getTradeInfo(
+            _trader,
+            _index
+        );
+        IPriceImpact.OiWindowsSettings storage settings = _getStorage().oiWindowsSettings;
+        IPriceImpact.TradePriceImpactInfo storage tradePriceImpactInfo = _getStorage()
+            .tradePriceImpactInfos[_trader][_index];
+
+        // If trade OI wasn't stored in any window we return early
+        if (
+            _oiDeltaCollateral == 0 ||
+            tradeInfo.lastOiUpdateTs == 0 ||
+            tradeInfo.collateralPriceUsd == 0
+        ) {
             return;
         }
 
-        IPriceImpact.PriceImpactStorage storage priceImpactStorage = _getStorage();
-        IPriceImpact.OiWindowsSettings storage settings = priceImpactStorage.oiWindowsSettings;
-
         uint256 currentWindowId = _getCurrentWindowId(settings);
-        uint256 addWindowId = _getWindowId(_addTs, settings);
-
+        uint256 addWindowId = _getWindowId(tradeInfo.lastOiUpdateTs, settings);
         bool notOutdated = _isWindowPotentiallyActive(addWindowId, currentWindowId);
 
-        // Only remove OI if window is not outdated already
-        if (notOutdated) {
-            IPriceImpact.PairOi storage pairOi = priceImpactStorage.windows[
-                settings.windowsDuration
-            ][_pairIndex][addWindowId];
+        uint128 oiDeltaUsd = uint128(
+            TradingCommonUtils.convertCollateralToUsd(
+                _oiDeltaCollateral,
+                _getMultiCollatDiamond().getCollateral(trade.collateralIndex).precisionDelta,
+                tradeInfo.collateralPriceUsd
+            )
+        );
 
-            if (_long) {
-                pairOi.oiLongUsd = _openInterestUsd < pairOi.oiLongUsd
-                    ? pairOi.oiLongUsd - _openInterestUsd
+        // 2. Remove OI if window where OI was added isn't outdated
+        if (notOutdated) {
+            IPriceImpact.PairOi storage window = _getStorage().windows[settings.windowsDuration][
+                trade.pairIndex
+            ][addWindowId];
+
+            // 2.1 Prevent removing trade OI that was already expired by capping delta at active OI
+            uint128 lastWindowOiUsd = getTradeLastWindowOiUsd(_trader, _index);
+            oiDeltaUsd = oiDeltaUsd > lastWindowOiUsd ? lastWindowOiUsd : oiDeltaUsd;
+
+            // 2.2 Remove delta from last OI delta for trade so it's up to date
+            tradePriceImpactInfo.lastWindowOiUsd = lastWindowOiUsd - oiDeltaUsd;
+
+            // 2.3 Remove OI from trade last oi updated window
+            if (trade.long) {
+                window.oiLongUsd = oiDeltaUsd < window.oiLongUsd
+                    ? window.oiLongUsd - oiDeltaUsd
                     : 0;
             } else {
-                pairOi.oiShortUsd = _openInterestUsd < pairOi.oiShortUsd
-                    ? pairOi.oiShortUsd - _openInterestUsd
+                window.oiShortUsd = oiDeltaUsd < window.oiShortUsd
+                    ? window.oiShortUsd - oiDeltaUsd
                     : 0;
             }
         }
 
         emit IPriceImpactUtils.PriceImpactOpenInterestRemoved(
             IPriceImpact.OiWindowUpdate(
+                _trader,
+                _index,
                 settings.windowsDuration,
-                _pairIndex,
+                trade.pairIndex,
                 addWindowId,
-                _long,
-                _openInterestUsd
+                trade.long,
+                oiDeltaUsd
             ),
             notOutdated
         );
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
+    function getTradeLastWindowOiUsd(
+        address _trader,
+        uint32 _index
+    ) internal view returns (uint128) {
+        uint128 lastWindowOiUsd = _getStorage()
+        .tradePriceImpactInfos[_trader][_index].lastWindowOiUsd;
+        ITradingStorage.Trade memory trade = _getMultiCollatDiamond().getTrade(_trader, _index);
+        return
+            lastWindowOiUsd > 0
+                ? lastWindowOiUsd
+                : uint128( // if lastWindowOiUsd = 0 for trade, it was opened before partials => pos size USD using tradeInfo.collateralPriceUsd
+                    TradingCommonUtils.convertCollateralToUsd(
+                        TradingCommonUtils.getPositionSizeCollateral(
+                            trade.collateralAmount,
+                            trade.leverage
+                        ),
+                        _getMultiCollatDiamond()
+                            .getCollateral(trade.collateralIndex)
+                            .precisionDelta,
+                        _getMultiCollatDiamond().getTradeInfo(_trader, _index).collateralPriceUsd
+                    )
+                );
     }
 
     /**
@@ -338,6 +437,13 @@ library PriceImpactUtils {
         assembly {
             s.slot := storageSlot
         }
+    }
+
+    /**
+     * @dev Returns current address as multi-collateral diamond interface to call other facets functions.
+     */
+    function _getMultiCollatDiamond() internal view returns (IJavMultiCollatDiamond) {
+        return IJavMultiCollatDiamond(address(this));
     }
 
     /**

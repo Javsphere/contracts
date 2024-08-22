@@ -55,29 +55,31 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
 
     /// @inheritdoc IPriceImpactUtils
     function addPriceImpactOpenInterest(
-        uint256 _openInterestUsd,
-        uint256 _pairIndex,
-        bool _long
+        address _trader,
+        uint32 _index,
+        uint256 _oiDeltaCollateral
     ) external virtual onlySelf {
-        PriceImpactUtils.addPriceImpactOpenInterest(uint128(_openInterestUsd), _pairIndex, _long);
+        PriceImpactUtils.addPriceImpactOpenInterest(_trader, _index, _oiDeltaCollateral);
     }
 
     /// @inheritdoc IPriceImpactUtils
     function removePriceImpactOpenInterest(
-        uint256 _openInterestUsd,
-        uint256 _pairIndex,
-        bool _long,
-        uint48 _addTs
+        address _trader,
+        uint32 _index,
+        uint256 _oiDeltaCollateral
     ) external virtual onlySelf {
-        PriceImpactUtils.removePriceImpactOpenInterest(
-            uint128(_openInterestUsd),
-            _pairIndex,
-            _long,
-            _addTs
-        );
+        PriceImpactUtils.removePriceImpactOpenInterest(_trader, _index, _oiDeltaCollateral);
     }
 
     // Getters
+
+    /// @inheritdoc IPriceImpactUtils
+    function getTradeLastWindowOiUsd(
+        address _trader,
+        uint32 _index
+    ) external view returns (uint128) {
+        return PriceImpactUtils.getTradeLastWindowOiUsd(_trader, _index);
+    }
 
     /// @inheritdoc IPriceImpactUtils
     function getPriceImpactOi(

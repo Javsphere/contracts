@@ -52,6 +52,14 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
         return PriceAggregatorUtils.getPrice(_pairIndex);
     }
 
+    /// @inheritdoc IPriceAggregatorUtils
+    function updatePrices(
+        bytes[][] calldata _priceUpdate,
+        address _user
+    ) external payable onlySelf {
+        PriceAggregatorUtils.updatePrices(_priceUpdate, _user);
+    }
+
     // Getters
 
     /// @inheritdoc IPriceAggregatorUtils

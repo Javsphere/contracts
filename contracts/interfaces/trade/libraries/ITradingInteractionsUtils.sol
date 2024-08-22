@@ -15,18 +15,21 @@ interface ITradingInteractionsUtils is ITradingInteractions {
      * @param _trade the trade to be opened
      * @param _maxSlippageP the maximum allowed slippage % when open the trade (1e3 precision)
      * @param _referrer the address of the referrer (can only be set once for a trader)
+     * @param _priceUpdate Array of price update data.
      */
     function openTrade(
         ITradingStorage.Trade memory _trade,
         uint16 _maxSlippageP,
-        address _referrer
-    ) external;
+        address _referrer,
+        bytes[][] calldata _priceUpdate
+    ) external payable;
 
     /**
      * @dev Closes an open trade (market order) for caller
      * @param _index the index of the trade of caller
+     * @param _priceUpdate Array of price update data.
      */
-    function closeTradeMarket(uint32 _index) external;
+    function closeTradeMarket(uint32 _index, bytes[][] calldata _priceUpdate) external payable;
 
     /**
      * @dev Updates an existing limit/stop order for caller
@@ -65,10 +68,55 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     function updateSl(uint32 _index, uint64 _newSl) external;
 
     /**
+     * @dev Update trade leverage
+     * @param _index index of trade
+     * @param _newLeverage new leverage (1e3)
+     * @param _priceUpdate Array of price update data.
+     */
+    function updateLeverage(
+        uint32 _index,
+        uint24 _newLeverage,
+        bytes[][] calldata _priceUpdate
+    ) external payable;
+
+    /**
+     * @dev Increase trade position size
+     * @param _index index of trade
+     * @param _collateralDelta collateral to add (collateral precision)
+     * @param _leverageDelta partial trade leverage (1e3)
+     * @param _expectedPrice expected price of execution (1e10 precision)
+     * @param _maxSlippageP max slippage % (1e3)
+     * @param _priceUpdate Array of price update data.
+     */
+    function increasePositionSize(
+        uint32 _index,
+        uint120 _collateralDelta,
+        uint24 _leverageDelta,
+        uint64 _expectedPrice,
+        uint16 _maxSlippageP,
+        bytes[][] calldata _priceUpdate
+    ) external payable;
+
+    /**
+     * @dev Decrease trade position size
+     * @param _index index of trade
+     * @param _collateralDelta collateral to remove (collateral precision)
+     * @param _leverageDelta leverage to reduce by (1e3)
+     * @param _priceUpdate Array of price update data.
+     */
+    function decreasePositionSize(
+        uint32 _index,
+        uint120 _collateralDelta,
+        uint24 _leverageDelta,
+        bytes[][] calldata _priceUpdate
+    ) external payable;
+
+    /**
      * @dev Initiates a new trigger order (for tp/sl/liq/limit/stop orders)
      * @param _packed the packed data of the trigger order (orderType, trader, index)
+     * @param _priceUpdate Array of price update data.
      */
-    function triggerOrder(uint256 _packed) external;
+    function triggerOrder(uint256 _packed, bytes[][] calldata _priceUpdate) external payable;
 
     /**
      * @dev Emitted when a market order is initiated
@@ -77,18 +125,6 @@ interface ITradingInteractionsUtils is ITradingInteractions {
      * @param open whether the market order is for opening or closing a trade
      */
     event MarketOrderInitiated(address indexed trader, uint16 indexed pairIndex, bool open);
-
-    /**
-     *
-     * @param trader address of the trader
-     * @param collateralIndex index of the collateral
-     * @param amountCollateral amount charged (collateral precision)
-     */
-    event TriggerFeeCharged(
-        address indexed trader,
-        uint8 indexed collateralIndex,
-        uint256 amountCollateral
-    );
 
     /**
      * @dev Emitted when a new limit/stop order is placed
@@ -137,6 +173,7 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     error NotWrappedNativeToken();
     error DelegateNotApproved();
     error PriceZero();
+    error AboveExposureLimits();
     error AbovePairMaxOi();
     error AboveGroupMaxOi();
     error CollateralNotActive();
@@ -155,4 +192,5 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     error NoTp();
     error NotYourOrder();
     error DelegatedActionNotAllowed();
+    error InsufficientCollateral();
 }

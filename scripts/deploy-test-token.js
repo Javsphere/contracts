@@ -1,5 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
-const {logDeploy} = require("./utils");
+const { logDeploy } = require("./utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -15,12 +15,11 @@ async function main() {
     // const contractAddress = await contract.getAddress();
     // console.log(`TestUSDT contract deployed to: ${contractAddress}`);
 
-
     const tokenFactory = await ethers.getContractFactory("TestToken");
     const token1 = await upgrades.deployProxy(tokenFactory, ["Test WBTC", "wBTC"], {
-            initializer: "initialize",
-            kind: "uups",
-        });
+        initializer: "initialize",
+        kind: "uups",
+    });
     await token1.waitForDeployment();
 
     logDeploy("tWBTC", await token1.getAddress());
@@ -40,7 +39,6 @@ async function main() {
     await token3.waitForDeployment();
 
     logDeploy("tUSDC", await token3.getAddress());
-
 }
 
 main()

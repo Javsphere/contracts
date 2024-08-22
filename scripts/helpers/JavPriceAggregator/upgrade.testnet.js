@@ -5,7 +5,9 @@ async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("contracts/helpers/JavPriceAggregator.sol:JavPriceAggregator");
+    const Contract = await ethers.getContractFactory(
+        "contracts/helpers/JavPriceAggregator.sol:JavPriceAggregator",
+    );
 
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",

@@ -5,14 +5,14 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import "../base/BaseUpgradable.sol";
 
-contract JavLPToken is ERC20BurnableUpgradeable, BaseUpgradable {
+contract LLPToken is ERC20BurnableUpgradeable, BaseUpgradable {
     address public borrowingProvider;
 
     /* ========== EVENTS ========== */
     event SetBorrowingProvider(address indexed _address);
 
     modifier onlyBorrowingProvider() {
-        require(msg.sender == borrowingProvider, "JavLPToken: only borrowing provider");
+        require(msg.sender == borrowingProvider, "LLPToken: only borrowing provider");
         _;
     }
 
@@ -22,7 +22,7 @@ contract JavLPToken is ERC20BurnableUpgradeable, BaseUpgradable {
     }
 
     function initialize() external initializer {
-        __ERC20_init("Javsphere LP", "JavLP");
+        __ERC20_init("LeverageX LP", "LLP");
         __Base_init();
     }
 

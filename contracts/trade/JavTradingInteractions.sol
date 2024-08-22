@@ -25,14 +25,15 @@ contract JavTradingInteractions is JavAddressStore, ITradingInteractionsUtils {
     function openTrade(
         ITradingStorage.Trade memory _trade,
         uint16 _maxSlippageP,
-        address _referrer
-    ) external {
-        TradingInteractionsUtils.openTrade(_trade, _maxSlippageP, _referrer);
+        address _referrer,
+        bytes[][] calldata _priceUpdate
+    ) external payable {
+        TradingInteractionsUtils.openTrade(_trade, _maxSlippageP, _referrer, _priceUpdate);
     }
 
     /// @inheritdoc ITradingInteractionsUtils
-    function closeTradeMarket(uint32 _index) external {
-        TradingInteractionsUtils.closeTradeMarket(_index);
+    function closeTradeMarket(uint32 _index, bytes[][] calldata _priceUpdate) external payable {
+        TradingInteractionsUtils.closeTradeMarket(_index, _priceUpdate);
     }
 
     /// @inheritdoc ITradingInteractionsUtils
@@ -62,7 +63,50 @@ contract JavTradingInteractions is JavAddressStore, ITradingInteractionsUtils {
     }
 
     /// @inheritdoc ITradingInteractionsUtils
-    function triggerOrder(uint256 _packed) external {
-        TradingInteractionsUtils.triggerOrder(_packed);
+    function updateLeverage(
+        uint32 _index,
+        uint24 _newLeverage,
+        bytes[][] calldata _priceUpdate
+    ) external payable {
+        TradingInteractionsUtils.updateLeverage(_index, _newLeverage, _priceUpdate);
+    }
+
+    /// @inheritdoc ITradingInteractionsUtils
+    function increasePositionSize(
+        uint32 _index,
+        uint120 _collateralDelta,
+        uint24 _leverageDelta,
+        uint64 _expectedPrice,
+        uint16 _maxSlippageP,
+        bytes[][] calldata _priceUpdate
+    ) external payable {
+        TradingInteractionsUtils.increasePositionSize(
+            _index,
+            _collateralDelta,
+            _leverageDelta,
+            _expectedPrice,
+            _maxSlippageP,
+            _priceUpdate
+        );
+    }
+
+    /// @inheritdoc ITradingInteractionsUtils
+    function decreasePositionSize(
+        uint32 _index,
+        uint120 _collateralDelta,
+        uint24 _leverageDelta,
+        bytes[][] calldata _priceUpdate
+    ) external payable {
+        TradingInteractionsUtils.decreasePositionSize(
+            _index,
+            _collateralDelta,
+            _leverageDelta,
+            _priceUpdate
+        );
+    }
+
+    /// @inheritdoc ITradingInteractionsUtils
+    function triggerOrder(uint256 _packed, bytes[][] calldata _priceUpdate) external payable {
+        TradingInteractionsUtils.triggerOrder(_packed, _priceUpdate);
     }
 }

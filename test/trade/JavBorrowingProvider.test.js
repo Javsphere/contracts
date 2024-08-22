@@ -36,7 +36,7 @@ describe("JavBorrowingProvider contract", () => {
         [owner, ...addrs] = await ethers.getSigners();
         const javPriceAggregator = await upgrades.deployProxy(
             javPriceAggregatorFactory,
-            [[owner.address]],
+            [1, [owner.address]],
             {
                 initializer: "initialize",
             },

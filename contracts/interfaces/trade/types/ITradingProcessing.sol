@@ -19,6 +19,7 @@ interface ITradingProcessing {
         MAX_LEVERAGE,
         NO_TRADE,
         NOT_HIT
+
     }
 
     // Useful to avoid stack too deep errors
@@ -34,6 +35,9 @@ interface ITradingProcessing {
         uint128 collateralPrecisionDelta;
         uint256 collateralPriceUsd;
         bool exactExecution;
+        uint256 closingFeeCollateral;
+        uint256 triggerFeeCollateral;
+        uint256 collateralLeftInStorage;
     }
 
     struct TradingProcessingStorage {

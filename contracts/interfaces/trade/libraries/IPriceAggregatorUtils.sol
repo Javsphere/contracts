@@ -38,6 +38,13 @@ interface IPriceAggregatorUtils is IPriceAggregator {
     function getPrice(uint16 _pairIndex) external returns (uint256);
 
     /**
+     * @dev Function to update prices
+     * @param _priceUpdate Array of price update data.
+     * @param _user user address
+     */
+    function updatePrices(bytes[][] calldata _priceUpdate, address _user) external payable;
+
+    /**
      * @dev Returns collateral/USD price
      * @param _collateralIndex index of collateral
      */

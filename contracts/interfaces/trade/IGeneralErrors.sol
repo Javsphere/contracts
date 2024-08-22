@@ -26,4 +26,8 @@ interface IGeneralErrors {
     error NotAuthorized();
     error WrongTradeType();
     error GeneralPaused();
+    error LiqReached();
+    error SlReached();
+    error TpReached();
+    error Slippage();
 }

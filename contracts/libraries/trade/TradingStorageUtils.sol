@@ -7,6 +7,8 @@ import "../../interfaces/trade/IJavMultiCollatDiamond.sol";
 import "./StorageUtils.sol";
 import "./AddressStoreUtils.sol";
 import "./CollateralUtils.sol";
+import "./TradingCommonUtils.sol";
+import "./ConstantsUtils.sol";
 
 /**
  * @custom:version 8
@@ -174,6 +176,50 @@ library TradingStorageUtils {
         t.collateralAmount = _collateralAmount;
 
         emit ITradingStorageUtils.TradeCollateralUpdated(_tradeId, _collateralAmount);
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function updateTradePosition(
+        ITradingStorage.Id memory _tradeId,
+        uint120 _collateralAmount,
+        uint24 _leverage,
+        uint64 _openPrice
+    ) internal {
+        ITradingStorage.TradingStorage storage s = _getStorage();
+        ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
+        ITradingStorage.TradeInfo storage i = s.tradeInfos[_tradeId.user][_tradeId.index];
+
+        if (!t.isOpen) revert IGeneralErrors.DoesntExist();
+        if (t.tradeType != ITradingStorage.TradeType.TRADE) revert IGeneralErrors.WrongTradeType();
+        if (_collateralAmount * _leverage == 0) revert ITradingStorageUtils.TradePositionSizeZero();
+        if (_openPrice == 0) revert ITradingStorageUtils.TradeOpenPriceZero();
+
+        TradingCommonUtils.handleOiDelta(
+            t,
+            TradingCommonUtils.getPositionSizeCollateral(_collateralAmount, _leverage)
+        );
+
+        t.collateralAmount = _collateralAmount;
+        t.leverage = _leverage;
+        t.openPrice = _openPrice;
+        t.tp = _limitTpDistance(t.openPrice, t.leverage, t.tp, t.long);
+        t.sl = _limitSlDistance(t.openPrice, t.leverage, t.sl, t.long);
+
+        uint32 blockNumber = uint32(block.number);
+        i.createdBlock = blockNumber;
+        i.tpLastUpdatedBlock = blockNumber;
+        i.slLastUpdatedBlock = blockNumber;
+
+        emit ITradingStorageUtils.TradePositionUpdated(
+            _tradeId,
+            _collateralAmount,
+            t.leverage,
+            t.openPrice,
+            t.tp,
+            t.sl
+        );
     }
 
     /**
@@ -534,6 +580,8 @@ library TradingStorageUtils {
     ) internal pure returns (int256 p) {
         int256 pricePrecision = int256(PRICE_PRECISION);
         int256 maxPnlP = int256(MAX_PNL_P) * pricePrecision;
+        int256 minPnlP = -100 * int256(PRICE_PRECISION);
+
         int256 openPrice = int256(uint256(_openPrice));
         int256 currentPrice = int256(uint256(_currentPrice));
         int256 leverage = int256(uint256(_leverage));
@@ -547,7 +595,7 @@ library TradingStorageUtils {
                 1e3
             : int256(0);
 
-        p = p > maxPnlP ? maxPnlP : p;
+        p = p > maxPnlP ? maxPnlP : p < minPnlP ? minPnlP : p;
     }
 
     /**

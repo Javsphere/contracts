@@ -1,5 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
-const {logDeploy} = require("../../utils");
+const { logDeploy } = require("../../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -14,7 +14,6 @@ async function main() {
         {
             initializer: "initialize",
             kind: "uups",
-
         },
     );
     await contract.waitForDeployment();

@@ -59,6 +59,20 @@ interface ITradingStorageUtils is ITradingStorage {
     function updateTradeCollateralAmount(Id memory _tradeId, uint120 _collateralAmount) external;
 
     /**
+     * @dev Updates an open trade collateral
+     * @param _tradeId id of updated trade
+     * @param _collateralAmount new collateral amount value (collateral precision)
+     * @param _leverage new leverage value
+     * @param _openPrice new open price value
+     */
+    function updateTradePosition(
+        Id memory _tradeId,
+        uint120 _collateralAmount,
+        uint24 _leverage,
+        uint64 _openPrice
+    ) external;
+
+    /**
      * @dev Updates an open order details (limit/stop)
      * @param _tradeId id of updated trade
      * @param _openPrice new open price (1e10)
@@ -268,6 +282,22 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param collateralAmount new collateral value (collateral precision)
      */
     event TradeCollateralUpdated(Id tradeId, uint120 collateralAmount);
+
+    /**
+     * @dev Emitted when an open trade collateral is updated
+     * @param tradeId id of the updated trade
+     * @param collateralAmount new collateral value (collateral precision)
+     * @param leverage new leverage value if present
+     * @param openPrice new open price value if present
+     */
+    event TradePositionUpdated(
+        Id tradeId,
+        uint120 collateralAmount,
+        uint24 leverage,
+        uint64 openPrice,
+        uint64 newTp,
+        uint64 newSl
+    );
 
     /**
      * @dev Emitted when an existing trade/limit order/stop order is updated
