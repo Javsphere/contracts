@@ -118,6 +118,22 @@ library PriceAggregatorUtils {
     /**
      * @dev Check IPriceAggregatorUtils interface for documentation
      */
+    function getCollateralFeed(uint8 _collateralIndex) internal view returns (bytes32) {
+        IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
+        return s.collateralUsdPriceFeed[_collateralIndex];
+    }
+
+    /**
+     * @dev Check IPriceAggregatorUtils interface for documentation
+     */
+    function getRewardsTokenUsdFeed() internal view returns (bytes32) {
+        IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
+        return s.rewardsTokenUsdFeed;
+    }
+
+    /**
+     * @dev Check IPriceAggregatorUtils interface for documentation
+     */
     function getUsdNormalizedValue(
         uint8 _collateralIndex,
         uint256 _collateralValue

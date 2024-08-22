@@ -51,6 +51,17 @@ interface IPriceAggregatorUtils is IPriceAggregator {
     function getCollateralPriceUsd(uint8 _collateralIndex) external view returns (uint256);
 
     /**
+     * @dev Returns collateral price feed
+     * @param _collateralIndex index of collateral
+     */
+    function getCollateralFeed(uint8 _collateralIndex) external view returns (bytes32);
+
+    /**
+     * @dev Returns rewards token price feed
+     */
+    function getRewardsTokenUsdFeed() external view returns (bytes32);
+
+    /**
      * @dev Returns USD normalized value from collateral value
      * @param _collateralIndex index of collateral
      * @param _collateralValue collateral value (collateral precision)
