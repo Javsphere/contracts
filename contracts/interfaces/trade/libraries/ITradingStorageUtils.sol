@@ -45,7 +45,13 @@ interface ITradingStorageUtils is ITradingStorage {
      * @dev Update borrowing provider address
      * @param _borrowingProvider borrowing provider address
      */
-    function updateBorrowingProvider(address _borrowingProvider) external ;
+    function updateBorrowingProvider(address _borrowingProvider) external;
+
+    /**
+     * @dev Update collateral approve
+     * @param _collateralIndex index of collateral
+     */
+    function updateCollateralApprove(uint8 _collateralIndex) external;
 
     /**
      * @dev Stores a new trade (trade/limit/stop)

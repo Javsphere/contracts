@@ -1,6 +1,6 @@
 const { ethers, upgrades } = require("hardhat");
 const ContractName = "JavBorrowingProvider";
-const PROXY = "0xb2755fCAC2de208b20ec482317de0dB2A89EcaFd";
+const PROXY = "0x5EeCca8207cfe5fCe52F4Fb9716FB7748D6228f4";
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -11,9 +11,9 @@ async function main() {
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",
         redeployImplementation: "always",
-        txOverrides: {
-            gasLimit: ethers.parseUnits("0.03", "gwei"),
-        },
+        // txOverrides: {
+        //     gasLimit: ethers.parseUnits("0.03", "gwei"),
+        // },
     });
     await impl.waitForDeployment();
 

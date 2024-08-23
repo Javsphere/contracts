@@ -124,6 +124,15 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
+    function updateCollateralApprove(uint8 _collateralIndex) internal {
+        ITradingStorage.TradingStorage storage s = _getStorage();
+        IERC20 collateral = IERC20(s.collaterals[_collateralIndex].collateral);
+        collateral.approve(_getMultiCollatDiamond().getBorrowingProvider(), type(uint256).max);
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
     function storeTrade(
         ITradingStorage.Trade memory _trade,
         ITradingStorage.TradeInfo memory _tradeInfo
