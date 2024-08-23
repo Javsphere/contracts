@@ -271,7 +271,7 @@ interface ITradingStorageUtils is ITradingStorage {
 
     /**
      * @dev Emitted when an existing borrowing provider is updated
-     * @param _borrowingProvider borrowing provider address
+     * @param borrowingProvider borrowing provider address
      */
     event BorrowingProviderUpdated(address indexed borrowingProvider);
 
