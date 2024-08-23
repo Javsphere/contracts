@@ -42,6 +42,12 @@ interface ITradingStorageUtils is ITradingStorage {
     function toggleCollateralActiveState(uint8 _collateralIndex) external;
 
     /**
+     * @dev Update borrowing provider address
+     * @param _borrowingProvider borrowing provider address
+     */
+    function updateBorrowingProvider(address _borrowingProvider) external ;
+
+    /**
      * @dev Stores a new trade (trade/limit/stop)
      * @param _trade trade to be stored
      * @param _tradeInfo trade info to be stored
@@ -262,6 +268,12 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param isActive the new active state
      */
     event CollateralUpdated(uint8 indexed index, bool isActive);
+
+    /**
+     * @dev Emitted when an existing borrowing provider is updated
+     * @param _borrowingProvider borrowing provider address
+     */
+    event BorrowingProviderUpdated(address indexed borrowingProvider);
 
     /**
      * @dev Emitted when an existing supported collateral is disabled (can still close trades but not open new ones)

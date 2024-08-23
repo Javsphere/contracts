@@ -114,6 +114,16 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
+    function updateBorrowingProvider(address _borrowingProvider) internal {
+        ITradingStorage.TradingStorage storage s = _getStorage();
+        s.borrowingProvider = _borrowingProvider;
+
+        emit ITradingStorageUtils.BorrowingProviderUpdated(_borrowingProvider);
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
     function storeTrade(
         ITradingStorage.Trade memory _trade,
         ITradingStorage.TradeInfo memory _tradeInfo

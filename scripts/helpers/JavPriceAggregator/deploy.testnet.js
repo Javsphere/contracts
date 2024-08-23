@@ -11,7 +11,8 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            ["0x8D50eE492c9c3a8174aA39c377839944dc546378"], //_allowedAddresses_
+            1, //_priceUpdateFee
+            ["0x7c9c28a342bf4CB8d34C33E93C3E4b71ADA2b9a2"], //_allowedAddresses_
         ],
         {
             initializer: "initialize",

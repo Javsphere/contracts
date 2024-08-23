@@ -54,8 +54,8 @@ async function main() {
     const sepolia_baseArgs = [
         "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729", //_priceAggregator,
         "0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4", // _swapRouter,
-        "0x09542E14956b269E2534Da26AD60586980ef5A27", // _jlpToken,
-        "0x8835117E5911129286723c63F42899E99107E78e", // _pnlHandler,
+        "0x3A08602D2f407529299199107547624019fb4e44", // _llpToken,
+        "0x1c31729b02D9151a61BB1f92f3dae90d99F24257", // _pnlHandler,
         5, // _buyFee,
         5, // _sellFee,
         [

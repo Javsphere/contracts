@@ -5,14 +5,14 @@ async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("JavLPToken");
+    const Contract = await ethers.getContractFactory("LLPToken");
     const contract = await upgrades.deployProxy(Contract, [], {
         initializer: "initialize",
         kind: "uups",
     });
     await contract.waitForDeployment();
 
-    logDeploy("JavLPToken", await contract.getAddress());
+    logDeploy("LLPToken", await contract.getAddress());
 }
 
 main()

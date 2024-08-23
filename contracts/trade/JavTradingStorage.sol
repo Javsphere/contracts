@@ -53,6 +53,11 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         TradingStorageUtils.toggleCollateralActiveState(_collateralIndex);
     }
 
+    /// @inheritdoc ITradingStorageUtils
+    function updateBorrowingProvider(address _borrowingProvider) external onlyRole(Role.GOV) {
+        TradingStorageUtils.updateBorrowingProvider(_borrowingProvider);
+    }
+
     // Interactions
 
     /// @inheritdoc ITradingStorageUtils
