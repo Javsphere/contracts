@@ -386,7 +386,7 @@ library BorrowingFeesUtils {
         return
             (groupOi.max == 0) ||
             ((_long ? groupOi.long : groupOi.short) +
-                (_positionSizeCollateral * P_1) /
+                (_positionSizeCollateral * ConstantsUtils.P_10) /
                 _getMultiCollatDiamond().getCollateral(_collateralIndex).precision <=
                 groupOi.max);
     }
@@ -527,7 +527,7 @@ library BorrowingFeesUtils {
     ) internal view returns (uint256) {
         return
             (uint256(_getMultiCollatDiamond().getCollateral(_collateralIndex).precision) *
-                _getStorage().pairOis[_collateralIndex][_pairIndex].max) / P_1;
+                _getStorage().pairOis[_collateralIndex][_pairIndex].max) / ConstantsUtils.P_10;
     }
 
     /**

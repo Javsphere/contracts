@@ -125,6 +125,12 @@ interface IPairsStorageUtils is IPairsStorage {
     function pairMinPositionSizeUsd(uint256 _pairIndex) external view returns (uint256);
 
     /**
+     * @dev Returns a pair's minimum trading fee in USD (1e18 precision)
+     * @param _pairIndex index of pair
+     */
+    function pairMinFeeUsd(uint256 _pairIndex) external view returns (uint256);
+
+    /**
      * @dev Returns a group details
      * @param _index index of group
      */

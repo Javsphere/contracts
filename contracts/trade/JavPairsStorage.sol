@@ -123,6 +123,11 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     }
 
     /// @inheritdoc IPairsStorageUtils
+    function pairMinFeeUsd(uint256 _pairIndex) external view returns (uint256) {
+        return PairsStorageUtils.pairMinFeeUsd(_pairIndex);
+    }
+
+    /// @inheritdoc IPairsStorageUtils
     function groups(uint256 _index) external view returns (Group memory) {
         return PairsStorageUtils.groups(_index);
     }

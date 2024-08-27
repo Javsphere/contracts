@@ -351,26 +351,24 @@ library TradingInteractionsUtils {
         );
 
         if (
-            _getMultiCollatDiamond().getPairOiCollateral(
-                _trade.collateralIndex,
-                _trade.pairIndex,
-                _trade.long
-            ) +
-                positionSizeCollateral >
-            _getMultiCollatDiamond().getPairMaxOiCollateral(
-                _trade.collateralIndex,
-                _trade.pairIndex
-            )
-        ) revert ITradingInteractionsUtils.AbovePairMaxOi();
-
-        if (
-            !_getMultiCollatDiamond().withinMaxBorrowingGroupOi(
+            !TradingCommonUtils.isWithinExposureLimits(
                 _trade.collateralIndex,
                 _trade.pairIndex,
                 _trade.long,
                 positionSizeCollateral
             )
-        ) revert ITradingInteractionsUtils.AboveGroupMaxOi();
+        ) revert ITradingInteractionsUtils.AboveExposureLimits();
+
+        // Trade collateral usd value needs to be >= 5x min trade fee usd (collateral left after trade opened >= 80%)
+        if (
+            (positionSizeUsd * 1e3) / _trade.leverage <
+            5 * _getMultiCollatDiamond().pairMinFeeUsd(_trade.pairIndex)
+        ) revert ITradingInteractionsUtils.InsufficientCollateral();
+
+        if (
+            _trade.leverage < _getMultiCollatDiamond().pairMinLeverage(_trade.pairIndex) * 1e3 ||
+            _trade.leverage > _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) * 1e3
+        ) revert ITradingInteractionsUtils.WrongLeverage();
 
         if (positionSizeUsd < _getMultiCollatDiamond().pairMinPositionSizeUsd(_trade.pairIndex))
             revert ITradingInteractionsUtils.BelowMinPositionSizeUsd();

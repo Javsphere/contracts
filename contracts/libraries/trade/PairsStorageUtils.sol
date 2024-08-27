@@ -7,6 +7,7 @@ import "../../interfaces/trade/libraries/IPairsStorageUtils.sol";
 import "../../interfaces/trade/IGeneralErrors.sol";
 
 import "./StorageUtils.sol";
+import "./ConstantsUtils.sol";
 
 /**
  * @custom:version 8
@@ -180,6 +181,17 @@ library PairsStorageUtils {
      */
     function pairMinPositionSizeUsd(uint256 _pairIndex) internal view returns (uint256) {
         return fees(pairs(_pairIndex).feeIndex).minPositionSizeUsd;
+    }
+
+    /**
+     * @dev Check IPairsStorageUtils interface for documentation
+     */
+    function pairMinFeeUsd(uint256 _pairIndex) internal view returns (uint256) {
+        IPairsStorage.Fee memory f = fees(pairs(_pairIndex).feeIndex);
+        return
+            (f.minPositionSizeUsd * (f.openFeeP * 2 + f.triggerOrderFeeP)) /
+            ConstantsUtils.P_10 /
+            100;
     }
 
     /**
