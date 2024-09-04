@@ -237,42 +237,20 @@ library TradingInteractionsUtils {
         ITradingStorage.Trade memory t = _getMultiCollatDiamond().getTrade(_trader, _index);
         if (!t.isOpen) revert ITradingInteractionsUtils.NoTrade();
 
-        if (orderType == ITradingStorage.PendingOrderType.LIQ_CLOSE && t.sl > 0) {
-            uint256 liqPrice = _getMultiCollatDiamond().getTradeLiquidationPrice(
-                IBorrowingFees.LiqPriceInput(
-                    t.collateralIndex,
-                    t.user,
-                    t.pairIndex,
-                    t.index,
-                    t.openPrice,
-                    t.long,
-                    t.collateralAmount,
-                    t.leverage,
-                    true
-                )
-            );
+        address sender = msg.sender;
 
-            // If liq price not closer than SL, turn order into a SL order
-            if ((t.long && liqPrice <= t.sl) || (!t.long && liqPrice >= t.sl)) {
-                orderType = ITradingStorage.PendingOrderType.SL_CLOSE;
-            }
-        }
-
-        uint256 positionSizeCollateral = _getPositionSizeCollateral(t.collateralAmount, t.leverage);
+        uint256 positionSizeCollateral = TradingCommonUtils.getPositionSizeCollateral(
+            t.collateralAmount,
+            t.leverage
+        );
 
         if (isOpenLimit) {
-            uint256 leveragedPosUsd = _getMultiCollatDiamond().getUsdNormalizedValue(
-                t.collateralIndex,
-                positionSizeCollateral
-            );
-            (uint256 priceImpactP, ) = _getMultiCollatDiamond().getTradePriceImpact(
-                0,
-                t.pairIndex,
-                t.long,
-                leveragedPosUsd
+            (uint256 priceImpactP, ) = TradingCommonUtils.getTradeOpeningPriceImpact(
+                ITradingCommonUtils.TradePriceImpactInput(t, 0, 0, positionSizeCollateral),
+                _getMultiCollatDiamond().getCurrentContractsVersion()
             );
 
-            if ((priceImpactP * t.leverage) / 1e3 > MAX_OPEN_NEGATIVE_PNL_P)
+            if ((priceImpactP * t.leverage) / 1e3 > ConstantsUtils.MAX_OPEN_NEGATIVE_PNL_P)
                 revert ITradingInteractionsUtils.PriceImpactTooHigh();
         }
 
@@ -280,8 +258,7 @@ library TradingInteractionsUtils {
         pendingOrder.trade.user = t.user;
         pendingOrder.trade.index = t.index;
         pendingOrder.trade.pairIndex = t.pairIndex;
-        pendingOrder.user = msg.sender;
-        pendingOrder.orderType = orderType;
+        pendingOrder.user = sender;
         pendingOrder.isOpen = t.isOpen;
         pendingOrder.price = uint64(_getMultiCollatDiamond().getPrice(t.pairIndex));
 
