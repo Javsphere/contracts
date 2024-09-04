@@ -16,10 +16,6 @@ import "./ConstantsUtils.sol";
  */
 
 library TradingStorageUtils {
-    uint256 private constant PRICE_PRECISION = 1e10; // 10 decimals
-    uint256 private constant MAX_SL_P = 75; // -75% pnl
-    uint256 private constant MAX_PNL_P = 900; // 900% pnl (10x)
-
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */

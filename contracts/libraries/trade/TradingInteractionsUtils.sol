@@ -324,7 +324,7 @@ library TradingInteractionsUtils {
     }
 
     /**
-     * @dev Private function for openTrade
+     * @dev Internal function for openTrade and openTradeNative
      * @param _trade trade data
      * @param _maxSlippageP max slippage percentage (1e3 precision)
      * @param _referrer referrer address
@@ -336,9 +336,11 @@ library TradingInteractionsUtils {
         address _referrer,
         bool _isNative
     ) internal {
-        _trade.user = msg.sender;
+        address sender = msg.sender;
+        _trade.user = sender;
+        _trade.__placeholder = 0;
 
-        uint256 positionSizeCollateral = _getPositionSizeCollateral(
+        uint256 positionSizeCollateral = TradingCommonUtils.getPositionSizeCollateral(
             _trade.collateralAmount,
             _trade.leverage
         );
@@ -367,28 +369,18 @@ library TradingInteractionsUtils {
             _trade.leverage > _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) * 1e3
         ) revert ITradingInteractionsUtils.WrongLeverage();
 
-        if (positionSizeUsd < _getMultiCollatDiamond().pairMinPositionSizeUsd(_trade.pairIndex))
-            revert ITradingInteractionsUtils.BelowMinPositionSizeUsd();
-
-        if (
-            _trade.leverage < _getMultiCollatDiamond().pairMinLeverage(_trade.pairIndex) * 1e3 ||
-            _trade.leverage > _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) * 1e3
-        ) revert ITradingInteractionsUtils.WrongLeverage();
-
-        (uint256 priceImpactP, ) = _getMultiCollatDiamond().getTradePriceImpact(
-            0,
-            _trade.pairIndex,
-            _trade.long,
-            positionSizeUsd
+        (uint256 priceImpactP, ) = TradingCommonUtils.getTradeOpeningPriceImpact(
+            ITradingCommonUtils.TradePriceImpactInput(_trade, 0, 0, positionSizeCollateral),
+            _getMultiCollatDiamond().getCurrentContractsVersion()
         );
 
-        if ((priceImpactP * _trade.leverage) / 1e3 > MAX_OPEN_NEGATIVE_PNL_P)
+        if ((priceImpactP * _trade.leverage) / 1e3 > ConstantsUtils.MAX_OPEN_NEGATIVE_PNL_P)
             revert ITradingInteractionsUtils.PriceImpactTooHigh();
 
         if (!_isNative)
-            _receiveCollateralFromTrader(
+            TradingCommonUtils.transferCollateralFrom(
                 _trade.collateralIndex,
-                msg.sender,
+                sender,
                 _trade.collateralAmount
             );
 
@@ -398,16 +390,11 @@ library TradingInteractionsUtils {
 
             _trade = _getMultiCollatDiamond().storeTrade(_trade, tradeInfo);
 
-            emit ITradingInteractionsUtils.OpenOrderPlaced(
-                msg.sender,
-                _trade.pairIndex,
-                _trade.index
-            );
+            emit ITradingInteractionsUtils.OpenOrderPlaced(sender, _trade.pairIndex, _trade.index);
         } else {
-            if (_maxSlippageP == 0) revert ITradingStorageUtils.MaxSlippageZero();
             ITradingStorage.PendingOrder memory pendingOrder;
             pendingOrder.trade = _trade;
-            pendingOrder.user = msg.sender;
+            pendingOrder.user = sender;
             pendingOrder.orderType = ITradingStorage.PendingOrderType.MARKET_OPEN;
             pendingOrder.maxSlippageP = _maxSlippageP;
             pendingOrder.price = uint64(_getMultiCollatDiamond().getPrice(_trade.pairIndex));
@@ -418,7 +405,7 @@ library TradingInteractionsUtils {
         }
 
         if (_referrer != address(0)) {
-            _getMultiCollatDiamond().registerPotentialReferrer(msg.sender, _referrer);
+            _getMultiCollatDiamond().registerPotentialReferrer(sender, _referrer);
         }
     }
 
