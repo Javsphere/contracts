@@ -119,6 +119,66 @@ library PriceImpactUtils {
         }
     }
 
+    function setProtectionCloseFactors(
+        uint16[] calldata _pairIndices,
+        uint40[] calldata _protectionCloseFactors
+    ) internal {
+        if (_pairIndices.length == 0 || _protectionCloseFactors.length != _pairIndices.length)
+            revert IGeneralErrors.WrongLength();
+
+        IPriceImpact.PriceImpactStorage storage s = _getStorage();
+
+        for (uint256 i = 0; i < _protectionCloseFactors.length; ++i) {
+            if (_protectionCloseFactors[i] < ConstantsUtils.P_10) revert IGeneralErrors.BelowMin();
+
+            s.pairFactors[_pairIndices[i]].protectionCloseFactor = _protectionCloseFactors[i];
+
+            emit IPriceImpactUtils.ProtectionCloseFactorUpdated(
+                _pairIndices[i],
+                _protectionCloseFactors[i]
+            );
+        }
+    }
+
+    function setProtectionCloseFactorBlocks(
+        uint16[] calldata _pairIndices,
+        uint32[] calldata _protectionCloseFactorBlocks
+    ) internal {
+        if (_pairIndices.length == 0 || _protectionCloseFactorBlocks.length != _pairIndices.length)
+            revert IGeneralErrors.WrongLength();
+
+        IPriceImpact.PriceImpactStorage storage s = _getStorage();
+
+        for (uint256 i = 0; i < _protectionCloseFactorBlocks.length; ++i) {
+            s
+                .pairFactors[_pairIndices[i]]
+                .protectionCloseFactorBlocks = _protectionCloseFactorBlocks[i];
+
+            emit IPriceImpactUtils.ProtectionCloseFactorBlocksUpdated(
+                _pairIndices[i],
+                _protectionCloseFactorBlocks[i]
+            );
+        }
+    }
+
+    function setCumulativeFactors(
+        uint16[] calldata _pairIndices,
+        uint40[] calldata _cumulativeFactors
+    ) internal {
+        if (_pairIndices.length == 0 || _cumulativeFactors.length != _pairIndices.length)
+            revert IGeneralErrors.WrongLength();
+
+        IPriceImpact.PriceImpactStorage storage s = _getStorage();
+
+        for (uint256 i = 0; i < _cumulativeFactors.length; ++i) {
+            if (_cumulativeFactors[i] == 0) revert IGeneralErrors.ZeroValue();
+
+            s.pairFactors[_pairIndices[i]].cumulativeFactor = _cumulativeFactors[i];
+
+            emit IPriceImpactUtils.CumulativeFactorUpdated(_pairIndices[i], _cumulativeFactors[i]);
+        }
+    }
+
     /**
      * @dev Check IPriceImpactUtils interface for documentation
      */

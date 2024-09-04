@@ -51,6 +51,30 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
         PriceImpactUtils.setPairDepths(_indices, _depthsAboveUsd, _depthsBelowUsd);
     }
 
+    /// @inheritdoc IPriceImpactUtils
+    function setProtectionCloseFactors(
+        uint16[] calldata _pairIndices,
+        uint40[] calldata _protectionCloseFactors
+    ) external onlyRole(Role.GOV) {
+        PriceImpactUtils.setProtectionCloseFactors(_pairIndices, _protectionCloseFactors);
+    }
+
+    /// @inheritdoc IPriceImpactUtils
+    function setProtectionCloseFactorBlocks(
+        uint16[] calldata _pairIndices,
+        uint32[] calldata _protectionCloseFactorBlocks
+    ) external onlyRole(Role.GOV) {
+        PriceImpactUtils.setProtectionCloseFactorBlocks(_pairIndices, _protectionCloseFactorBlocks);
+    }
+
+    /// @inheritdoc IPriceImpactUtils
+    function setCumulativeFactors(
+        uint16[] calldata _pairIndices,
+        uint40[] calldata _cumulativeFactors
+    ) external onlyRole(Role.GOV) {
+        PriceImpactUtils.setCumulativeFactors(_pairIndices, _cumulativeFactors);
+    }
+
     // Interactions
 
     /// @inheritdoc IPriceImpactUtils

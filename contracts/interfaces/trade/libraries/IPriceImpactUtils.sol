@@ -42,6 +42,36 @@ interface IPriceImpactUtils is IPriceImpact {
     ) external;
 
     /**
+     * @dev Sets protection close factors for pairs
+     * @param _pairIndices pair indices to update
+     * @param _protectionCloseFactors new protection close factors (1e10)
+     */
+    function setProtectionCloseFactors(
+        uint16[] calldata _pairIndices,
+        uint40[] calldata _protectionCloseFactors
+    ) external;
+
+    /**
+     * @dev Sets protection close factor blocks duration for pairs
+     * @param _pairIndices pair indices to update
+     * @param _protectionCloseFactorBlocks new protection close factor blocks
+     */
+    function setProtectionCloseFactorBlocks(
+        uint16[] calldata _pairIndices,
+        uint32[] calldata _protectionCloseFactorBlocks
+    ) external;
+
+    /**
+     * @dev Sets cumulative factors for pairs
+     * @param _pairIndices pair indices to update
+     * @param _cumulativeFactors new cumulative factors (1e10)
+     */
+    function setCumulativeFactors(
+        uint16[] calldata _pairIndices,
+        uint40[] calldata _cumulativeFactors
+    ) external;
+
+    /**
      * @dev Adds open interest to current window
      * @param _trader trader address
      * @param _index trade index
@@ -154,6 +184,30 @@ interface IPriceImpactUtils is IPriceImpact {
      * @param windowsDuration new duration of each window (seconds)
      */
     event PriceImpactWindowsDurationUpdated(uint48 indexed windowsDuration);
+
+    /**
+     * @dev Triggered when a pair's protection close factor is updated
+     * @param pairIndex index of the pair
+     * @param protectionCloseFactor new protection close factor (1e10)
+     */
+    event ProtectionCloseFactorUpdated(uint256 indexed pairIndex, uint40 protectionCloseFactor);
+
+    /**
+     * @dev Triggered when a pair's protection close factor duration is updated
+     * @param pairIndex index of the pair
+     * @param protectionCloseFactorBlocks new protection close factor blocks
+     */
+    event ProtectionCloseFactorBlocksUpdated(
+        uint256 indexed pairIndex,
+        uint32 protectionCloseFactorBlocks
+    );
+
+    /**
+     * @dev Triggered when a pair's cumulative factor is updated
+     * @param pairIndex index of the pair
+     * @param cumulativeFactor new cumulative factor (1e10)
+     */
+    event CumulativeFactorUpdated(uint256 indexed pairIndex, uint40 cumulativeFactor);
 
     /**
      * @dev Triggered when OI is added to a window.
