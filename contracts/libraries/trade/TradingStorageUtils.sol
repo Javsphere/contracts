@@ -178,6 +178,22 @@ library TradingStorageUtils {
         return _trade;
     }
 
+    function updateTradeMaxClosingSlippageP(
+        ITradingStorage.Id memory _tradeId,
+        uint16 _maxClosingSlippageP
+    ) external {
+        ITradingStorage.TradingStorage storage s = _getStorage();
+        ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
+
+        if (!t.isOpen) revert IGeneralErrors.DoesntExist();
+        if (t.tradeType != ITradingStorage.TradeType.TRADE) revert IGeneralErrors.WrongTradeType();
+        if (_maxClosingSlippageP == 0) revert ITradingStorageUtils.MaxSlippageZero();
+
+        s.tradeInfos[_tradeId.user][_tradeId.index].maxSlippageP = _maxClosingSlippageP;
+
+        emit ITradingStorageUtils.TradeMaxClosingSlippagePUpdated(_tradeId, _maxClosingSlippageP);
+    }
+
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
@@ -274,10 +290,11 @@ library TradingStorageUtils {
             revert ITradingStorageUtils.TradeSlInvalid();
         if (_maxSlippageP == 0) revert ITradingStorageUtils.MaxSlippageZero();
 
-        _tp = _limitTpDistance(_openPrice, t.leverage, _tp, t.long);
-        _sl = _limitSlDistance(_openPrice, t.leverage, _sl, t.long);
-
         t.openPrice = _openPrice;
+
+        _tp = _limitTpDistance(_openPrice, t.leverage, _tp, t.long);
+        _sl = _limitTradeSlDistance(t, _sl);
+
         t.tp = _tp;
         t.sl = _sl;
 
@@ -329,7 +346,7 @@ library TradingStorageUtils {
         if (!t.isOpen) revert IGeneralErrors.DoesntExist();
         if (t.tradeType != ITradingStorage.TradeType.TRADE) revert IGeneralErrors.WrongTradeType();
 
-        _newSl = _limitSlDistance(t.openPrice, t.leverage, _newSl, t.long);
+        _newSl = _limitTradeSlDistance(t, _newSl);
 
         t.sl = _newSl;
         i.slLastUpdatedBlock = uint32(block.number);

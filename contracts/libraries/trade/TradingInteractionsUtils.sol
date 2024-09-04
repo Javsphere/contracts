@@ -71,6 +71,19 @@ library TradingInteractionsUtils {
     /**
      * @dev Check ITradingInteractionsUtils interface for documentation
      */
+    function updateMaxClosingSlippageP(
+        uint32 _index,
+        uint16 _maxClosingSlippageP
+    ) internal tradingActivatedOrCloseOnly {
+        _getMultiCollatDiamond().updateTradeMaxClosingSlippageP(
+            ITradingStorage.Id(msg.sender, _index),
+            _maxClosingSlippageP
+        );
+    }
+
+    /**
+     * @dev Check ITradingInteractionsUtils interface for documentation
+     */
     function closeTradeMarket(
         uint32 _index,
         bytes[][] calldata _priceUpdate

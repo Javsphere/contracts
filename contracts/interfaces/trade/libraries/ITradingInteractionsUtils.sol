@@ -25,6 +25,13 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     ) external payable;
 
     /**
+     * @dev Updates existing trade's max closing slippage % for caller
+     * @param _index index of trade
+     * @param _maxSlippageP new max closing slippage % (1e3 precision)
+     */
+    function updateMaxClosingSlippageP(uint32 _index, uint16 _maxSlippageP) external;
+
+    /**
      * @dev Closes an open trade (market order) for caller
      * @param _index the index of the trade of caller
      * @param _priceUpdate Array of price update data.

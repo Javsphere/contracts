@@ -75,6 +75,14 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
+    function updateTradeMaxClosingSlippageP(
+        ITradingStorage.Id memory _tradeId,
+        uint16 _maxSlippageP
+    ) external virtual onlySelf {
+        TradingStorageUtils.updateTradeMaxClosingSlippageP(_tradeId, _maxSlippageP);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
     function updateTradeCollateralAmount(
         ITradingStorage.Id memory _tradeId,
         uint120 _collateralAmount

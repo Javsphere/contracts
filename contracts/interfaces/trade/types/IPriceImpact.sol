@@ -33,6 +33,7 @@ interface IPriceImpact {
         uint256 pairIndex;
         uint256 windowId;
         bool long;
+        bool open;
         uint128 openInterestUsd; // 1e18 USD
     }
 

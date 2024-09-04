@@ -158,9 +158,8 @@ interface IPriceImpactUtils is IPriceImpact {
     /**
      * @dev Triggered when OI is added to a window.
      * @param oiWindowUpdate OI window update details (windowsDuration, pairIndex, windowId, etc.)
-     * @param isPartial true if partial add
      */
-    event PriceImpactOpenInterestAdded(IPriceImpact.OiWindowUpdate oiWindowUpdate, bool isPartial);
+    event PriceImpactOpenInterestAdded(IPriceImpact.OiWindowUpdate oiWindowUpdate);
 
     /**
      * @dev Triggered when multiple pairs' OI are transferred to a new window (when updating windows duration).

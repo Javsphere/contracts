@@ -130,14 +130,17 @@ library IncreasePositionSizeUtils {
             : (values.newPositionSizeCollateral * 1e3) / values.newCollateralAmount;
 
         // 3. Calculate price impact values
-        (, values.priceAfterImpact) = _getMultiCollatDiamond().getTradePriceImpact(
-            TradingCommonUtils.getMarketExecutionPrice(_price, 10, _existingTrade.long),
-            _existingTrade.pairIndex,
-            _existingTrade.long,
-            _getMultiCollatDiamond().getUsdNormalizedValue(
-                _existingTrade.collateralIndex,
+        // 3. Calculate price impact values
+        (, values.priceAfterImpact) = TradingCommonUtils.getTradeOpeningPriceImpact(
+            ITradingCommonUtils.TradePriceImpactInput(
+                _existingTrade,
+                _price,
+                10,
                 values.positionSizeCollateralDelta
-            )
+            ),
+            _getMultiCollatDiamond()
+                .getTradeInfo(_existingTrade.user, _existingTrade.index)
+                .contractsVersion
         );
 
         // 4. Calculate existing trade pnl

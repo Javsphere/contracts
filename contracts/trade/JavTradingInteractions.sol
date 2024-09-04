@@ -32,6 +32,11 @@ contract JavTradingInteractions is JavAddressStore, ITradingInteractionsUtils {
     }
 
     /// @inheritdoc ITradingInteractionsUtils
+    function updateMaxClosingSlippageP(uint32 _index, uint16 _maxSlippageP) external {
+        TradingInteractionsUtils.updateMaxClosingSlippageP(_index, _maxSlippageP);
+    }
+
+    /// @inheritdoc ITradingInteractionsUtils
     function closeTradeMarket(uint32 _index, bytes[][] calldata _priceUpdate) external payable {
         TradingInteractionsUtils.closeTradeMarket(_index, _priceUpdate);
     }

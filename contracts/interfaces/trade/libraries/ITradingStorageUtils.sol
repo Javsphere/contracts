@@ -64,6 +64,16 @@ interface ITradingStorageUtils is ITradingStorage {
     ) external returns (Trade memory);
 
     /**
+     * @dev Updates an existing trade max closing slippage %
+     * @param _tradeId id of the trade
+     * @param _maxSlippageP new max slippage % (1e3 precision)
+     */
+    function updateTradeMaxClosingSlippageP(
+        ITradingStorage.Id memory _tradeId,
+        uint16 _maxSlippageP
+    ) external;
+
+    /**
      * @dev Updates an open trade collateral
      * @param _tradeId id of updated trade
      * @param _collateralAmount new collateral amount value (collateral precision)
@@ -300,8 +310,20 @@ interface ITradingStorageUtils is ITradingStorage {
      * @dev Emitted when a new trade is stored
      * @param trade the trade stored
      * @param tradeInfo the trade info stored
+     * @param liquidationParams the trade liquidation params stored
      */
-    event TradeStored(Trade trade, TradeInfo tradeInfo);
+    event TradeStored(
+        Trade trade,
+        TradeInfo tradeInfo,
+        IPairsStorage.GroupLiquidationParams liquidationParams
+    );
+
+    /**
+     * @dev Emitted when the max closing slippage % of an open trade is updated
+     * @param tradeId id of the updated trade
+     * @param maxClosingSlippageP new max closing slippage % value (1e3 precision)
+     */
+    event TradeMaxClosingSlippagePUpdated(Id tradeId, uint16 maxClosingSlippageP);
 
     /**
      * @dev Emitted when an open trade collateral is updated
@@ -316,6 +338,7 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param collateralAmount new collateral value (collateral precision)
      * @param leverage new leverage value if present
      * @param openPrice new open price value if present
+     * @param isPartialIncrease true if trade liquidation params were refreshed
      */
     event TradePositionUpdated(
         Id tradeId,
@@ -323,7 +346,8 @@ interface ITradingStorageUtils is ITradingStorage {
         uint24 leverage,
         uint64 openPrice,
         uint64 newTp,
-        uint64 newSl
+        uint64 newSl,
+        bool isPartialIncrease
     );
 
     /**
