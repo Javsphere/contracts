@@ -217,7 +217,8 @@ library UpdateLeverageUtils {
             ITradingStorage.Id(_trade.user, _trade.index),
             uint120(_values.newCollateralAmount),
             uint24(_values.newLeverage),
-            _trade.openPrice
+            _trade.openPrice,
+            false
         );
 
         // 1.2 If leverage increase, transfer collateral delta to trader

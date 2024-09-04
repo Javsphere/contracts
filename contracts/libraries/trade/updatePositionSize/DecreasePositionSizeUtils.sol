@@ -174,7 +174,8 @@ library DecreasePositionSizeUtils {
             ITradingStorage.Id(_existingTrade.user, _existingTrade.index),
             _values.newCollateralAmount,
             _values.newLeverage,
-            _existingTrade.openPrice // open price stays the same
+            _existingTrade.openPrice, // open price stays the same
+            false // don't refresh liquidation params
         );
 
         // 3. Reset trade borrowing fee to zero

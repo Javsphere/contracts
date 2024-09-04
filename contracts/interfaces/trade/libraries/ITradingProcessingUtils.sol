@@ -102,6 +102,7 @@ interface ITradingProcessingUtils is
 
     /**
      * @dev Emitted when a market order is executed (open/close)
+     * @param orderId the id of the corrsponding pending market order
      * @param t the trade object
      * @param open true for a market open order, false for a market close order
      * @param price the price at which the trade was executed (1e10 precision)
@@ -111,6 +112,7 @@ interface ITradingProcessingUtils is
      * @param collateralPriceUsd the price of the collateral in USD (1e8 precision)
      */
     event MarketExecuted(
+        ITradingStorage.Id orderId,
         ITradingStorage.Trade t,
         bool open,
         uint64 price,
@@ -122,11 +124,13 @@ interface ITradingProcessingUtils is
 
     /**
      * @dev Emitted when a pending market open order is canceled
+     * @param orderId order id of the pending market open order
      * @param trader address of the trader
      * @param pairIndex index of the trading pair
      * @param cancelReason reason for the cancelation
      */
     event MarketOpenCanceled(
+        ITradingStorage.Id orderId,
         address indexed trader,
         uint256 indexed pairIndex,
         CancelReason cancelReason
@@ -134,12 +138,14 @@ interface ITradingProcessingUtils is
 
     /**
      * @dev Emitted when a pending market close order is canceled
+     * @param orderId order id of the pending market close order
      * @param trader address of the trader
      * @param pairIndex index of the trading pair
      * @param index index of the trade for trader
      * @param cancelReason reason for the cancelation
      */
     event MarketCloseCanceled(
+        ITradingStorage.Id orderId,
         address indexed trader,
         uint256 indexed pairIndex,
         uint256 index,

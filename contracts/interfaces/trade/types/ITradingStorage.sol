@@ -92,13 +92,15 @@ interface ITradingStorage {
     }
 
     struct TradeInfo {
-        uint32 createdBlock;
-        uint32 tpLastUpdatedBlock;
-        uint32 slLastUpdatedBlock;
+        uint32 createdBlock; // for lookbacks
+        uint32 tpLastUpdatedBlock; // for lookbacks
+        uint32 slLastUpdatedBlock; // for lookbacks
         uint16 maxSlippageP; // 1e3 (%)
-        uint48 lastOiUpdateTs;
+        uint48 lastOiUpdateTs; // deprecated
         uint48 collateralPriceUsd; // 1e8 collateral price at trade open
-        uint48 __placeholder;
+        ContractsVersion contractsVersion;
+        uint32 lastPosIncreaseBlock; // for protection close factor
+        uint8 __placeholder;
     }
 
     struct PendingOrder {

@@ -302,7 +302,8 @@ library IncreasePositionSizeUtils {
             ITradingStorage.Id(_existingTrade.user, _existingTrade.index),
             uint120(_values.newCollateralAmount),
             uint24(_values.newLeverage),
-            uint64(_values.newOpenPrice)
+            uint64(_values.newOpenPrice),
+            true // refresh liquidation params
         );
 
         // 3. Reset trade borrowing fees to zero

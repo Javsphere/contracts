@@ -136,30 +136,31 @@ library TradingStorageUtils {
     function storeTrade(
         ITradingStorage.Trade memory _trade,
         ITradingStorage.TradeInfo memory _tradeInfo
-    ) internal returns (ITradingStorage.Trade memory) {
+    ) external returns (ITradingStorage.Trade memory) {
         ITradingStorage.TradingStorage storage s = _getStorage();
 
-        validateTrade(_trade);
+        _validateTrade(_trade);
 
         if (_trade.tradeType != ITradingStorage.TradeType.TRADE && _tradeInfo.maxSlippageP == 0)
             revert ITradingStorageUtils.MaxSlippageZero();
 
-        if (
-            _trade.tradeType == ITradingStorage.TradeType.TRADE &&
-            _tradeInfo.collateralPriceUsd == 0
-        ) revert ITradingStorageUtils.TradeInfoCollateralPriceUsdZero();
-
         ITradingStorage.Counter memory counter = s.userCounters[_trade.user];
-
         _trade.index = counter.currentIndex;
         _trade.isOpen = true;
+
+        IPairsStorage.GroupLiquidationParams memory liquidationParams = _getMultiCollatDiamond()
+            .getPairLiquidationParams(_trade.pairIndex);
+        s.tradeLiquidationParams[_trade.user][_trade.index] = liquidationParams;
+
         _trade.tp = _limitTpDistance(_trade.openPrice, _trade.leverage, _trade.tp, _trade.long);
-        _trade.sl = _limitSlDistance(_trade.openPrice, _trade.leverage, _trade.sl, _trade.long);
+        _trade.sl = _limitTradeSlDistance(_trade, _trade.sl);
 
         _tradeInfo.createdBlock = uint32(block.number);
         _tradeInfo.tpLastUpdatedBlock = _tradeInfo.createdBlock;
         _tradeInfo.slLastUpdatedBlock = _tradeInfo.createdBlock;
-        _tradeInfo.lastOiUpdateTs = uint48(block.timestamp);
+
+        _tradeInfo.contractsVersion = _getMultiCollatDiamond().getCurrentContractsVersion();
+        _tradeInfo.lastPosIncreaseBlock = _tradeInfo.createdBlock;
 
         counter.currentIndex++;
         counter.openCount++;
@@ -173,7 +174,10 @@ library TradingStorageUtils {
             s.traderStored[_trade.user] = true;
         }
 
-        emit ITradingStorageUtils.TradeStored(_trade, _tradeInfo);
+        if (_trade.tradeType == ITradingStorage.TradeType.TRADE)
+            TradingCommonUtils.updateOiTrade(_trade, true);
+
+        emit ITradingStorageUtils.TradeStored(_trade, _tradeInfo, liquidationParams);
 
         return _trade;
     }
@@ -204,8 +208,9 @@ library TradingStorageUtils {
         ITradingStorage.Id memory _tradeId,
         uint120 _collateralAmount,
         uint24 _leverage,
-        uint64 _openPrice
-    ) internal {
+        uint64 _openPrice,
+        bool _isPartialIncrease
+    ) external {
         ITradingStorage.TradingStorage storage s = _getStorage();
         ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
         ITradingStorage.TradeInfo storage i = s.tradeInfos[_tradeId.user][_tradeId.index];
@@ -220,13 +225,20 @@ library TradingStorageUtils {
             TradingCommonUtils.getPositionSizeCollateral(_collateralAmount, _leverage)
         );
 
+        uint32 blockNumber = uint32(block.number);
+
+        if (_isPartialIncrease) {
+            s.tradeLiquidationParams[_tradeId.user][_tradeId.index] = _getMultiCollatDiamond()
+                .getPairLiquidationParams(t.pairIndex);
+            i.lastPosIncreaseBlock = blockNumber;
+        }
+
         t.collateralAmount = _collateralAmount;
         t.leverage = _leverage;
         t.openPrice = _openPrice;
         t.tp = _limitTpDistance(t.openPrice, t.leverage, t.tp, t.long);
-        t.sl = _limitSlDistance(t.openPrice, t.leverage, t.sl, t.long);
+        t.sl = _limitTradeSlDistance(t, t.sl);
 
-        uint32 blockNumber = uint32(block.number);
         i.createdBlock = blockNumber;
         i.tpLastUpdatedBlock = blockNumber;
         i.slLastUpdatedBlock = blockNumber;
@@ -237,7 +249,8 @@ library TradingStorageUtils {
             t.leverage,
             t.openPrice,
             t.tp,
-            t.sl
+            t.sl,
+            _isPartialIncrease
         );
     }
 
@@ -412,30 +425,6 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getTraders(uint32 _offset, uint32 _limit) internal view returns (address[] memory) {
-        ITradingStorage.TradingStorage storage s = _getStorage();
-
-        if (s.traders.length == 0) return new address[](0);
-
-        uint256 lastIndex = s.traders.length - 1;
-        _limit = _limit == 0 || _limit > lastIndex ? uint32(lastIndex) : _limit;
-
-        address[] memory traders = new address[](_limit - _offset + 1);
-
-        uint32 currentIndex;
-        for (uint32 i = _offset; i <= _limit; ++i) {
-            address trader = s.traders[i];
-            if (s.userCounters[trader].openCount > 0) {
-                traders[currentIndex++] = trader;
-            }
-        }
-
-        return traders;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
     function getTrade(
         address _trader,
         uint32 _index
@@ -574,17 +563,39 @@ library TradingStorageUtils {
     }
 
     /**
+     * @dev Limits trade stop loss price distance
+     * @param _trade trade struct
+     */
+    function _limitTradeSlDistance(
+        ITradingStorage.Trade memory _trade,
+        uint64 _newSl
+    ) public view returns (uint64) {
+        return
+            _limitSlDistance(
+                _trade.openPrice,
+                _trade.leverage,
+                _newSl,
+                _trade.long,
+                TradingCommonUtils.getTradeLiqPnlThresholdP(_trade)
+            );
+    }
+
+    /**
      * @dev Validation for trade struct (used by storeTrade and storePendingOrder for market open orders)
      * @param _trade trade struct to validate
      */
-    function validateTrade(ITradingStorage.Trade memory _trade) internal view {
+    function _validateTrade(ITradingStorage.Trade memory _trade) internal view {
         if (_trade.user == address(0)) revert IGeneralErrors.ZeroAddress();
 
         if (!_getMultiCollatDiamond().isPairIndexListed(_trade.pairIndex))
             revert ITradingStorageUtils.TradePairNotListed();
 
-        if (uint256(_trade.collateralAmount) * _trade.leverage == 0)
-            revert ITradingStorageUtils.TradePositionSizeZero();
+        if (
+            TradingCommonUtils.getPositionSizeCollateral(
+                _trade.collateralAmount,
+                _trade.leverage
+            ) == 0
+        ) revert ITradingStorageUtils.TradePositionSizeZero();
 
         if (!isCollateralActive(_trade.collateralIndex))
             revert IGeneralErrors.InvalidCollateralIndex();

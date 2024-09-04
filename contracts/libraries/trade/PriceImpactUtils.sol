@@ -181,33 +181,6 @@ library PriceImpactUtils {
     /**
      * @dev Check IPriceImpactUtils interface for documentation
      */
-    function getTradeLastWindowOiUsd(
-        address _trader,
-        uint32 _index
-    ) internal view returns (uint128) {
-        uint128 lastWindowOiUsd = _getStorage()
-        .tradePriceImpactInfos[_trader][_index].lastWindowOiUsd;
-        ITradingStorage.Trade memory trade = _getMultiCollatDiamond().getTrade(_trader, _index);
-        return
-            lastWindowOiUsd > 0
-                ? lastWindowOiUsd
-                : uint128( // if lastWindowOiUsd = 0 for trade, it was opened before partials => pos size USD using tradeInfo.collateralPriceUsd
-                    TradingCommonUtils.convertCollateralToUsd(
-                        TradingCommonUtils.getPositionSizeCollateral(
-                            trade.collateralAmount,
-                            trade.leverage
-                        ),
-                        _getMultiCollatDiamond()
-                            .getCollateral(trade.collateralIndex)
-                            .precisionDelta,
-                        _getMultiCollatDiamond().getTradeInfo(_trader, _index).collateralPriceUsd
-                    )
-                );
-    }
-
-    /**
-     * @dev Check IPriceImpactUtils interface for documentation
-     */
     function getPriceImpactOi(
         uint256 _pairIndex,
         bool _long
@@ -238,27 +211,44 @@ library PriceImpactUtils {
      * @dev Check IPriceImpactUtils interface for documentation
      */
     function getTradePriceImpact(
-        uint256 _openPrice, // PRECISION
+        uint256 _marketPrice, // 1e10
         uint256 _pairIndex,
         bool _long,
-        uint256 _tradeOpenInterestUsd // 1e18 USD
+        uint256 _tradeOpenInterestUsd, // 1e18 USD
+        bool _isPnlPositive, // only relevant when _open = false
+        bool _open,
+        uint256 _lastPosIncreaseBlock, // only relevant when _open = false
+        ITradingStorage.ContractsVersion _contractsVersion
     )
         internal
         view
         returns (
-            uint256 priceImpactP, // PRECISION (%)
-            uint256 priceAfterImpact // PRECISION
+            uint256 priceImpactP, // 1e10 (%)
+            uint256 priceAfterImpact // 1e10
         )
     {
         IPriceImpact.PairDepth storage pDepth = _getStorage().pairDepths[_pairIndex];
-        uint256 depth = _long ? pDepth.onePercentDepthAboveUsd : pDepth.onePercentDepthBelowUsd;
+        IPriceImpact.PairFactors memory pairFactors = _getStorage().pairFactors[_pairIndex];
+
+        uint256 depth = (_long && _open) || (!_long && !_open)
+            ? pDepth.onePercentDepthAboveUsd
+            : pDepth.onePercentDepthBelowUsd; // on close use opposite side depth
 
         (priceImpactP, priceAfterImpact) = _getTradePriceImpact(
-            _openPrice,
+            _marketPrice,
             _long,
-            depth > 0 ? getPriceImpactOi(_pairIndex, _long) : 0, // saves gas if depth is 0
+            depth > 0 ? getPriceImpactOi(_pairIndex, _open ? _long : !_long) : 0, // saves gas if depth is 0
             _tradeOpenInterestUsd,
-            depth
+            depth,
+            _open,
+            _isPnlPositive &&
+                !_open &&
+                pairFactors.protectionCloseFactor != 0 &&
+                block.number <= _lastPosIncreaseBlock + pairFactors.protectionCloseFactorBlocks
+                ? pairFactors.protectionCloseFactor
+                : ConstantsUtils.P_10,
+            pairFactors.cumulativeFactor != 0 ? pairFactors.cumulativeFactor : ConstantsUtils.P_10,
+            _contractsVersion
         );
     }
 

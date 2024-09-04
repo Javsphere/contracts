@@ -72,9 +72,23 @@ library TradingCommonUtils {
     function getMarketExecutionPrice(
         uint256 _price,
         uint256 _spreadP,
-        bool _long
+        bool _long,
+        bool _open,
+        ITradingStorage.ContractsVersion _contractsVersion
     ) internal pure returns (uint256) {
+        // No closing spread for trades opened before v9.2
+        if (!_open && _contractsVersion == ITradingStorage.ContractsVersion.BEFORE_V9_2) {
+            return _price;
+        }
+
+        // For trades opened after v9.2 use half spread (open + close),
+        // for trades opened before v9.2 use full spread (open)
+        if (_contractsVersion >= ITradingStorage.ContractsVersion.V9_2) {
+            _spreadP = _spreadP / 2;
+        }
+
         uint256 priceDiff = (_price * _spreadP) / 100 / ConstantsUtils.P_10;
+        if (!_open) _long = !_long; // reverse spread direction on close
         return _long ? _price + priceDiff : _price - priceDiff;
     }
 
@@ -881,65 +895,45 @@ library TradingCommonUtils {
     // Open interests
 
     /**
-     * @dev Add open interest to the protocol (any amount)
-     * @dev CAREFUL: this will reset the trade's borrowing fees to 0
+     * @dev Update protocol open interest (any amount)
+     * @dev CAREFUL: this will reset the trade's borrowing fees to 0 when _open = true
      * @param _trade trade struct
      * @param _positionSizeCollateral position size in collateral tokens (collateral precision)
+     * @param _open whether it corresponds to a trade opening or closing
      */
-    function addOiCollateral(
+    function updateOi(
         ITradingStorage.Trade memory _trade,
-        uint256 _positionSizeCollateral
-    ) internal {
+        uint256 _positionSizeCollateral,
+        bool _open
+    ) public {
         _getMultiCollatDiamond().handleTradeBorrowingCallback(
             _trade.collateralIndex,
             _trade.user,
             _trade.pairIndex,
             _trade.index,
             _positionSizeCollateral,
-            true,
+            _open,
             _trade.long
         );
         _getMultiCollatDiamond().addPriceImpactOpenInterest(
             _trade.user,
             _trade.index,
-            _positionSizeCollateral
-        );
-    }
-
-    /**
-     * @dev Add trade position size OI to the protocol (for new trades)
-     * @dev CAREFUL: this will reset the trade's borrowing fees to 0
-     * @param _trade trade struct
-     */
-    function addTradeOiCollateral(ITradingStorage.Trade memory _trade) internal {
-        addOiCollateral(
-            _trade,
-            getPositionSizeCollateral(_trade.collateralAmount, _trade.leverage)
-        );
-    }
-
-    /**
-     * @dev Remove open interest from the protocol (any amount)
-     * @param _trade trade struct
-     * @param _positionSizeCollateral position size in collateral tokens (collateral precision)
-     */
-    function removeOiCollateral(
-        ITradingStorage.Trade memory _trade,
-        uint256 _positionSizeCollateral
-    ) internal {
-        _getMultiCollatDiamond().handleTradeBorrowingCallback(
-            _trade.collateralIndex,
-            _trade.user,
-            _trade.pairIndex,
-            _trade.index,
             _positionSizeCollateral,
-            false,
-            _trade.long
+            _open
         );
-        _getMultiCollatDiamond().removePriceImpactOpenInterest(
-            _trade.user,
-            _trade.index,
-            _positionSizeCollateral
+    }
+
+    /**
+     * @dev Update protocol open interest (trade position size)
+     * @dev CAREFUL: this will reset the trade's borrowing fees to 0 when _open = true
+     * @param _trade trade struct
+     * @param _open whether it corresponds to a trade opening or closing
+     */
+    function updateOiTrade(ITradingStorage.Trade memory _trade, bool _open) external {
+        updateOi(
+            _trade,
+            getPositionSizeCollateral(_trade.collateralAmount, _trade.leverage),
+            _open
         );
     }
 
@@ -958,9 +952,9 @@ library TradingCommonUtils {
         );
 
         if (_newPositionSizeCollateral > existingPositionSizeCollateral) {
-            addOiCollateral(_trade, _newPositionSizeCollateral - existingPositionSizeCollateral);
+            updateOi(_trade, _newPositionSizeCollateral - existingPositionSizeCollateral, true);
         } else if (_newPositionSizeCollateral < existingPositionSizeCollateral) {
-            removeOiCollateral(_trade, existingPositionSizeCollateral - _newPositionSizeCollateral);
+            updateOi(_trade, existingPositionSizeCollateral - _newPositionSizeCollateral, false);
         }
     }
 

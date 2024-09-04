@@ -57,20 +57,13 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
     function addPriceImpactOpenInterest(
         address _trader,
         uint32 _index,
-        uint256 _oiDeltaCollateral
+        uint256 _oiDeltaCollateral,
+        bool _open
     ) external virtual onlySelf {
-        PriceImpactUtils.addPriceImpactOpenInterest(_trader, _index, _oiDeltaCollateral);
+        PriceImpactUtils.addPriceImpactOpenInterest(_trader, _index, _oiDeltaCollateral, _open);
     }
 
     // Getters
-
-    /// @inheritdoc IPriceImpactUtils
-    function getTradeLastWindowOiUsd(
-        address _trader,
-        uint32 _index
-    ) external view returns (uint128) {
-        return PriceImpactUtils.getTradeLastWindowOiUsd(_trader, _index);
-    }
 
     /// @inheritdoc IPriceImpactUtils
     function getPriceImpactOi(
@@ -82,16 +75,24 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
 
     /// @inheritdoc IPriceImpactUtils
     function getTradePriceImpact(
-        uint256 _openPrice,
+        uint256 _marketPrice,
         uint256 _pairIndex,
         bool _long,
-        uint256 _tradeOpenInterestUsd
+        uint256 _tradeOpenInterestUsd,
+        bool _isPnlPositive,
+        bool _open,
+        uint256 _lastPosIncreaseBlock,
+        ITradingStorage.ContractsVersion _contractsVersion
     ) external view returns (uint256 priceImpactP, uint256 priceAfterImpact) {
         (priceImpactP, priceAfterImpact) = PriceImpactUtils.getTradePriceImpact(
-            _openPrice,
+            _marketPrice,
             _pairIndex,
             _long,
-            _tradeOpenInterestUsd
+            _tradeOpenInterestUsd,
+            _isPnlPositive,
+            _open,
+            _lastPosIncreaseBlock,
+            _contractsVersion
         );
     }
 

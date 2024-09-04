@@ -87,9 +87,16 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         ITradingStorage.Id memory _tradeId,
         uint120 _collateralAmount,
         uint24 _leverage,
-        uint64 _openPrice
+        uint64 _openPrice,
+        bool _isPartialIncrease
     ) external virtual onlySelf {
-        TradingStorageUtils.updateTradePosition(_tradeId, _collateralAmount, _leverage, _openPrice);
+        TradingStorageUtils.updateTradePosition(
+            _tradeId,
+            _collateralAmount,
+            _leverage,
+            _openPrice,
+            _isPartialIncrease
+        );
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -116,11 +123,6 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     /// @inheritdoc ITradingStorageUtils
     function closeTrade(Id memory _tradeId) external virtual onlySelf {
         TradingStorageUtils.closeTrade(_tradeId);
-    }
-
-    /// @inheritdoc ITradingStorageUtils
-    function validateTrade(Trade memory _trade) external virtual onlySelf {
-        return TradingStorageUtils.validateTrade(_trade);
     }
 
     // Getters

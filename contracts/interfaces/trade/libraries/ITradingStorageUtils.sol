@@ -76,12 +76,14 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param _collateralAmount new collateral amount value (collateral precision)
      * @param _leverage new leverage value
      * @param _openPrice new open price value
+     * @param _isPartialIncrease refreshes trade liquidation params if true
      */
     function updateTradePosition(
         Id memory _tradeId,
         uint120 _collateralAmount,
         uint24 _leverage,
-        uint64 _openPrice
+        uint64 _openPrice,
+        bool _isPartialIncrease
     ) external;
 
     /**
@@ -119,12 +121,6 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param _tradeId the trade id
      */
     function closeTrade(Id memory _tradeId) external;
-
-    /**
-     * @dev Validation for trade struct (used by storeTrade and storePendingOrder for market open orders)
-     * @param _trade trade struct to validate
-     */
-    function validateTrade(Trade memory _trade) external;
 
     /**
      * @dev Returns collateral data by index

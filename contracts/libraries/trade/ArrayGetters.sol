@@ -24,10 +24,7 @@ library ArrayGetters {
         uint32 currentIndex;
         for (uint32 i = _offset; i <= _limit; ++i) {
             address trader = s.traders[i];
-            if (
-                s.userCounters[trader][ITradingStorage.CounterType.TRADE].openCount > 0 ||
-                s.userCounters[trader][ITradingStorage.CounterType.PENDING_ORDER].openCount > 0
-            ) {
+            if (s.userCounters[trader].openCount > 0) {
                 traders[currentIndex++] = trader;
             }
         }
@@ -40,9 +37,7 @@ library ArrayGetters {
      */
     function getTrades(address _trader) public view returns (ITradingStorage.Trade[] memory) {
         ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
-        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader][
-            ITradingStorage.CounterType.TRADE
-        ];
+        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader];
         ITradingStorage.Trade[] memory trades = new ITradingStorage.Trade[](
             traderCounter.openCount
         );
@@ -96,9 +91,7 @@ library ArrayGetters {
         address _trader
     ) public view returns (ITradingStorage.TradeInfo[] memory) {
         ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
-        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader][
-            ITradingStorage.CounterType.TRADE
-        ];
+        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader];
         ITradingStorage.TradeInfo[] memory tradeInfos = new ITradingStorage.TradeInfo[](
             traderCounter.openCount
         );
@@ -149,72 +142,11 @@ library ArrayGetters {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getPendingOrders(
-        address _trader
-    ) public view returns (ITradingStorage.PendingOrder[] memory) {
-        ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
-        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader][
-            ITradingStorage.CounterType.PENDING_ORDER
-        ];
-        ITradingStorage.PendingOrder[] memory pendingOrders = new ITradingStorage.PendingOrder[](
-            traderCounter.openCount
-        );
-
-        uint32 currentIndex;
-        for (uint32 i; i < traderCounter.currentIndex; ++i) {
-            if (s.pendingOrders[_trader][i].isOpen) {
-                pendingOrders[currentIndex++] = s.pendingOrders[_trader][i];
-            }
-        }
-
-        return pendingOrders;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getAllPendingOrders(
-        uint256 _offset,
-        uint256 _limit
-    ) external view returns (ITradingStorage.PendingOrder[] memory) {
-        // Fetch all traders with open trades (no pagination, return size is not an issue here)
-        address[] memory traders = getTraders(0, 0);
-
-        uint256 currentPendingOrderIndex; // current global pending order index
-        uint256 currentArrayIndex; // current index in returned pending orders array
-
-        ITradingStorage.PendingOrder[] memory pendingOrders = new ITradingStorage.PendingOrder[](
-            _limit - _offset + 1
-        );
-
-        // Fetch all trades for each trader
-        for (uint256 i; i < traders.length; ++i) {
-            ITradingStorage.PendingOrder[] memory traderPendingOrders = getPendingOrders(
-                traders[i]
-            );
-
-            // Add trader trades to final trades array only if within _offset and _limit
-            for (uint256 j; j < traderPendingOrders.length; ++j) {
-                if (currentPendingOrderIndex >= _offset && currentPendingOrderIndex <= _limit) {
-                    pendingOrders[currentArrayIndex++] = traderPendingOrders[j];
-                }
-                currentPendingOrderIndex++;
-            }
-        }
-
-        return pendingOrders;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
     function getTradesLiquidationParams(
         address _trader
     ) public view returns (IPairsStorage.GroupLiquidationParams[] memory) {
         ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
-        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader][
-            ITradingStorage.CounterType.TRADE
-        ];
+        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader];
         IPairsStorage.GroupLiquidationParams[]
             memory tradeLiquidationParams = new IPairsStorage.GroupLiquidationParams[](
                 traderCounter.openCount

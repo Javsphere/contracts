@@ -154,6 +154,66 @@ library TradingProcessingUtils {
     /**
      * @dev Check ITradingProcessingUtils interface for documentation
      */
+    function validateTriggerOpenOrder(
+        ITradingStorage.Id memory _tradeId,
+        ITradingStorage.PendingOrder memory _pendingOrder
+    )
+        internal
+        view
+        returns (
+            ITradingStorage.Trade memory t,
+            ITradingProcessing.CancelReason cancelReason,
+            uint256 priceImpactP,
+            uint256 priceAfterImpact,
+            bool exactExecution
+        )
+    {
+        if (
+            _pendingOrder.orderType != ITradingStorage.PendingOrderType.LIMIT_OPEN &&
+            _pendingOrder.orderType != ITradingStorage.PendingOrderType.STOP_OPEN
+        ) {
+            revert IGeneralErrors.WrongOrderType();
+        }
+
+        t = _getTrade(_tradeId.user, _tradeId.index);
+
+        // Return early if trade is not open
+        if (!t.isOpen) {
+            cancelReason = ITradingProcessing.CancelReason.NO_TRADE;
+            return (t, cancelReason, priceImpactP, priceAfterImpact, exactExecution);
+        }
+
+        exactExecution = _pendingOrder.price == t.openPrice;
+
+        (priceImpactP, priceAfterImpact, cancelReason) = _openTradePrep(
+            t,
+            exactExecution ? t.openPrice : _pendingOrder.price,
+            _pendingOrder.price,
+            _getMultiCollatDiamond().pairSpreadP(t.pairIndex),
+            _getTradeInfo(t.user, t.index).maxSlippageP
+        );
+
+        if (
+            !exactExecution &&
+            (
+                t.tradeType == ITradingStorage.TradeType.STOP
+                    ? (
+                        t.long
+                            ? _pendingOrder.price < t.openPrice
+                            : _pendingOrder.price > t.openPrice
+                    )
+                    : (
+                        t.long
+                            ? _pendingOrder.price > t.openPrice
+                            : _pendingOrder.price < t.openPrice
+                    )
+            )
+        ) cancelReason = ITradingProcessing.CancelReason.NOT_HIT;
+    }
+
+    /**
+     * @dev Check ITradingProcessingUtils interface for documentation
+     */
     function validateTriggerCloseOrder(
         ITradingStorage.Id memory _tradeId,
         ITradingStorage.PendingOrder memory _pendingOrder
@@ -267,7 +327,10 @@ library TradingProcessingUtils {
     function openTradeMarketOrder(ITradingStorage.PendingOrder memory _pendingOrder) internal {
         ITradingStorage.Trade memory t = _pendingOrder.trade;
 
-        _getMultiCollatDiamond().validateTrade(t);
+        ITradingStorage.Id memory orderId = ITradingStorage.Id({
+            user: _pendingOrder.trade.user,
+            index: _pendingOrder.trade.index
+        });
 
         (
             uint256 priceImpactP,
@@ -284,17 +347,17 @@ library TradingProcessingUtils {
         t.openPrice = uint64(priceAfterImpact);
 
         if (cancelReason == ITradingProcessing.CancelReason.NONE) {
-            uint256 collateralPriceUsd;
-            (t, collateralPriceUsd) = _registerTrade(t, _pendingOrder);
+            t = _registerTrade(t, _pendingOrder);
 
             emit ITradingProcessingUtils.MarketExecuted(
+                orderId,
                 t,
                 true,
                 t.openPrice,
                 priceImpactP,
                 0,
                 0,
-                collateralPriceUsd
+                _getCollateralPriceUsd(t.collateralIndex)
             );
         } else {
             // Gov fee to pay for oracle cost
@@ -303,7 +366,7 @@ library TradingProcessingUtils {
                 t.collateralIndex,
                 t.user,
                 t.pairIndex,
-                TradingCommonUtils.getPositionSizeCollateral(t.collateralAmount, t.leverage),
+                TradingCommonUtils.getMinPositionSizeCollateral(t.collateralIndex, t.pairIndex) / 2, // use min fee / 2
                 0
             );
             TradingCommonUtils.transferCollateralTo(
@@ -312,7 +375,12 @@ library TradingProcessingUtils {
                 t.collateralAmount - govFees
             );
 
-            emit ITradingProcessingUtils.MarketOpenCanceled(t.user, t.pairIndex, cancelReason);
+            emit ITradingProcessingUtils.MarketOpenCanceled(
+                orderId,
+                t.user,
+                t.pairIndex,
+                cancelReason
+            );
         }
     }
 
@@ -322,83 +390,103 @@ library TradingProcessingUtils {
     function closeTradeMarketOrder(
         ITradingStorage.PendingOrder memory _pendingOrder
     ) internal tradingActivatedOrCloseOnly {
+        ITradingStorage.Id memory orderId = ITradingStorage.Id({
+            user: _pendingOrder.trade.user,
+            index: _pendingOrder.trade.index
+        });
+
         ITradingStorage.Trade memory t = _getTrade(
             _pendingOrder.trade.user,
             _pendingOrder.trade.index
         );
+        ITradingStorage.TradeInfo memory i = _getTradeInfo(
+            _pendingOrder.trade.user,
+            _pendingOrder.trade.index
+        );
 
-        ITradingProcessing.CancelReason cancelReason = !t.isOpen
-            ? ITradingProcessing.CancelReason.NO_TRADE
-            : (
-                _pendingOrder.price == 0
-                    ? ITradingProcessing.CancelReason.MARKET_CLOSED
-                    : ITradingProcessing.CancelReason.NONE
+        (uint256 priceImpactP, uint256 priceAfterImpact, ) = TradingCommonUtils
+            .getTradeClosingPriceImpact(
+                ITradingCommonUtils.TradePriceImpactInput(
+                    t,
+                    _pendingOrder.price,
+                    _getMultiCollatDiamond().pairSpreadP(t.pairIndex),
+                    TradingCommonUtils.getPositionSizeCollateral(t.collateralAmount, t.leverage)
+                )
             );
+
+        ITradingProcessing.CancelReason cancelReason;
+        {
+            uint256 expectedPrice = _pendingOrder.trade.openPrice;
+            uint256 maxSlippage = (expectedPrice *
+                (
+                    i.maxSlippageP > 0
+                        ? i.maxSlippageP
+                        : ConstantsUtils.DEFAULT_MAX_CLOSING_SLIPPAGE_P
+                )) /
+                100 /
+                1e3;
+
+            cancelReason = !t.isOpen
+                ? ITradingProcessing.CancelReason.NO_TRADE
+                : _pendingOrder.price == 0
+                ? ITradingProcessing.CancelReason.MARKET_CLOSED
+                : (
+                    t.long
+                        ? priceAfterImpact < expectedPrice - maxSlippage
+                        : priceAfterImpact > expectedPrice + maxSlippage
+                )
+                ? ITradingProcessing.CancelReason.SLIPPAGE
+                : ITradingProcessing.CancelReason.NONE;
+        }
 
         if (cancelReason != ITradingProcessing.CancelReason.NO_TRADE) {
             ITradingProcessing.Values memory v;
-            v.positionSizeCollateral = TradingCommonUtils.getPositionSizeCollateral(
-                t.collateralAmount,
-                t.leverage
-            );
 
             if (cancelReason == ITradingProcessing.CancelReason.NONE) {
-                v.profitP = _getMultiCollatDiamond().getPnlPercent(
+                v.profitP = TradingCommonUtils.getPnlPercent(
                     t.openPrice,
-                    _pendingOrder.price,
+                    uint64(priceAfterImpact),
                     t.long,
                     t.leverage
                 );
 
-                v.amountSentToTrader = _unregisterTrade(
-                    t,
-                    _pendingOrder.orderType,
-                    true,
-                    v.profitP,
-                    (v.positionSizeCollateral *
-                        _getMultiCollatDiamond().pairCloseFeeP(t.pairIndex)) /
-                        100 /
-                        PRECISION,
-                    (v.positionSizeCollateral *
-                        _getMultiCollatDiamond().pairTriggerOrderFeeP(t.pairIndex)) /
-                        100 /
-                        PRECISION
-                );
+                v.amountSentToTrader = _unregisterTrade(t, v.profitP, _pendingOrder.orderType);
 
                 emit ITradingProcessingUtils.MarketExecuted(
+                    orderId,
                     t,
                     false,
-                    _pendingOrder.price,
-                    0,
+                    uint64(priceAfterImpact),
+                    priceImpactP,
                     v.profitP,
                     v.amountSentToTrader,
                     _getCollateralPriceUsd(t.collateralIndex)
                 );
             } else {
-                // Recalculate trader fee tier cache
+                // Charge gov fee
                 TradingCommonUtils.updateFeeTierPoints(t.collateralIndex, t.user, t.pairIndex, 0);
-
-                // Charge gov fee on trade
                 uint256 govFee = TradingCommonUtils.distributeGovFeeCollateral(
                     t.collateralIndex,
                     t.user,
                     t.pairIndex,
-                    v.positionSizeCollateral,
+                    TradingCommonUtils.getMinPositionSizeCollateral(
+                        t.collateralIndex,
+                        t.pairIndex
+                    ) / 2, // use min fee / 2
                     0
                 );
+
+                // Deduct from trade collateral
                 _getMultiCollatDiamond().updateTradeCollateralAmount(
                     ITradingStorage.Id({user: t.user, index: t.index}),
                     t.collateralAmount - uint120(govFee)
                 );
-
-                // Remove OI corresponding to gov fee from price impact windows and borrowing fees
-                uint256 levGovFee = (govFee * t.leverage) / 1e3;
-                TradingCommonUtils.removeOiCollateral(t, levGovFee);
             }
         }
 
         if (cancelReason != ITradingProcessing.CancelReason.NONE) {
             emit ITradingProcessingUtils.MarketCloseCanceled(
+                orderId,
                 t.user,
                 t.pairIndex,
                 t.index,
@@ -417,83 +505,45 @@ library TradingProcessingUtils {
             return;
         }
 
-        ITradingStorage.Trade memory t = _getTrade(
-            _pendingOrder.trade.user,
-            _pendingOrder.trade.index
-        );
+        ITradingStorage.Id memory orderId = ITradingStorage.Id({
+            user: _pendingOrder.trade.user,
+            index: _pendingOrder.trade.index
+        });
 
-        ITradingProcessing.CancelReason cancelReason = !t.isOpen
-            ? ITradingProcessing.CancelReason.NO_TRADE
-            : ITradingProcessing.CancelReason.NONE;
+        // Ensure state conditions for executing close order trigger are met
+        (
+            ITradingStorage.Trade memory t,
+            ITradingProcessing.CancelReason cancelReason,
+            uint256 priceImpactP,
+            uint256 priceAfterImpact,
+            bool exactExecution
+        ) = validateTriggerOpenOrder(orderId, _pendingOrder);
 
         if (cancelReason == ITradingProcessing.CancelReason.NONE) {
-            cancelReason = _pendingOrder.price == t.openPrice
-                ? ITradingProcessing.CancelReason.NONE
-                : ITradingProcessing.CancelReason.NOT_HIT;
+            // Unregister open order
+            _getMultiCollatDiamond().closeTrade(ITradingStorage.Id({user: t.user, index: t.index}));
 
-            (
-                uint256 priceImpactP,
-                uint256 priceAfterImpact,
-                ITradingProcessing.CancelReason _cancelReason
-            ) = _openTradePrep(
-                    t,
-                    cancelReason == ITradingProcessing.CancelReason.NONE
-                        ? t.openPrice
-                        : _pendingOrder.price,
-                    _pendingOrder.price,
-                    _getMultiCollatDiamond().pairSpreadP(t.pairIndex),
-                    _getMultiCollatDiamond().getTradeInfo(t.user, t.index).maxSlippageP
-                );
+            // Store trade
+            t.openPrice = uint64(priceAfterImpact);
+            t.tradeType = ITradingStorage.TradeType.TRADE;
+            t = _registerTrade(t, _pendingOrder);
 
-            bool exactExecution = cancelReason == ITradingProcessing.CancelReason.NONE;
-
-            cancelReason = !exactExecution &&
-                (
-                    t.tradeType == ITradingStorage.TradeType.STOP
-                        ? (
-                            t.long
-                                ? _pendingOrder.price < t.openPrice
-                                : _pendingOrder.price > t.openPrice
-                        )
-                        : (
-                            t.long
-                                ? _pendingOrder.price > t.openPrice
-                                : _pendingOrder.price < t.openPrice
-                        )
-                )
-                ? ITradingProcessing.CancelReason.NOT_HIT
-                : _cancelReason;
-
-            if (cancelReason == ITradingProcessing.CancelReason.NONE) {
-                // Unregister open order
-                _getMultiCollatDiamond().closeTrade(
-                    ITradingStorage.Id({user: t.user, index: t.index})
-                );
-
-                // Store trade
-                t.openPrice = uint64(priceAfterImpact);
-                t.tradeType = ITradingStorage.TradeType.TRADE;
-                uint256 collateralPriceUsd;
-                (t, collateralPriceUsd) = _registerTrade(t, _pendingOrder);
-
-                emit ITradingProcessingUtils.LimitExecuted(
-                    t,
-                    _pendingOrder.user,
-                    _pendingOrder.orderType,
-                    t.openPrice,
-                    priceImpactP,
-                    0,
-                    0,
-                    collateralPriceUsd,
-                    exactExecution
-                );
-            }
-        }
-
-        if (cancelReason != ITradingProcessing.CancelReason.NONE) {
-            emit ITradingProcessingUtils.TriggerOrderCanceled(
+            emit ITradingProcessingUtils.LimitExecuted(
+                orderId,
+                t,
                 _pendingOrder.user,
-                _pendingOrder.index,
+                _pendingOrder.orderType,
+                t.openPrice,
+                priceImpactP,
+                0,
+                0,
+                _getCollateralPriceUsd(t.collateralIndex),
+                exactExecution
+            );
+        } else {
+            emit ITradingProcessingUtils.TriggerOrderCanceled(
+                orderId,
+                _pendingOrder.user,
                 _pendingOrder.orderType,
                 cancelReason
             );
@@ -575,15 +625,19 @@ library TradingProcessingUtils {
             ITradingProcessing.CancelReason cancelReason
         )
     {
-        uint256 usdValue = _getMultiCollatDiamond().getUsdNormalizedValue(
-            _trade.collateralIndex,
-            TradingCommonUtils.getPositionSizeCollateral(_trade.collateralAmount, _trade.leverage)
+        uint256 positionSizeCollateral = TradingCommonUtils.getPositionSizeCollateral(
+            _trade.collateralAmount,
+            _trade.leverage
         );
-        (priceImpactP, priceAfterImpact) = _getMultiCollatDiamond().getTradePriceImpact(
-            _marketExecutionPrice(_executionPrice, _spreadP, _trade.long),
-            _trade.pairIndex,
-            _trade.long,
-            usdValue
+
+        (priceImpactP, priceAfterImpact) = TradingCommonUtils.getTradeOpeningPriceImpact(
+            ITradingCommonUtils.TradePriceImpactInput(
+                _trade,
+                _executionPrice,
+                _spreadP,
+                positionSizeCollateral
+            ),
+            _getMultiCollatDiamond().getCurrentContractsVersion()
         );
 
         uint256 maxSlippage = (uint256(_trade.openPrice) * _maxSlippageP) / 100 / 1e3;
@@ -607,15 +661,15 @@ library TradingProcessingUtils {
                     : (_trade.sl > 0 &&
                         (_trade.long ? _executionPrice <= _trade.sl : _executionPrice >= _trade.sl))
                     ? ITradingProcessing.CancelReason.SL_REACHED
-                    : !_withinExposureLimits(
+                    : !TradingCommonUtils.isWithinExposureLimits(
                         _trade.collateralIndex,
                         _trade.pairIndex,
                         _trade.long,
-                        _trade.collateralAmount,
-                        _trade.leverage
+                        positionSizeCollateral
                     )
                     ? ITradingProcessing.CancelReason.EXPOSURE_LIMITS
-                    : (priceImpactP * _trade.leverage) / 1e3 > MAX_OPEN_NEGATIVE_PNL_P
+                    : (priceImpactP * _trade.leverage) / 1e3 >
+                        ConstantsUtils.MAX_OPEN_NEGATIVE_PNL_P
                     ? ITradingProcessing.CancelReason.PRICE_IMPACT
                     : _trade.leverage >
                         _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) * 1e3
@@ -628,29 +682,24 @@ library TradingProcessingUtils {
      * @dev Registers a trade in storage, and handles all fees and rewards
      * @param _trade Trade to register
      * @param _pendingOrder Corresponding pending order
-     * @return Registered trade
-     * @return Collateral price in USD (1e8 precision)
+     * @return Final registered trade
      */
     function _registerTrade(
         ITradingStorage.Trade memory _trade,
         ITradingStorage.PendingOrder memory _pendingOrder
-    ) internal returns (ITradingStorage.Trade memory, uint256) {
+    ) internal returns (ITradingStorage.Trade memory) {
+        // 1. Deduct gov fee, GNS staking fee (previously dev fee), Market/Limit fee
         _trade.collateralAmount -= TradingCommonUtils.processOpeningFees(
             _trade,
             TradingCommonUtils.getPositionSizeCollateral(_trade.collateralAmount, _trade.leverage),
             _pendingOrder.orderType
         );
 
-        // 8. Store final trade in storage contract
+        // 2. Store final trade in storage contract
         ITradingStorage.TradeInfo memory tradeInfo;
-        uint256 collateralPriceUsd = _getCollateralPriceUsd(_trade.collateralIndex);
-        tradeInfo.collateralPriceUsd = uint48(collateralPriceUsd);
         _trade = _getMultiCollatDiamond().storeTrade(_trade, tradeInfo);
 
-        // 9. Call other contracts
-        TradingCommonUtils.addTradeOiCollateral(_trade);
-
-        return (_trade, collateralPriceUsd);
+        return _trade;
     }
 
     /**

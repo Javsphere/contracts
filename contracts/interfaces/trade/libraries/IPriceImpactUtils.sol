@@ -3,6 +3,7 @@
 pragma solidity ^0.8.23;
 
 import "../types/IPriceImpact.sol";
+import "../types/ITradingStorage.sol";
 
 /**
  * @custom:version 8
@@ -45,22 +46,14 @@ interface IPriceImpactUtils is IPriceImpact {
      * @param _trader trader address
      * @param _index trade index
      * @param _oiDeltaCollateral open interest to add (collateral precision)
+     * @param _open whether it corresponds to opening or closing a trade
      */
     function addPriceImpactOpenInterest(
         address _trader,
         uint32 _index,
-        uint256 _oiDeltaCollateral
+        uint256 _oiDeltaCollateral,
+        bool _open
     ) external;
-
-    /**
-     * @dev Returns last OI delta in USD for a trade (1e18 precision)
-     * @param _trader trader address
-     * @param _index trade index
-     */
-    function getTradeLastWindowOiUsd(
-        address _trader,
-        uint32 _index
-    ) external view returns (uint128);
 
     /**
      * @dev Returns active open interest used in price impact calculation for a pair and side (long/short)
@@ -74,16 +67,24 @@ interface IPriceImpactUtils is IPriceImpact {
 
     /**
      * @dev Returns price impact % (1e10 precision) and price after impact (1e10 precision) for a trade
-     * @param _openPrice open price (1e10 precision)
+     * @param _marketPrice market price (1e10 precision)
      * @param _pairIndex index of pair
      * @param _long true for long, false for short
      * @param _tradeOpenInterestUsd open interest of trade in USD (1e18 precision)
+     * @param _isPnlPositive true if positive pnl, false if negative pnl (only relevant when _open = false)
+     * @param _open true on open, false on close
+     * @param _lastPosIncreaseBlock block when trade position size was last increased (only relevant when _open = false)
+     * @param _contractsVersion trade contracts version
      */
     function getTradePriceImpact(
-        uint256 _openPrice,
+        uint256 _marketPrice,
         uint256 _pairIndex,
         bool _long,
-        uint256 _tradeOpenInterestUsd
+        uint256 _tradeOpenInterestUsd,
+        bool _isPnlPositive,
+        bool _open,
+        uint256 _lastPosIncreaseBlock,
+        ITradingStorage.ContractsVersion _contractsVersion
     ) external view returns (uint256 priceImpactP, uint256 priceAfterImpact);
 
     /**

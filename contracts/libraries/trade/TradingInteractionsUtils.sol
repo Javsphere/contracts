@@ -221,10 +221,7 @@ library TradingInteractionsUtils {
 
         ITradingStorage.PendingOrderType orderType = ITradingStorage.PendingOrderType(_orderType);
 
-        if (
-            orderType == ITradingStorage.PendingOrderType.MARKET_OPEN ||
-            orderType == ITradingStorage.PendingOrderType.MARKET_CLOSE
-        ) revert ITradingInteractionsUtils.WrongOrderType();
+        if (ConstantsUtils.isOrderTypeMarket(orderType)) revert IGeneralErrors.WrongOrderType();
 
         bool isOpenLimit = orderType == ITradingStorage.PendingOrderType.LIMIT_OPEN ||
             orderType == ITradingStorage.PendingOrderType.STOP_OPEN;
