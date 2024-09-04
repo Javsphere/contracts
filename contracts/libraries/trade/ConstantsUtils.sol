@@ -10,10 +10,13 @@ import "../../interfaces/trade/types/ITradingStorage.sol";
  */
 library ConstantsUtils {
     uint256 internal constant P_10 = 1e10; // 10 decimals (DO NOT UPDATE)
-    uint256 internal constant MAX_SL_P = 75; // -75% PNL
     uint256 internal constant MAX_PNL_P = 900; // 900% PnL (10x)
-    uint256 internal constant LIQ_THRESHOLD_P = 90; // -90% pnl
-    uint256 internal constant MAX_OPEN_NEGATIVE_PNL_P = 40 * 1e10; // -40% pnl
+    uint256 internal constant SL_LIQ_BUFFER_P = 10 * P_10; // SL has to be 10% closer than liq price
+    uint256 internal constant LEGACY_LIQ_THRESHOLD_P = 90 * P_10; // -90% pnl
+    uint256 internal constant MIN_LIQ_THRESHOLD_P = 50 * P_10; // -50% pnl
+    uint256 internal constant MAX_OPEN_NEGATIVE_PNL_P = 40 * P_10; // -40% pnl
+    uint256 internal constant MAX_LIQ_SPREAD_P = (5 * P_10) / 100; // 0.05%
+    uint16 internal constant DEFAULT_MAX_CLOSING_SLIPPAGE_P = 1 * 1e3; // 1%
 
     function getMarketOrderTypes()
         internal
@@ -27,21 +30,6 @@ library ConstantsUtils {
             ITradingStorage.PendingOrderType.MARKET_PARTIAL_OPEN,
             ITradingStorage.PendingOrderType.MARKET_PARTIAL_CLOSE
         ];
-    }
-
-    /**
-     * @dev Returns pending order type (market open/limit open/stop open) for a trade type (trade/limit/stop)
-     * @param _tradeType the trade type
-     */
-    function getPendingOpenOrderType(
-        ITradingStorage.TradeType _tradeType
-    ) internal pure returns (ITradingStorage.PendingOrderType) {
-        return
-            _tradeType == ITradingStorage.TradeType.TRADE
-                ? ITradingStorage.PendingOrderType.MARKET_OPEN
-                : _tradeType == ITradingStorage.TradeType.LIMIT
-                ? ITradingStorage.PendingOrderType.LIMIT_OPEN
-                : ITradingStorage.PendingOrderType.STOP_OPEN;
     }
 
     /**

@@ -11,7 +11,7 @@ interface IPriceImpact {
         OiWindowsSettings oiWindowsSettings;
         mapping(uint48 => mapping(uint256 => mapping(uint256 => PairOi))) windows; // duration => pairIndex => windowId => Oi
         mapping(uint256 => PairDepth) pairDepths; // pairIndex => depth (USD)
-        mapping(address => mapping(uint32 => TradePriceImpactInfo)) tradePriceImpactInfos;
+        mapping(uint256 => PairFactors) pairFactors;
         uint256[46] __gap;
     }
 
@@ -41,8 +41,12 @@ interface IPriceImpact {
         uint128 onePercentDepthBelowUsd; // USD
     }
 
-    struct TradePriceImpactInfo {
-        uint128 lastWindowOiUsd; // 1e18 USD
-        uint128 __placeholder;
+    struct PairFactors {
+        uint40 protectionCloseFactor; // 1e10; max 109.95x
+        uint32 protectionCloseFactorBlocks;
+        uint40 cumulativeFactor; // 1e10; max 109.95x
+        uint144 __placeholder;
     }
+
+
 }

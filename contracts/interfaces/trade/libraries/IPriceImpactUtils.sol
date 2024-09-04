@@ -53,18 +53,6 @@ interface IPriceImpactUtils is IPriceImpact {
     ) external;
 
     /**
-     * @dev Removes open interest from trade last OI update window
-     * @param _trader trader address
-     * @param _index trade index
-     * @param _oiDeltaCollateral open interest to remove (collateral precision)
-     */
-    function removePriceImpactOpenInterest(
-        address _trader,
-        uint32 _index,
-        uint256 _oiDeltaCollateral
-    ) external;
-
-    /**
      * @dev Returns last OI delta in USD for a trade (1e18 precision)
      * @param _trader trader address
      * @param _index trade index
@@ -140,6 +128,14 @@ interface IPriceImpactUtils is IPriceImpact {
     function getPairDepths(uint256[] calldata _indices) external view returns (PairDepth[] memory);
 
     /**
+     * @dev Returns factors for a set of pairs (1e10)
+     * @param _indices indices of pairs
+     */
+    function getPairFactors(
+        uint256[] calldata _indices
+    ) external view returns (IPriceImpact.PairFactors[] memory);
+
+    /**
      * @dev Triggered when OiWindowsSettings is initialized (once)
      * @param windowsDuration duration of each window (seconds)
      * @param windowsCount number of windows
@@ -164,16 +160,6 @@ interface IPriceImpactUtils is IPriceImpact {
      * @param isPartial true if partial add
      */
     event PriceImpactOpenInterestAdded(IPriceImpact.OiWindowUpdate oiWindowUpdate, bool isPartial);
-
-    /**
-     * @dev Triggered when OI is (tentatively) removed from a window.
-     * @param oiWindowUpdate OI window update details (windowsDuration, pairIndex, windowId, etc.)
-     * @param notOutdated true if the OI is not outdated
-     */
-    event PriceImpactOpenInterestRemoved(
-        IPriceImpact.OiWindowUpdate oiWindowUpdate,
-        bool notOutdated
-    );
 
     /**
      * @dev Triggered when multiple pairs' OI are transferred to a new window (when updating windows duration).

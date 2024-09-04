@@ -62,15 +62,6 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
         PriceImpactUtils.addPriceImpactOpenInterest(_trader, _index, _oiDeltaCollateral);
     }
 
-    /// @inheritdoc IPriceImpactUtils
-    function removePriceImpactOpenInterest(
-        address _trader,
-        uint32 _index,
-        uint256 _oiDeltaCollateral
-    ) external virtual onlySelf {
-        PriceImpactUtils.removePriceImpactOpenInterest(_trader, _index, _oiDeltaCollateral);
-    }
-
     // Getters
 
     /// @inheritdoc IPriceImpactUtils
@@ -135,5 +126,12 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
     /// @inheritdoc IPriceImpactUtils
     function getPairDepths(uint256[] calldata _indices) external view returns (PairDepth[] memory) {
         return PriceImpactUtils.getPairDepths(_indices);
+    }
+
+    /// @inheritdoc IPriceImpactUtils
+    function getPairFactors(
+        uint256[] calldata _indices
+    ) external view returns (IPriceImpact.PairFactors[] memory) {
+        return PriceImpactUtils.getPairFactors(_indices);
     }
 }

@@ -19,6 +19,13 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
         _disableInitializers();
     }
 
+    /// @inheritdoc IPairsStorageUtils
+    function initializeGroupLiquidationParams(
+        IPairsStorage.GroupLiquidationParams[] memory _groupLiquidationParams
+    ) external reinitializer(3) {
+        PairsStorageUtils.initializeGroupLiquidationParams(_groupLiquidationParams);
+    }
+
     // Management Setters
 
     /// @inheritdoc IPairsStorageUtils
@@ -167,5 +174,19 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     /// @inheritdoc IPairsStorageUtils
     function getAllPairsRestrictedMaxLeverage() external view returns (uint256[] memory) {
         return PairsStorageUtils.getAllPairsRestrictedMaxLeverage();
+    }
+
+    /// @inheritdoc IPairsStorageUtils
+    function getGroupLiquidationParams(
+        uint256 _groupIndex
+    ) external view returns (IPairsStorage.GroupLiquidationParams memory) {
+        return PairsStorageUtils.getGroupLiquidationParams(_groupIndex);
+    }
+
+    /// @inheritdoc IPairsStorageUtils
+    function getPairLiquidationParams(
+        uint256 _pairIndex
+    ) external view returns (IPairsStorage.GroupLiquidationParams memory) {
+        return PairsStorageUtils.getPairLiquidationParams(_pairIndex);
     }
 }

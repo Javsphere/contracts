@@ -17,6 +17,17 @@ library PairsStorageUtils {
     uint256 private constant MIN_LEVERAGE = 2;
     uint256 private constant MAX_LEVERAGE = 1000;
 
+    function initializeGroupLiquidationParams(
+        IPairsStorage.GroupLiquidationParams[] memory _groupLiquidationParams
+    ) internal {
+        IPairsStorage.PairsStorage storage s = _getStorage();
+        if (_groupLiquidationParams.length != s.groupsCount) revert IGeneralErrors.WrongLength();
+
+        for (uint256 i = 0; i < _groupLiquidationParams.length; ++i) {
+            setGroupLiquidationParams(i, _groupLiquidationParams[i]);
+        }
+    }
+
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
@@ -99,6 +110,45 @@ library PairsStorageUtils {
 
             emit IPairsStorageUtils.PairCustomMaxLeverageUpdated(_indices[i], _values[i]);
         }
+    }
+
+    /**
+     * @dev Check IPairsStorageUtils interface for documentation
+     */
+    function setGroupLiquidationParams(
+        uint256 _groupIndex,
+        IPairsStorage.GroupLiquidationParams memory _params
+    ) internal groupListed(_groupIndex) {
+        IPairsStorage.PairsStorage storage s = _getStorage();
+
+        if (
+            _params.maxLiqSpreadP == 0 ||
+            _params.startLiqThresholdP == 0 ||
+            _params.endLiqThresholdP == 0 ||
+            _params.startLeverage == 0 ||
+            _params.endLeverage == 0
+        ) revert IGeneralErrors.ZeroValue();
+
+        if (_params.maxLiqSpreadP > ConstantsUtils.MAX_LIQ_SPREAD_P)
+            revert IPairsStorageUtils.MaxLiqSpreadPTooHigh();
+
+        if (_params.startLiqThresholdP < _params.endLiqThresholdP)
+            revert IPairsStorageUtils.WrongLiqParamsThresholds();
+        if (_params.startLiqThresholdP > ConstantsUtils.LEGACY_LIQ_THRESHOLD_P)
+            revert IPairsStorageUtils.StartLiqThresholdTooHigh();
+        if (_params.endLiqThresholdP < ConstantsUtils.MIN_LIQ_THRESHOLD_P)
+            revert IPairsStorageUtils.EndLiqThresholdTooLow();
+
+        if (_params.startLeverage > _params.endLeverage)
+            revert IPairsStorageUtils.WrongLiqParamsLeverages();
+        if (_params.startLeverage < groups(_groupIndex).minLeverage * 1e3)
+            revert IPairsStorageUtils.StartLeverageTooLow();
+        if (_params.endLeverage > groups(_groupIndex).maxLeverage * 1e3)
+            revert IPairsStorageUtils.EndLeverageTooHigh();
+
+        s.groupLiquidationParams[_groupIndex] = _params;
+
+        emit IPairsStorageUtils.GroupLiquidationParamsUpdated(_groupIndex, _params);
     }
 
     /**
@@ -271,6 +321,24 @@ library PairsStorageUtils {
         }
 
         return lev;
+    }
+
+    /**
+     * @dev Check IPairsStorageUtils interface for documentation
+     */
+    function getGroupLiquidationParams(
+        uint256 _groupIndex
+    ) internal view returns (IPairsStorage.GroupLiquidationParams memory) {
+        return _getStorage().groupLiquidationParams[_groupIndex];
+    }
+
+    /**
+     * @dev Check IPairsStorageUtils interface for documentation
+     */
+    function getPairLiquidationParams(
+        uint256 _pairIndex
+    ) internal view returns (IPairsStorage.GroupLiquidationParams memory) {
+        return _getStorage().groupLiquidationParams[pairs(_pairIndex).groupIndex];
     }
 
     /**

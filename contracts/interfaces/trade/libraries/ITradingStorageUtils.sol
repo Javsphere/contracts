@@ -231,29 +231,42 @@ interface ITradingStorageUtils is ITradingStorage {
     function getCounters(address _trader) external view returns (Counter memory);
 
     /**
-     * @dev Pure function that returns the pending order type (market open/limit open/stop open) for a trade type (trade/limit/stop)
-     * @param _tradeType the trade type
+     * @dev Returns the liquidation params for a trade
+     * @param _trader address of the trader
+     * @param _index index of the trade for trader
      */
-    function getPendingOpenOrderType(TradeType _tradeType) external pure returns (PendingOrderType);
+    function getTradeLiquidationParams(
+        address _trader,
+        uint32 _index
+    ) external view returns (IPairsStorage.GroupLiquidationParams memory);
+
+    /**
+     * @dev Returns all trade liquidation params of open trade/limit/stop orders for a trader
+     * @param _trader address of the trader
+     */
+    function getTradesLiquidationParams(
+        address _trader
+    ) external view returns (IPairsStorage.GroupLiquidationParams[] memory);
+
+    /**
+     * @dev Returns all trade liquidation params of open trade/limit/stop orders using a pagination system
+     * @param _offset index of first liq param to return
+     * @param _limit index of last liq param to return
+     */
+    function getAllTradesLiquidationParams(
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (IPairsStorage.GroupLiquidationParams[] memory);
+
+    /**
+     * @dev Returns the current contracts version
+     */
+    function getCurrentContractsVersion() external pure returns (ITradingStorage.ContractsVersion);
 
     /**
      * @dev Returns the address of the liquidityProvider
      */
     function getBorrowingProvider() external view returns (address);
-
-    /**
-     * @dev Returns the current percent profit of a trade (1e10 precision)
-     * @param _openPrice trade open price (1e10 precision)
-     * @param _currentPrice trade current price (1e10 precision)
-     * @param _long true for long, false for short
-     * @param _leverage trade leverage (1e3 precision)
-     */
-    function getPnlPercent(
-        uint64 _openPrice,
-        uint64 _currentPrice,
-        bool _long,
-        uint24 _leverage
-    ) external pure returns (int256);
 
     /**
      * @dev Emitted when the trading activated state is updated

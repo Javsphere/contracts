@@ -2,10 +2,19 @@
 
 pragma solidity ^0.8.23;
 
+import "../types/ITradingStorage.sol";
+
 /**
  * @dev Interface for TradingCommonUtils library
  */
 interface ITradingCommonUtils {
+    struct TradePriceImpactInput {
+        ITradingStorage.Trade trade;
+        uint256 marketPrice;
+        uint256 spreadP;
+        uint256 positionSizeCollateral;
+    }
+
     /**
      *
      * @param trader address of the trader

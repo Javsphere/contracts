@@ -2,6 +2,9 @@
 
 pragma solidity ^0.8.23;
 
+
+import "./IPairsStorage.sol";
+
 /**
  * @custom:version 8
  * @dev Contains the types for the JavTradingStorage facet
@@ -19,7 +22,8 @@ interface ITradingStorage {
         mapping(address => Counter) userCounters;
         address[] traders;
         mapping(address => bool) traderStored;
-        uint256[39] __gap;
+        mapping(address => mapping(uint32 => IPairsStorage.GroupLiquidationParams)) tradeLiquidationParams;
+        uint256[38] __gap;
     }
 
     enum PendingOrderType {
@@ -46,6 +50,11 @@ interface ITradingStorage {
         ACTIVATED,
         CLOSE_ONLY,
         PAUSED
+    }
+
+    enum ContractsVersion {
+        BEFORE_V9_2,
+        V9_2
     }
 
     struct Collateral {

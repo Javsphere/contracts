@@ -181,7 +181,6 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     error PriceImpactTooHigh();
     error NoTrade();
     error NoOrder();
-    error WrongOrderType();
     error AlreadyBeingMarketClosed();
     error WrongLeverage();
     error WrongTp();

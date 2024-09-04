@@ -76,6 +76,7 @@ interface ITradingProcessingUtils is
 
     /**
      * @dev Emitted when a limit/stop order is executed
+     * @param orderId the id of the corresponding pending trigger order
      * @param t the trade object
      * @param triggerCaller the address that triggered the limit order
      * @param orderType the type of the pending order
@@ -87,6 +88,7 @@ interface ITradingProcessingUtils is
      * @param exactExecution true if guaranteed execution was used
      */
     event LimitExecuted(
+        ITradingStorage.Id orderId,
         ITradingStorage.Trade t,
         address indexed triggerCaller,
         ITradingStorage.PendingOrderType orderType,
@@ -146,13 +148,14 @@ interface ITradingProcessingUtils is
 
     /**
      * @dev Emitted when a pending trigger order is canceled
+     * @param orderId order id of the pending trigger order
      * @param triggerCaller address of the trigger caller
      * @param orderType type of the pending trigger order
      * @param cancelReason reason for the cancelation
      */
     event TriggerOrderCanceled(
+        ITradingStorage.Id orderId,
         address indexed triggerCaller,
-        uint32 index,
         ITradingStorage.PendingOrderType orderType,
         CancelReason cancelReason
     );

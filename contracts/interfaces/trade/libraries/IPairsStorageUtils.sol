@@ -10,6 +10,14 @@ import "../types/IPairsStorage.sol";
  */
 interface IPairsStorageUtils is IPairsStorage {
     /**
+     * @dev Initializes liquidation params for all existing groups
+     * @param _groupLiquidationParams liquidation params for each group (index corresponds to group index)
+     */
+    function initializeGroupLiquidationParams(
+        IPairsStorage.GroupLiquidationParams[] memory _groupLiquidationParams
+    ) external;
+
+    /**
      * @dev Adds new trading pairs
      * @param _pairs pairs to add
      */
@@ -178,6 +186,20 @@ interface IPairsStorageUtils is IPairsStorage {
     function getAllPairsRestrictedMaxLeverage() external view returns (uint256[] memory);
 
     /**
+     * @dev Returns a group's liquidation params
+     */
+    function getGroupLiquidationParams(
+        uint256 _groupIndex
+    ) external view returns (IPairsStorage.GroupLiquidationParams memory);
+
+    /**
+     * @dev Returns a pair's group liquidation params
+     */
+    function getPairLiquidationParams(
+        uint256 _pairIndex
+    ) external view returns (IPairsStorage.GroupLiquidationParams memory);
+
+    /**
      * @dev Emitted when a new pair is listed
      * @param index index of pair
      * @param from pair from (eg. BTC)
@@ -224,10 +246,24 @@ interface IPairsStorageUtils is IPairsStorage {
      */
     event FeeUpdated(uint256 index);
 
+    /**
+     * @dev Emitted when a group liquidation params are updated
+     * @param index index of group
+     * @param params new group liquidation params
+     */
+    event GroupLiquidationParamsUpdated(uint256 index, IPairsStorage.GroupLiquidationParams params);
+
     error PairNotListed();
     error GroupNotListed();
     error FeeNotListed();
     error WrongLeverages();
     error WrongFees();
     error PairAlreadyListed();
+    error MaxLiqSpreadPTooHigh();
+    error WrongLiqParamsThresholds();
+    error WrongLiqParamsLeverages();
+    error StartLiqThresholdTooHigh();
+    error EndLiqThresholdTooLow();
+    error StartLeverageTooLow();
+    error EndLeverageTooHigh();
 }

@@ -446,118 +446,11 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getTrades(address _trader) internal view returns (ITradingStorage.Trade[] memory) {
-        ITradingStorage.TradingStorage storage s = _getStorage();
-        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader];
-        ITradingStorage.Trade[] memory trades = new ITradingStorage.Trade[](
-            traderCounter.openCount
-        );
-
-        uint32 currentIndex;
-        for (uint32 i; i < traderCounter.currentIndex; ++i) {
-            ITradingStorage.Trade memory trade = s.trades[_trader][i];
-            if (trade.isOpen) {
-                trades[currentIndex++] = trade;
-            }
-        }
-
-        return trades;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getAllTrades(
-        uint256 _offset,
-        uint256 _limit
-    ) internal view returns (ITradingStorage.Trade[] memory) {
-        // Fetch all traders with open trades (no pagination, return size is not an issue here)
-        address[] memory traders = getTraders(0, 0);
-
-        uint256 currentTradeIndex; // current global trade index
-        uint256 currentArrayIndex; // current index in returned trades array
-
-        ITradingStorage.Trade[] memory trades = new ITradingStorage.Trade[](_limit - _offset + 1);
-
-        // Fetch all trades for each trader
-        for (uint256 i; i < traders.length; ++i) {
-            ITradingStorage.Trade[] memory traderTrades = getTrades(traders[i]);
-
-            // Add trader trades to final trades array only if within _offset and _limit
-            for (uint256 j; j < traderTrades.length; ++j) {
-                if (currentTradeIndex >= _offset && currentTradeIndex <= _limit) {
-                    trades[currentArrayIndex++] = traderTrades[j];
-                }
-                currentTradeIndex++;
-            }
-        }
-
-        return trades;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
     function getTradeInfo(
         address _trader,
         uint32 _index
     ) internal view returns (ITradingStorage.TradeInfo memory) {
         return _getStorage().tradeInfos[_trader][_index];
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getTradeInfos(
-        address _trader
-    ) internal view returns (ITradingStorage.TradeInfo[] memory) {
-        ITradingStorage.TradingStorage storage s = _getStorage();
-        ITradingStorage.Counter memory traderCounter = s.userCounters[_trader];
-        ITradingStorage.TradeInfo[] memory tradeInfos = new ITradingStorage.TradeInfo[](
-            traderCounter.openCount
-        );
-
-        uint32 currentIndex;
-        for (uint32 i; i < traderCounter.currentIndex; ++i) {
-            if (s.trades[_trader][i].isOpen) {
-                tradeInfos[currentIndex++] = s.tradeInfos[_trader][i];
-            }
-        }
-
-        return tradeInfos;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getAllTradeInfos(
-        uint256 _offset,
-        uint256 _limit
-    ) internal view returns (ITradingStorage.TradeInfo[] memory) {
-        // Fetch all traders with open trades (no pagination, return size is not an issue here)
-        address[] memory traders = getTraders(0, 0);
-
-        uint256 currentTradeIndex; // current global trade index
-        uint256 currentArrayIndex; // current index in returned trades array
-
-        ITradingStorage.TradeInfo[] memory tradesInfos = new ITradingStorage.TradeInfo[](
-            _limit - _offset + 1
-        );
-
-        // Fetch all trades for each trader
-        for (uint256 i; i < traders.length; ++i) {
-            ITradingStorage.TradeInfo[] memory traderTradesInfos = getTradeInfos(traders[i]);
-
-            // Add trader trades to final trades array only if within _offset and _limit
-            for (uint256 j; j < traderTradesInfos.length; ++j) {
-                if (currentTradeIndex >= _offset && currentTradeIndex <= _limit) {
-                    tradesInfos[currentArrayIndex++] = traderTradesInfos[j];
-                }
-                currentTradeIndex++;
-            }
-        }
-
-        return tradesInfos;
     }
 
     /**
@@ -570,15 +463,18 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getPendingOpenOrderType(
-        ITradingStorage.TradeType _tradeType
-    ) internal pure returns (ITradingStorage.PendingOrderType) {
-        return
-            _tradeType == ITradingStorage.TradeType.TRADE
-                ? ITradingStorage.PendingOrderType.MARKET_OPEN
-                : _tradeType == ITradingStorage.TradeType.LIMIT
-                ? ITradingStorage.PendingOrderType.LIMIT_OPEN
-                : ITradingStorage.PendingOrderType.STOP_OPEN;
+    function getTradeLiquidationParams(
+        address _trader,
+        uint32 _index
+    ) external view returns (IPairsStorage.GroupLiquidationParams memory) {
+        return _getStorage().tradeLiquidationParams[_trader][_index];
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getCurrentContractsVersion() external pure returns (ITradingStorage.ContractsVersion) {
+        return ITradingStorage.ContractsVersion.V9_2;
     }
 
     /**
@@ -586,35 +482,6 @@ library TradingStorageUtils {
      */
     function getBorrowingProvider() internal view returns (address) {
         return _getStorage().borrowingProvider;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getPnlPercent(
-        uint64 _openPrice,
-        uint64 _currentPrice,
-        bool _long,
-        uint24 _leverage
-    ) internal pure returns (int256 p) {
-        int256 pricePrecision = int256(PRICE_PRECISION);
-        int256 maxPnlP = int256(MAX_PNL_P) * pricePrecision;
-        int256 minPnlP = -100 * int256(PRICE_PRECISION);
-
-        int256 openPrice = int256(uint256(_openPrice));
-        int256 currentPrice = int256(uint256(_currentPrice));
-        int256 leverage = int256(uint256(_leverage));
-
-        p = _openPrice > 0
-            ? ((_long ? currentPrice - openPrice : openPrice - currentPrice) *
-                100 *
-                pricePrecision *
-                leverage) /
-                openPrice /
-                1e3
-            : int256(0);
-
-        p = p > maxPnlP ? maxPnlP : p < minPnlP ? minPnlP : p;
     }
 
     /**
@@ -653,14 +520,14 @@ library TradingStorageUtils {
         uint24 _leverage,
         uint64 _tp,
         bool _long
-    ) internal pure returns (uint64) {
+    ) public pure returns (uint64) {
         if (
             _tp == 0 ||
-            getPnlPercent(_openPrice, _tp, _long, _leverage) ==
-            int256(MAX_PNL_P) * int256(PRICE_PRECISION)
+            TradingCommonUtils.getPnlPercent(_openPrice, _tp, _long, _leverage) ==
+            int256(ConstantsUtils.MAX_PNL_P) * int256(ConstantsUtils.P_10)
         ) {
             uint256 openPrice = uint256(_openPrice);
-            uint256 tpDiff = (openPrice * MAX_PNL_P * 1e3) / _leverage / 100;
+            uint256 tpDiff = (openPrice * ConstantsUtils.MAX_PNL_P * 1e3) / _leverage / 100;
             uint256 newTp = _long
                 ? openPrice + tpDiff
                 : (tpDiff <= openPrice ? openPrice - tpDiff : 0);
@@ -677,20 +544,24 @@ library TradingStorageUtils {
      * @param _leverage trade leverage (1e3 precision)
      * @param _sl trade stop loss price (1e10 precision)
      * @param _long trade direction
+     * @param _liqPnlThresholdP liquidation pnl threshold percentage (1e10)
      */
     function _limitSlDistance(
         uint64 _openPrice,
         uint24 _leverage,
         uint64 _sl,
-        bool _long
-    ) internal pure returns (uint64) {
+        bool _long,
+        uint256 _liqPnlThresholdP
+    ) public pure returns (uint64) {
+        uint256 minSlPnlP = _liqPnlThresholdP - ConstantsUtils.SL_LIQ_BUFFER_P;
+
         if (
             _sl > 0 &&
-            getPnlPercent(_openPrice, _sl, _long, _leverage) <
-            int256(MAX_SL_P) * int256(PRICE_PRECISION) * -1
+            TradingCommonUtils.getPnlPercent(_openPrice, _sl, _long, _leverage) <
+            int256(minSlPnlP) * -1
         ) {
             uint256 openPrice = uint256(_openPrice);
-            uint256 slDiff = (openPrice * MAX_SL_P * 1e3) / _leverage / 100;
+            uint256 slDiff = (openPrice * minSlPnlP * 1e3) / _leverage / 100 / ConstantsUtils.P_10;
             uint256 newSl = _long ? openPrice - slDiff : openPrice + slDiff;
 
             // Here an overflow (for shorts) is actually impossible because _sl is uint64

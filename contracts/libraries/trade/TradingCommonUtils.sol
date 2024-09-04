@@ -96,19 +96,19 @@ library TradingCommonUtils {
      * @dev Calculates trade value (useful when closing a trade)
      * @param _collateral amount of collateral (collateral precision)
      * @param _percentProfit profit percentage (1e10)
-     * @param _borrowingFeeCollateral borrowing fee in collateral tokens (collateral precision)
-     * @param _closingFeeCollateral closing fee in collateral tokens (collateral precision)
+     * @param _feesCollateral borrowing fee + closing fee in collateral tokens (collateral precision)
      * @param _collateralPrecisionDelta precision delta of collateral (10^18/10^decimals)
      * @param _orderType corresponding pending order type
+     * @param _liqPnlThresholdP pnl liquidation threshold percentage (1e10)
      */
     function getTradeValuePure(
         uint256 _collateral,
         int256 _percentProfit,
-        uint256 _borrowingFeeCollateral,
-        uint256 _closingFeeCollateral,
+        uint256 _feesCollateral,
         uint128 _collateralPrecisionDelta,
-        ITradingStorage.PendingOrderType _orderType
-    ) internal pure returns (uint256) {
+        ITradingStorage.PendingOrderType _orderType,
+        uint256 _liqPnlThresholdP
+    ) public pure returns (uint256) {
         if (_orderType == ITradingStorage.PendingOrderType.LIQ_CLOSE) return 0;
 
         int256 precisionDelta = int256(uint256(_collateralPrecisionDelta));
@@ -120,13 +120,36 @@ library TradingCommonUtils {
             int256(ConstantsUtils.P_10) /
             100) /
             precisionDelta -
-            int256(_borrowingFeeCollateral) -
-            int256(_closingFeeCollateral);
+            int256(_feesCollateral);
 
-        int256 collateralLiqThreshold = (int256(_collateral) *
-            int256(100 - ConstantsUtils.LIQ_THRESHOLD_P)) / 100;
+        uint256 collateralLiqThreshold = (_collateral *
+            (100 * ConstantsUtils.P_10 - _liqPnlThresholdP)) /
+            100 /
+            ConstantsUtils.P_10;
 
-        return value > collateralLiqThreshold ? uint256(value) : 0;
+        return value > int256(collateralLiqThreshold) ? uint256(value) : 0;
+    }
+
+    /**
+     * @dev Pure function that returns the liquidation pnl % threshold for a trade (1e10)
+     * @param _params trade liquidation params
+     * @param _leverage trade leverage (1e3 precision)
+     */
+    function getLiqPnlThresholdP(
+        IPairsStorage.GroupLiquidationParams memory _params,
+        uint256 _leverage
+    ) public pure returns (uint256) {
+        // By default use legacy threshold if liquidation params not set (trades opened before v9.2)
+        if (_params.maxLiqSpreadP == 0) return ConstantsUtils.LEGACY_LIQ_THRESHOLD_P;
+
+        if (_leverage <= _params.startLeverage) return _params.startLiqThresholdP;
+        if (_leverage >= _params.endLeverage) return _params.endLiqThresholdP;
+
+        return
+            _params.startLiqThresholdP -
+            ((_leverage - _params.startLeverage) *
+                (_params.startLiqThresholdP - _params.endLiqThresholdP)) /
+            (_params.endLeverage - _params.startLeverage);
     }
 
     // View functions
@@ -258,11 +281,138 @@ library TradingCommonUtils {
         valueCollateral = getTradeValuePure(
             _trade.collateralAmount,
             _percentProfit,
-            borrowingFeesCollateral,
-            _closingFeesCollateral,
+            borrowingFeesCollateral + _closingFeesCollateral,
             _collateralPrecisionDelta,
-            _orderType
+            _orderType,
+            getTradeLiqPnlThresholdP(_trade)
         );
+    }
+
+    /**
+     * @dev Returns price impact % (1e10), price after spread and impact (1e10)
+     * @param _input input data
+     * @param _contractsVersion contracts version
+     */
+    function getTradeOpeningPriceImpact(
+        ITradingCommonUtils.TradePriceImpactInput memory _input,
+        ITradingStorage.ContractsVersion _contractsVersion
+    ) external view returns (uint256 priceImpactP, uint256 priceAfterImpact) {
+        ITradingStorage.Trade memory trade = _input.trade;
+
+        (priceImpactP, priceAfterImpact) = _getMultiCollatDiamond().getTradePriceImpact(
+            getMarketExecutionPrice(
+                _input.marketPrice,
+                _input.spreadP,
+                trade.long,
+                true,
+                _contractsVersion
+            ),
+            trade.pairIndex,
+            trade.long,
+            _getMultiCollatDiamond().getUsdNormalizedValue(
+                trade.collateralIndex,
+                _input.positionSizeCollateral
+            ),
+            false,
+            true,
+            0,
+            _contractsVersion
+        );
+    }
+
+    /**
+     * @dev Returns price impact % (1e10), price after spread and impact (1e10), and trade value used to know if pnl is positive (collateral precision)
+     * @param _input input data
+     */
+    function getTradeClosingPriceImpact(
+        ITradingCommonUtils.TradePriceImpactInput memory _input
+    )
+        external
+        view
+        returns (
+            uint256 priceImpactP,
+            uint256 priceAfterImpact,
+            uint256 tradeValueCollateralNoFactor
+        )
+    {
+        ITradingStorage.Trade memory trade = _input.trade;
+        ITradingStorage.TradeInfo memory tradeInfo = _getMultiCollatDiamond().getTradeInfo(
+            trade.user,
+            trade.index
+        );
+
+        // 0. If trade opened before v9.2, return market price (no closing spread or price impact)
+        if (tradeInfo.contractsVersion == ITradingStorage.ContractsVersion.BEFORE_V9_2) {
+            return (0, _input.marketPrice, 0);
+        }
+
+        // 1. Prepare vars
+        bool open = false;
+        uint256 priceAfterSpread = getMarketExecutionPrice(
+            _input.marketPrice,
+            _input.spreadP,
+            trade.long,
+            open,
+            tradeInfo.contractsVersion
+        );
+        uint256 positionSizeUsd = _getMultiCollatDiamond().getUsdNormalizedValue(
+            trade.collateralIndex,
+            _input.positionSizeCollateral
+        );
+
+        // 2. Calculate PnL after fees, spread, and price impact without protection factor
+        (, uint256 priceNoProtectionFactor) = _getMultiCollatDiamond().getTradePriceImpact(
+            priceAfterSpread,
+            trade.pairIndex,
+            trade.long,
+            positionSizeUsd,
+            false, // assume pnl negative, so it doesn't use protection factor
+            open,
+            tradeInfo.lastPosIncreaseBlock,
+            tradeInfo.contractsVersion
+        );
+        int256 pnlPercentNoProtectionFactor = getPnlPercent(
+            trade.openPrice,
+            uint64(priceNoProtectionFactor),
+            trade.long,
+            trade.leverage
+        );
+        (tradeValueCollateralNoFactor, ) = getTradeValueCollateral(
+            trade,
+            pnlPercentNoProtectionFactor,
+            getTotalClosingFeesCollateral(
+                trade.collateralIndex,
+                trade.pairIndex,
+                getPositionSizeCollateral(trade.collateralAmount, trade.leverage)
+            ),
+            _getMultiCollatDiamond().getCollateral(trade.collateralIndex).precisionDelta,
+            ITradingStorage.PendingOrderType.MARKET_CLOSE
+        );
+
+        (priceImpactP, priceAfterImpact) = _getMultiCollatDiamond().getTradePriceImpact(
+            priceAfterSpread,
+            trade.pairIndex,
+            trade.long,
+            positionSizeUsd,
+            tradeValueCollateralNoFactor > trade.collateralAmount, // use protection factor when pnl > 0 without protection factor
+            open,
+            tradeInfo.lastPosIncreaseBlock,
+            tradeInfo.contractsVersion
+        );
+    }
+
+    /**
+     * @dev Returns a trade's liquidation threshold % (1e10)
+     * @param _trade trade struct
+     */
+    function getTradeLiqPnlThresholdP(
+        ITradingStorage.Trade memory _trade
+    ) public view returns (uint256) {
+        return
+            getLiqPnlThresholdP(
+                _getMultiCollatDiamond().getTradeLiquidationParams(_trade.user, _trade.index),
+                _trade.leverage
+            );
     }
 
     /**
@@ -283,6 +433,25 @@ library TradingCommonUtils {
                     ConstantsUtils.P_10 /
                     100
             );
+    }
+
+    /**
+     * @dev Returns total closing fees in collateral tokens
+     * @param _collateralIndex trade collateral index
+     * @param _pairIndex trade pair index
+     * @param _positionSizeCollateral trade position size (collateral precision)
+     */
+    function getTotalClosingFeesCollateral(
+        uint8 _collateralIndex,
+        uint16 _pairIndex,
+        uint256 _positionSizeCollateral
+    ) public view returns (uint256 closingFeesCollateral) {
+        return
+            (getPositionSizeCollateralBasis(_collateralIndex, _pairIndex, _positionSizeCollateral) *
+                (_getMultiCollatDiamond().pairCloseFeeP(_pairIndex) +
+                    _getMultiCollatDiamond().pairTriggerOrderFeeP(_pairIndex))) /
+            ConstantsUtils.P_10 /
+            100;
     }
 
     /**
@@ -771,17 +940,6 @@ library TradingCommonUtils {
             _trade.user,
             _trade.index,
             _positionSizeCollateral
-        );
-    }
-
-    /**
-     * @dev Remove trade position size OI from the protocol (for full close)
-     * @param _trade trade struct
-     */
-    function removeTradeOiCollateral(ITradingStorage.Trade memory _trade) internal {
-        removeOiCollateral(
-            _trade,
-            getPositionSizeCollateral(_trade.collateralAmount, _trade.leverage)
         );
     }
 

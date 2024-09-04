@@ -20,7 +20,7 @@ contract JavTradingProcessing is JavAddressStore, ITradingProcessingUtils {
     }
 
     /// @inheritdoc ITradingProcessingUtils
-    function initializeTradingProcessing(uint8 _vaultClosingFeeP) external reinitializer(4) {
+    function initializeTradingProcessing(uint8 _vaultClosingFeeP) external reinitializer(5) {
         TradingProcessingUtils.initializeTradingProcessing(_vaultClosingFeeP);
     }
 

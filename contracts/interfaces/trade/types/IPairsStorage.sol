@@ -16,6 +16,7 @@ interface IPairsStorage {
         uint256 pairsCount;
         uint256 groupsCount;
         uint256 feesCount;
+        mapping(uint256 => GroupLiquidationParams) groupLiquidationParams;
         uint256[41] __gap;
     }
 
@@ -41,5 +42,13 @@ interface IPairsStorage {
         uint256 closeFeeP; // PRECISION (% of position size)
         uint256 triggerOrderFeeP; // PRECISION (% of position size)
         uint256 minPositionSizeUsd; // 1e18 (collateral x leverage, useful for min fee)
+    }
+
+    struct GroupLiquidationParams {
+        uint40 maxLiqSpreadP; // 1e10 (%)
+        uint40 startLiqThresholdP; // 1e10 (%)
+        uint40 endLiqThresholdP; // 1e10 (%)
+        uint24 startLeverage; // 1e3
+        uint24 endLeverage; // 1e3
     }
 }

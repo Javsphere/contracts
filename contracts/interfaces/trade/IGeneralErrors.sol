@@ -25,6 +25,7 @@ interface IGeneralErrors {
     error AboveMax();
     error NotAuthorized();
     error WrongTradeType();
+    error WrongOrderType();
     error GeneralPaused();
     error LiqReached();
     error SlReached();

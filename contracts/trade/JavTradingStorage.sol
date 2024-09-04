@@ -6,6 +6,7 @@ import "../interfaces/trade/libraries/ITradingStorageUtils.sol";
 
 import "../libraries/trade/TradingStorageUtils.sol";
 import "./abstract/JavAddressStore.sol";
+import "../libraries/trade/ArrayGetters.sol";
 
 /**
  * @custom:version 8
@@ -26,7 +27,7 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         address _borrowingProvider,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
-    ) external reinitializer(6) {
+    ) external reinitializer(7) {
         TradingStorageUtils.initializeTradingStorage(
             _rewardsToken,
             _rewardsDistributor,
@@ -166,7 +167,7 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
 
     /// @inheritdoc ITradingStorageUtils
     function getTraders(uint32 _offset, uint32 _limit) external view returns (address[] memory) {
-        return TradingStorageUtils.getTraders(_offset, _limit);
+        return ArrayGetters.getTraders(_offset, _limit);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -176,12 +177,12 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
 
     /// @inheritdoc ITradingStorageUtils
     function getTrades(address _trader) external view returns (Trade[] memory) {
-        return TradingStorageUtils.getTrades(_trader);
+        return ArrayGetters.getTrades(_trader);
     }
 
     /// @inheritdoc ITradingStorageUtils
     function getAllTrades(uint256 _offset, uint256 _limit) external view returns (Trade[] memory) {
-        return TradingStorageUtils.getAllTrades(_offset, _limit);
+        return ArrayGetters.getAllTrades(_offset, _limit);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -191,7 +192,7 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
 
     /// @inheritdoc ITradingStorageUtils
     function getTradeInfos(address _trader) external view returns (TradeInfo[] memory) {
-        return TradingStorageUtils.getTradeInfos(_trader);
+        return ArrayGetters.getTradeInfos(_trader);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -199,7 +200,7 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         uint256 _offset,
         uint256 _limit
     ) external view returns (TradeInfo[] memory) {
-        return TradingStorageUtils.getAllTradeInfos(_offset, _limit);
+        return ArrayGetters.getAllTradeInfos(_offset, _limit);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -208,24 +209,35 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function getPendingOpenOrderType(
-        TradeType _tradeType
-    ) external pure returns (PendingOrderType) {
-        return TradingStorageUtils.getPendingOpenOrderType(_tradeType);
-    }
-
-    /// @inheritdoc ITradingStorageUtils
     function getBorrowingProvider() external view returns (address) {
         return TradingStorageUtils.getBorrowingProvider();
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function getPnlPercent(
-        uint64 _openPrice,
-        uint64 _currentPrice,
-        bool _long,
-        uint24 _leverage
-    ) external pure returns (int256) {
-        return TradingStorageUtils.getPnlPercent(_openPrice, _currentPrice, _long, _leverage);
+    function getTradeLiquidationParams(
+        address _trader,
+        uint32 _index
+    ) external view returns (IPairsStorage.GroupLiquidationParams memory) {
+        return TradingStorageUtils.getTradeLiquidationParams(_trader, _index);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function getTradesLiquidationParams(
+        address _trader
+    ) external view returns (IPairsStorage.GroupLiquidationParams[] memory) {
+        return ArrayGetters.getTradesLiquidationParams(_trader);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function getAllTradesLiquidationParams(
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (IPairsStorage.GroupLiquidationParams[] memory) {
+        return ArrayGetters.getAllTradesLiquidationParams(_offset, _limit);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function getCurrentContractsVersion() external pure returns (ITradingStorage.ContractsVersion) {
+        return TradingStorageUtils.getCurrentContractsVersion();
     }
 }

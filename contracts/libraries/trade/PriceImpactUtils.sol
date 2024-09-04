@@ -21,11 +21,9 @@ import "./TradingStorageUtils.sol";
  * When calculating price impact, only the most recent X windows are taken into account.
  */
 library PriceImpactUtils {
-    uint256 private constant PRECISION = 1e10; // 10 decimals
-
     uint48 private constant MAX_WINDOWS_COUNT = 5;
-    uint48 private constant MAX_WINDOWS_DURATION = 30 days;
-    uint48 private constant MIN_WINDOWS_DURATION = 10 minutes;
+    uint48 private constant MAX_WINDOWS_DURATION = 10 minutes;
+    uint48 private constant MIN_WINDOWS_DURATION = 1 minutes;
 
     /**
      * @dev Validates new windowsDuration value
@@ -127,7 +125,8 @@ library PriceImpactUtils {
     function addPriceImpactOpenInterest(
         address _trader,
         uint32 _index,
-        uint256 _oiDeltaCollateral
+        uint256 _oiDeltaCollateral,
+        bool _open
     ) internal {
         // 1. Prepare variables
         IPriceImpact.OiWindowsSettings storage settings = _getStorage().oiWindowsSettings;
@@ -135,13 +134,12 @@ library PriceImpactUtils {
         ITradingStorage.TradeInfo storage tradeInfo = TradingStorageUtils._getStorage().tradeInfos[
             _trader
         ][_index];
-        IPriceImpact.TradePriceImpactInfo storage tradePriceImpactInfo = _getStorage()
-            .tradePriceImpactInfos[_trader][_index];
 
         uint256 currentWindowId = _getCurrentWindowId(settings);
         uint256 currentCollateralPriceUsd = _getMultiCollatDiamond().getCollateralPriceUsd(
             trade.collateralIndex
         );
+
         uint128 oiDeltaUsd = uint128(
             TradingCommonUtils.convertCollateralToUsd(
                 _oiDeltaCollateral,
@@ -150,39 +148,21 @@ library PriceImpactUtils {
             )
         );
 
-        // 2. Handle logic for partials when last OI delta is still in an active window
-        bool isPartial = tradeInfo.lastOiUpdateTs > 0;
-        if (
-            isPartial &&
-            _getWindowId(tradeInfo.lastOiUpdateTs, settings) >=
-            _getEarliestActiveWindowId(currentWindowId, settings.windowsCount)
-        ) {
-            // 2.1 Fetch last OI delta for trade
-            uint128 lastWindowOiUsd = getTradeLastWindowOiUsd(_trader, _index);
-
-            // 2.2 Remove it from existing window
-            removePriceImpactOpenInterest(_trader, _index, lastWindowOiUsd);
-
-            // 2.3 Add it to current window, scaling it to the current collateral/usd price
-            oiDeltaUsd += uint128(
-                (currentCollateralPriceUsd * lastWindowOiUsd) / tradeInfo.collateralPriceUsd
-            );
-        }
-
-        // 3. Add OI to current window
+        // 2. Add OI to current window
         IPriceImpact.PairOi storage currentWindow = _getStorage().windows[settings.windowsDuration][
             trade.pairIndex
         ][currentWindowId];
-        if (trade.long) {
+        bool long = (trade.long && _open) || (!trade.long && !_open);
+
+        if (long) {
             currentWindow.oiLongUsd += oiDeltaUsd;
         } else {
             currentWindow.oiShortUsd += oiDeltaUsd;
         }
 
-        // 4. Update trade info
+        // 3. Update trade info
         tradeInfo.lastOiUpdateTs = uint48(block.timestamp);
         tradeInfo.collateralPriceUsd = uint48(currentCollateralPriceUsd);
-        tradePriceImpactInfo.lastWindowOiUsd = oiDeltaUsd;
 
         emit IPriceImpactUtils.PriceImpactOpenInterestAdded(
             IPriceImpact.OiWindowUpdate(
@@ -191,88 +171,10 @@ library PriceImpactUtils {
                 settings.windowsDuration,
                 trade.pairIndex,
                 currentWindowId,
-                trade.long,
+                long,
+                _open,
                 oiDeltaUsd
-            ),
-            isPartial
-        );
-    }
-
-    /**
-     * @dev Check IPriceImpactUtils interface for documentation
-     */
-    function removePriceImpactOpenInterest(
-        address _trader,
-        uint32 _index,
-        uint256 _oiDeltaCollateral
-    ) internal {
-        // 1. Prepare vars
-        ITradingStorage.Trade memory trade = _getMultiCollatDiamond().getTrade(_trader, _index);
-        ITradingStorage.TradeInfo memory tradeInfo = _getMultiCollatDiamond().getTradeInfo(
-            _trader,
-            _index
-        );
-        IPriceImpact.OiWindowsSettings storage settings = _getStorage().oiWindowsSettings;
-        IPriceImpact.TradePriceImpactInfo storage tradePriceImpactInfo = _getStorage()
-            .tradePriceImpactInfos[_trader][_index];
-
-        // If trade OI wasn't stored in any window we return early
-        if (
-            _oiDeltaCollateral == 0 ||
-            tradeInfo.lastOiUpdateTs == 0 ||
-            tradeInfo.collateralPriceUsd == 0
-        ) {
-            return;
-        }
-
-        uint256 currentWindowId = _getCurrentWindowId(settings);
-        uint256 addWindowId = _getWindowId(tradeInfo.lastOiUpdateTs, settings);
-        bool notOutdated = _isWindowPotentiallyActive(addWindowId, currentWindowId);
-
-        uint128 oiDeltaUsd = uint128(
-            TradingCommonUtils.convertCollateralToUsd(
-                _oiDeltaCollateral,
-                _getMultiCollatDiamond().getCollateral(trade.collateralIndex).precisionDelta,
-                tradeInfo.collateralPriceUsd
             )
-        );
-
-        // 2. Remove OI if window where OI was added isn't outdated
-        if (notOutdated) {
-            IPriceImpact.PairOi storage window = _getStorage().windows[settings.windowsDuration][
-                trade.pairIndex
-            ][addWindowId];
-
-            // 2.1 Prevent removing trade OI that was already expired by capping delta at active OI
-            uint128 lastWindowOiUsd = getTradeLastWindowOiUsd(_trader, _index);
-            oiDeltaUsd = oiDeltaUsd > lastWindowOiUsd ? lastWindowOiUsd : oiDeltaUsd;
-
-            // 2.2 Remove delta from last OI delta for trade so it's up to date
-            tradePriceImpactInfo.lastWindowOiUsd = lastWindowOiUsd - oiDeltaUsd;
-
-            // 2.3 Remove OI from trade last oi updated window
-            if (trade.long) {
-                window.oiLongUsd = oiDeltaUsd < window.oiLongUsd
-                    ? window.oiLongUsd - oiDeltaUsd
-                    : 0;
-            } else {
-                window.oiShortUsd = oiDeltaUsd < window.oiShortUsd
-                    ? window.oiShortUsd - oiDeltaUsd
-                    : 0;
-            }
-        }
-
-        emit IPriceImpactUtils.PriceImpactOpenInterestRemoved(
-            IPriceImpact.OiWindowUpdate(
-                _trader,
-                _index,
-                settings.windowsDuration,
-                trade.pairIndex,
-                addWindowId,
-                trade.long,
-                oiDeltaUsd
-            ),
-            notOutdated
         );
     }
 
@@ -420,6 +322,20 @@ library PriceImpactUtils {
         }
 
         return depths;
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
+    function getPairFactors(
+        uint256[] calldata _indices
+    ) internal view returns (IPriceImpact.PairFactors[] memory pairFactors) {
+        pairFactors = new IPriceImpact.PairFactors[](_indices.length);
+        IPriceImpact.PriceImpactStorage storage s = _getStorage();
+
+        for (uint256 i = 0; i < _indices.length; ++i) {
+            pairFactors[i] = s.pairFactors[_indices[i]];
+        }
     }
 
     /**
@@ -595,36 +511,55 @@ library PriceImpactUtils {
 
     /**
      * @dev Returns trade price impact % and opening price after impact.
-     * @param _openPrice trade open price (1e10 precision)
+     * @param _marketPrice market price (1e10 precision)
      * @param _long true for long, false for short
      * @param _startOpenInterestUsd existing open interest of pair on trade side in USD (1e18 precision)
      * @param _tradeOpenInterestUsd open interest of trade in USD (1e18 precision)
      * @param _onePercentDepthUsd one percent depth of pair in USD on trade side
+     * @param _open true for open, false for close
+     * @param _protectionCloseFactor protection close factor (1e10 precision)
+     * @param _cumulativeFactor cumulative factor (1e10 precision)
+     * @param _contractsVersion trade contracts version
      */
     function _getTradePriceImpact(
-        uint256 _openPrice, // PRECISION
+        uint256 _marketPrice,
         bool _long,
-        uint256 _startOpenInterestUsd, // 1e18 USD
-        uint256 _tradeOpenInterestUsd, // 1e18 USD
-        uint256 _onePercentDepthUsd // USD
+        uint256 _startOpenInterestUsd,
+        uint256 _tradeOpenInterestUsd,
+        uint256 _onePercentDepthUsd,
+        bool _open,
+        uint256 _protectionCloseFactor,
+        uint256 _cumulativeFactor,
+        ITradingStorage.ContractsVersion _contractsVersion
     )
         internal
         pure
         returns (
-            uint256 priceImpactP, // PRECISION (%)
-            uint256 priceAfterImpact // PRECISION
+            uint256 priceImpactP, // 1e10 (%)
+            uint256 priceAfterImpact // 1e10
         )
     {
-        if (_onePercentDepthUsd == 0) {
-            return (0, _openPrice);
+        // No price impact if 0 depth or if closing trade opened before v9.2
+        if (
+            _onePercentDepthUsd == 0 ||
+            (!_open && _contractsVersion == ITradingStorage.ContractsVersion.BEFORE_V9_2)
+        ) {
+            return (0, _marketPrice);
         }
 
+        // Half price impact for trades opened after v9.2, full opening price impact for trades opened before v9.2
         priceImpactP =
-            ((_startOpenInterestUsd + _tradeOpenInterestUsd / 2) * PRECISION) /
+            (((_startOpenInterestUsd * _cumulativeFactor) /
+                ConstantsUtils.P_10 +
+                _tradeOpenInterestUsd /
+                2) * _protectionCloseFactor) /
             _onePercentDepthUsd /
-            1e18;
+            1e18 /
+            (_contractsVersion == ITradingStorage.ContractsVersion.BEFORE_V9_2 ? 1 : 2);
 
-        uint256 priceImpact = (priceImpactP * _openPrice) / PRECISION / 100;
-        priceAfterImpact = _long ? _openPrice + priceImpact : _openPrice - priceImpact;
+        uint256 priceImpact = (priceImpactP * _marketPrice) / ConstantsUtils.P_10 / 100;
+
+        if (!_open) _long = !_long; // reverse price impact direction on close
+        priceAfterImpact = _long ? _marketPrice + priceImpact : _marketPrice - priceImpact;
     }
 }

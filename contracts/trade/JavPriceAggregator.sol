@@ -25,7 +25,7 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
         bytes32 _rewardsTokenUsdFeed,
         uint8[] calldata _collateralIndices,
         bytes32[] memory _collateralUsdPriceFeeds
-    ) external reinitializer(7) {
+    ) external reinitializer(8) {
         PriceAggregatorUtils.initializePriceAggregator(
             _oracle,
             _alternativeOracle,
