@@ -126,6 +126,13 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
     }
 
     /// @inheritdoc IPriceImpactUtils
+    function getPairFactor(
+        uint256 _pairIndex
+    ) external view returns (IPriceImpact.PairFactors memory) {
+        return PriceImpactUtils.getPairFactor(_pairIndex);
+    }
+
+    /// @inheritdoc IPriceImpactUtils
     function getOiWindowsSettings() external view returns (OiWindowsSettings memory) {
         return PriceImpactUtils.getOiWindowsSettings();
     }

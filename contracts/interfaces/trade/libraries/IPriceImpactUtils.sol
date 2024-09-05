@@ -124,6 +124,14 @@ interface IPriceImpactUtils is IPriceImpact {
     function getPairDepth(uint256 _pairIndex) external view returns (PairDepth memory);
 
     /**
+     * @dev Returns a pair's factor
+     * @param _pairIndex index of pair
+     */
+    function getPairFactor(
+        uint256 _pairIndex
+    ) external view returns (IPriceImpact.PairFactors memory);
+
+    /**
      * @dev Returns current price impact windows settings
      */
     function getOiWindowsSettings() external view returns (OiWindowsSettings memory);

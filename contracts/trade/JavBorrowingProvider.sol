@@ -117,14 +117,14 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
 
     function initialBuy(
         uint256 _inputToken,
-        uint256 _amount
+        uint256 _amount,
+        uint256 _llpAmount
     ) external onlyAdmin validToken(_inputToken) {
         require(
             IERC20(llpToken).totalSupply() == 0,
             "JavBorrowingProvider: Purchase not available"
         );
         TokenInfo memory _token = tokens[_inputToken];
-        uint256 _llpAmount = (_amount * _getUsdPrice(_token.priceFeed)) / 1e18;
 
         IERC20(_token.asset).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20Extended(llpToken).mint(msg.sender, _llpAmount);

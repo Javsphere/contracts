@@ -324,6 +324,15 @@ library PriceImpactUtils {
     /**
      * @dev Check IPriceImpactUtils interface for documentation
      */
+    function getPairFactor(
+        uint256 _pairIndex
+    ) external view returns (IPriceImpact.PairFactors memory) {
+        return _getStorage().pairFactors[_pairIndex];
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
     function getOiWindowsSettings() internal view returns (IPriceImpact.OiWindowsSettings memory) {
         return _getStorage().oiWindowsSettings;
     }
