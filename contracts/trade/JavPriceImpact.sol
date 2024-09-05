@@ -105,8 +105,7 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
         uint256 _tradeOpenInterestUsd,
         bool _isPnlPositive,
         bool _open,
-        uint256 _lastPosIncreaseBlock,
-        ITradingStorage.ContractsVersion _contractsVersion
+        uint256 _lastPosIncreaseBlock
     ) external view returns (uint256 priceImpactP, uint256 priceAfterImpact) {
         (priceImpactP, priceAfterImpact) = PriceImpactUtils.getTradePriceImpact(
             _marketPrice,
@@ -115,8 +114,7 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
             _tradeOpenInterestUsd,
             _isPnlPositive,
             _open,
-            _lastPosIncreaseBlock,
-            _contractsVersion
+            _lastPosIncreaseBlock
         );
     }
 

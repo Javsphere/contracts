@@ -636,8 +636,7 @@ library TradingProcessingUtils {
                 _executionPrice,
                 _spreadP,
                 positionSizeCollateral
-            ),
-            _getMultiCollatDiamond().getCurrentContractsVersion()
+            )
         );
 
         uint256 maxSlippage = (uint256(_trade.openPrice) * _maxSlippageP) / 100 / 1e3;

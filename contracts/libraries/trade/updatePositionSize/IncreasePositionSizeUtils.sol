@@ -137,10 +137,7 @@ library IncreasePositionSizeUtils {
                 _price,
                 10,
                 values.positionSizeCollateralDelta
-            ),
-            _getMultiCollatDiamond()
-                .getTradeInfo(_existingTrade.user, _existingTrade.index)
-                .contractsVersion
+            )
         );
 
         // 4. Calculate existing trade pnl

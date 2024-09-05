@@ -259,8 +259,7 @@ library TradingInteractionsUtils {
 
         if (isOpenLimit) {
             (uint256 priceImpactP, ) = TradingCommonUtils.getTradeOpeningPriceImpact(
-                ITradingCommonUtils.TradePriceImpactInput(t, 0, 0, positionSizeCollateral),
-                _getMultiCollatDiamond().getCurrentContractsVersion()
+                ITradingCommonUtils.TradePriceImpactInput(t, 0, 0, positionSizeCollateral)
             );
 
             if ((priceImpactP * t.leverage) / 1e3 > ConstantsUtils.MAX_OPEN_NEGATIVE_PNL_P)
@@ -360,8 +359,7 @@ library TradingInteractionsUtils {
         ) revert ITradingInteractionsUtils.WrongLeverage();
 
         (uint256 priceImpactP, ) = TradingCommonUtils.getTradeOpeningPriceImpact(
-            ITradingCommonUtils.TradePriceImpactInput(_trade, 0, 0, positionSizeCollateral),
-            _getMultiCollatDiamond().getCurrentContractsVersion()
+            ITradingCommonUtils.TradePriceImpactInput(_trade, 0, 0, positionSizeCollateral)
         );
 
         if ((priceImpactP * _trade.leverage) / 1e3 > ConstantsUtils.MAX_OPEN_NEGATIVE_PNL_P)

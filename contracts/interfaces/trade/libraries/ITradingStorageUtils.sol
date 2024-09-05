@@ -265,11 +265,6 @@ interface ITradingStorageUtils is ITradingStorage {
     ) external view returns (IPairsStorage.GroupLiquidationParams[] memory);
 
     /**
-     * @dev Returns the current contracts version
-     */
-    function getCurrentContractsVersion() external pure returns (ITradingStorage.ContractsVersion);
-
-    /**
      * @dev Returns the address of the liquidityProvider
      */
     function getBorrowingProvider() external view returns (address);

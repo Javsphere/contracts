@@ -245,9 +245,4 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     ) external view returns (IPairsStorage.GroupLiquidationParams[] memory) {
         return ArrayGetters.getAllTradesLiquidationParams(_offset, _limit);
     }
-
-    /// @inheritdoc ITradingStorageUtils
-    function getCurrentContractsVersion() external pure returns (ITradingStorage.ContractsVersion) {
-        return TradingStorageUtils.getCurrentContractsVersion();
-    }
 }

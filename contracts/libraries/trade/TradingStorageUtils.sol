@@ -132,7 +132,7 @@ library TradingStorageUtils {
     function storeTrade(
         ITradingStorage.Trade memory _trade,
         ITradingStorage.TradeInfo memory _tradeInfo
-    ) external returns (ITradingStorage.Trade memory) {
+    ) internal returns (ITradingStorage.Trade memory) {
         ITradingStorage.TradingStorage storage s = _getStorage();
 
         _validateTrade(_trade);
@@ -155,7 +155,6 @@ library TradingStorageUtils {
         _tradeInfo.tpLastUpdatedBlock = _tradeInfo.createdBlock;
         _tradeInfo.slLastUpdatedBlock = _tradeInfo.createdBlock;
 
-        _tradeInfo.contractsVersion = _getMultiCollatDiamond().getCurrentContractsVersion();
         _tradeInfo.lastPosIncreaseBlock = _tradeInfo.createdBlock;
 
         counter.currentIndex++;
@@ -181,7 +180,7 @@ library TradingStorageUtils {
     function updateTradeMaxClosingSlippageP(
         ITradingStorage.Id memory _tradeId,
         uint16 _maxClosingSlippageP
-    ) external {
+    ) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
 
@@ -222,7 +221,7 @@ library TradingStorageUtils {
         uint24 _leverage,
         uint64 _openPrice,
         bool _isPartialIncrease
-    ) external {
+    ) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
         ITradingStorage.TradeInfo storage i = s.tradeInfos[_tradeId.user][_tradeId.index];
@@ -468,15 +467,8 @@ library TradingStorageUtils {
     function getTradeLiquidationParams(
         address _trader,
         uint32 _index
-    ) external view returns (IPairsStorage.GroupLiquidationParams memory) {
+    ) internal view returns (IPairsStorage.GroupLiquidationParams memory) {
         return _getStorage().tradeLiquidationParams[_trader][_index];
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
-    function getCurrentContractsVersion() external pure returns (ITradingStorage.ContractsVersion) {
-        return ITradingStorage.ContractsVersion.V9_2;
     }
 
     /**

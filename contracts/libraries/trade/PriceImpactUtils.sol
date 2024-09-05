@@ -277,8 +277,7 @@ library PriceImpactUtils {
         uint256 _tradeOpenInterestUsd, // 1e18 USD
         bool _isPnlPositive, // only relevant when _open = false
         bool _open,
-        uint256 _lastPosIncreaseBlock, // only relevant when _open = false
-        ITradingStorage.ContractsVersion _contractsVersion
+        uint256 _lastPosIncreaseBlock // only relevant when _open = false
     )
         internal
         view
@@ -307,8 +306,7 @@ library PriceImpactUtils {
                 block.number <= _lastPosIncreaseBlock + pairFactors.protectionCloseFactorBlocks
                 ? pairFactors.protectionCloseFactor
                 : ConstantsUtils.P_10,
-            pairFactors.cumulativeFactor != 0 ? pairFactors.cumulativeFactor : ConstantsUtils.P_10,
-            _contractsVersion
+            pairFactors.cumulativeFactor != 0 ? pairFactors.cumulativeFactor : ConstantsUtils.P_10
         );
     }
 
@@ -326,7 +324,7 @@ library PriceImpactUtils {
      */
     function getPairFactor(
         uint256 _pairIndex
-    ) external view returns (IPriceImpact.PairFactors memory) {
+    ) internal view returns (IPriceImpact.PairFactors memory) {
         return _getStorage().pairFactors[_pairIndex];
     }
 
@@ -578,7 +576,6 @@ library PriceImpactUtils {
      * @param _open true for open, false for close
      * @param _protectionCloseFactor protection close factor (1e10 precision)
      * @param _cumulativeFactor cumulative factor (1e10 precision)
-     * @param _contractsVersion trade contracts version
      */
     function _getTradePriceImpact(
         uint256 _marketPrice,
@@ -588,8 +585,7 @@ library PriceImpactUtils {
         uint256 _onePercentDepthUsd,
         bool _open,
         uint256 _protectionCloseFactor,
-        uint256 _cumulativeFactor,
-        ITradingStorage.ContractsVersion _contractsVersion
+        uint256 _cumulativeFactor
     )
         internal
         pure
@@ -599,10 +595,7 @@ library PriceImpactUtils {
         )
     {
         // No price impact if 0 depth or if closing trade opened before v9.2
-        if (
-            _onePercentDepthUsd == 0 ||
-            (!_open && _contractsVersion == ITradingStorage.ContractsVersion.BEFORE_V9_2)
-        ) {
+        if (_onePercentDepthUsd == 0 || !_open) {
             return (0, _marketPrice);
         }
 
@@ -614,7 +607,7 @@ library PriceImpactUtils {
                 2) * _protectionCloseFactor) /
             _onePercentDepthUsd /
             1e18 /
-            (_contractsVersion == ITradingStorage.ContractsVersion.BEFORE_V9_2 ? 1 : 2);
+            2;
 
         uint256 priceImpact = (priceImpactP * _marketPrice) / ConstantsUtils.P_10 / 100;
 

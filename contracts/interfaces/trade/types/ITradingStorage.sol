@@ -52,10 +52,7 @@ interface ITradingStorage {
         PAUSED
     }
 
-    enum ContractsVersion {
-        BEFORE_V9_2,
-        V9_2
-    }
+
 
     struct Collateral {
         // slot 1
@@ -98,7 +95,6 @@ interface ITradingStorage {
         uint16 maxSlippageP; // 1e3 (%)
         uint48 lastOiUpdateTs; // deprecated
         uint48 collateralPriceUsd; // 1e8 collateral price at trade open
-        ContractsVersion contractsVersion;
         uint32 lastPosIncreaseBlock; // for protection close factor
         uint8 __placeholder;
     }

@@ -104,7 +104,6 @@ interface IPriceImpactUtils is IPriceImpact {
      * @param _isPnlPositive true if positive pnl, false if negative pnl (only relevant when _open = false)
      * @param _open true on open, false on close
      * @param _lastPosIncreaseBlock block when trade position size was last increased (only relevant when _open = false)
-     * @param _contractsVersion trade contracts version
      */
     function getTradePriceImpact(
         uint256 _marketPrice,
@@ -113,8 +112,7 @@ interface IPriceImpactUtils is IPriceImpact {
         uint256 _tradeOpenInterestUsd,
         bool _isPnlPositive,
         bool _open,
-        uint256 _lastPosIncreaseBlock,
-        ITradingStorage.ContractsVersion _contractsVersion
+        uint256 _lastPosIncreaseBlock
     ) external view returns (uint256 priceImpactP, uint256 priceAfterImpact);
 
     /**
