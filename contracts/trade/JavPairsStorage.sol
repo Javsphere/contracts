@@ -22,7 +22,7 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     /// @inheritdoc IPairsStorageUtils
     function initializeGroupLiquidationParams(
         IPairsStorage.GroupLiquidationParams[] memory _groupLiquidationParams
-    ) external reinitializer(3) {
+    ) external reinitializer(5) {
         PairsStorageUtils.initializeGroupLiquidationParams(_groupLiquidationParams);
     }
 
