@@ -361,26 +361,10 @@ library TradingProcessingUtils {
 
         ITradingProcessing.CancelReason cancelReason;
         {
-            uint256 expectedPrice = _pendingOrder.trade.openPrice;
-            uint256 maxSlippage = (expectedPrice *
-                (
-                    i.maxSlippageP > 0
-                        ? i.maxSlippageP
-                        : ConstantsUtils.DEFAULT_MAX_CLOSING_SLIPPAGE_P
-                )) /
-                100 /
-                1e3;
-
             cancelReason = !t.isOpen
                 ? ITradingProcessing.CancelReason.NO_TRADE
                 : _pendingOrder.price == 0
                 ? ITradingProcessing.CancelReason.MARKET_CLOSED
-                : (
-                    t.long
-                        ? priceAfterImpact < expectedPrice - maxSlippage
-                        : priceAfterImpact > expectedPrice + maxSlippage
-                )
-                ? ITradingProcessing.CancelReason.SLIPPAGE
                 : ITradingProcessing.CancelReason.NONE;
         }
 
