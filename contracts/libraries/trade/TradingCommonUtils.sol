@@ -341,8 +341,6 @@ library TradingCommonUtils {
             trade.index
         );
 
-
-
         // 1. Prepare vars
         bool open = false;
         uint256 priceAfterSpread = getMarketExecutionPrice(

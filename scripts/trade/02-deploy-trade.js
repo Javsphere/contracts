@@ -6,110 +6,111 @@ async function main() {
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
 
-    const PackingUtils = await ethers.getContractFactory("PackingUtils");
-    const packlingUtils = await PackingUtils.deploy();
-
-    logDeploy("PackingUtils", packlingUtils.target);
-
-    const ArrayGetters = await ethers.getContractFactory("ArrayGetters");
-    const arrayGetters = await ArrayGetters.deploy();
-
-    logDeploy("ArrayGetters", arrayGetters.target);
-
-    const TradingCommonUtils = await ethers.getContractFactory("TradingCommonUtils");
-    const tradingCommonUtils = await TradingCommonUtils.deploy();
-
-    logDeploy("TradingCommonUtils", tradingCommonUtils.target);
-
-    const UpdateLeverageUtils = await ethers.getContractFactory("UpdateLeverageUtils", {
-        libraries: {
-            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-                tradingCommonUtils.target,
-        },
-    });
-    const updateLeverageUtils = await UpdateLeverageUtils.deploy();
-
-    logDeploy("UpdateLeverageUtils", updateLeverageUtils.target);
-
-    const UpdatePositionSizeUtils = await ethers.getContractFactory("UpdatePositionSizeUtils", {
-        libraries: {
-            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
-        },
-    });
-    const updatePositionSizeUtils = await UpdatePositionSizeUtils.deploy();
-
-    logDeploy("UpdatePositionSizeUtils", updatePositionSizeUtils.target);
+    // const PackingUtils = await ethers.getContractFactory("PackingUtils");
+    // const packlingUtils = await PackingUtils.deploy();
+    //
+    // logDeploy("PackingUtils", packlingUtils.target);
+    //
+    // const ArrayGetters = await ethers.getContractFactory("ArrayGetters");
+    // const arrayGetters = await ArrayGetters.deploy();
+    //
+    // logDeploy("ArrayGetters", arrayGetters.target);
+    //
+    // const TradingCommonUtils = await ethers.getContractFactory("TradingCommonUtils");
+    // const tradingCommonUtils = await TradingCommonUtils.deploy();
+    //
+    // logDeploy("TradingCommonUtils", tradingCommonUtils.target);
+    //
+    // const UpdateLeverageUtils = await ethers.getContractFactory("UpdateLeverageUtils", {
+    //     libraries: {
+    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+    //             tradingCommonUtils.target,
+    //     },
+    // });
+    // const updateLeverageUtils = await UpdateLeverageUtils.deploy();
+    //
+    // logDeploy("UpdateLeverageUtils", updateLeverageUtils.target);
+    //
+    // const UpdatePositionSizeUtils = await ethers.getContractFactory("UpdatePositionSizeUtils", {
+    //     libraries: {
+    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+    //         tradingCommonUtils.target,
+    //     },
+    // });
+    // const updatePositionSizeUtils = await UpdatePositionSizeUtils.deploy();
+    //
+    // logDeploy("UpdatePositionSizeUtils", updatePositionSizeUtils.target);
 
     const managerAddress = "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb";
     // const managerAddress = "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199";
-    const multiCollatDiamondFactory = await ethers.getContractFactory("JavMultiCollatDiamond");
-    const multiCollatDiamond = await upgrades.deployProxy(
-        multiCollatDiamondFactory,
-        [
-            managerAddress, //_rolesManager
-        ],
 
-        {
-            initializer: "initialize",
-            kind: "uups",
-        },
-    );
-    await multiCollatDiamond.waitForDeployment();
-
-    logDeploy("JavMultiCollatDiamond", await multiCollatDiamond.getAddress());
-
-    const pairsStorageFactory = await ethers.getContractFactory("JavPairsStorage");
-    const pairsStorage = await pairsStorageFactory.deploy();
-    await pairsStorage.waitForDeployment();
-
-    logDeploy("JavPairsStorage", await pairsStorage.getAddress());
-
-    const referralsFactory = await ethers.getContractFactory("JavReferrals");
-    const referrals = await referralsFactory.deploy();
-    await referrals.waitForDeployment();
-
-    logDeploy("JavReferrals", await referrals.getAddress());
-
-    const feeTiersFactory = await ethers.getContractFactory("JavFeeTiers");
-    const feeTiers = await feeTiersFactory.deploy();
-    await feeTiers.waitForDeployment();
-
-    logDeploy("JavFeeTiers", await feeTiers.getAddress());
-
-    const priceImpactFactory = await ethers.getContractFactory("JavPriceImpact", {
-        libraries: {
-            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
-        },
-    });
-    const priceImpact = await priceImpactFactory.deploy();
-    await priceImpact.waitForDeployment();
-
-    logDeploy("JavPriceImpact", await priceImpact.getAddress());
-
-    const tradingStorageFactory = await ethers.getContractFactory("JavTradingStorage", {
-        libraries: {
-            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
-            "contracts/libraries/trade/ArrayGetters.sol:ArrayGetters":
-            arrayGetters.target,
-        },
-    });
-    const tradingStorage = await tradingStorageFactory.deploy();
-    await tradingStorage.waitForDeployment();
-
-    logDeploy("JavTradingStorage", await tradingStorage.getAddress());
-
+    // const multiCollatDiamondFactory = await ethers.getContractFactory("JavMultiCollatDiamond");
+    // const multiCollatDiamond = await upgrades.deployProxy(
+    //     multiCollatDiamondFactory,
+    //     [
+    //         managerAddress, //_rolesManager
+    //     ],
+    //
+    //     {
+    //         initializer: "initialize",
+    //         kind: "uups",
+    //     },
+    // );
+    // await multiCollatDiamond.waitForDeployment();
+    //
+    // logDeploy("JavMultiCollatDiamond", await multiCollatDiamond.getAddress());
+    //
+    // const pairsStorageFactory = await ethers.getContractFactory("JavPairsStorage");
+    // const pairsStorage = await pairsStorageFactory.deploy();
+    // await pairsStorage.waitForDeployment();
+    //
+    // logDeploy("JavPairsStorage", await pairsStorage.getAddress());
+    //
+    // const referralsFactory = await ethers.getContractFactory("JavReferrals");
+    // const referrals = await referralsFactory.deploy();
+    // await referrals.waitForDeployment();
+    //
+    // logDeploy("JavReferrals", await referrals.getAddress());
+    //
+    // const feeTiersFactory = await ethers.getContractFactory("JavFeeTiers");
+    // const feeTiers = await feeTiersFactory.deploy();
+    // await feeTiers.waitForDeployment();
+    //
+    // logDeploy("JavFeeTiers", await feeTiers.getAddress());
+    //
+    // const priceImpactFactory = await ethers.getContractFactory("JavPriceImpact", {
+    //     libraries: {
+    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+    //         tradingCommonUtils.target,
+    //     },
+    // });
+    // const priceImpact = await priceImpactFactory.deploy();
+    // await priceImpact.waitForDeployment();
+    //
+    // logDeploy("JavPriceImpact", await priceImpact.getAddress());
+    //
+    // const tradingStorageFactory = await ethers.getContractFactory("JavTradingStorage", {
+    //     libraries: {
+    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+    //         tradingCommonUtils.target,
+    //         "contracts/libraries/trade/ArrayGetters.sol:ArrayGetters":
+    //         arrayGetters.target,
+    //     },
+    // });
+    // const tradingStorage = await tradingStorageFactory.deploy();
+    // await tradingStorage.waitForDeployment();
+    //
+    // logDeploy("JavTradingStorage", await tradingStorage.getAddress());
+    //
     const tradingInteractionsFactory = await ethers.getContractFactory("JavTradingInteractions", {
         libraries: {
-            "contracts/libraries/trade/PackingUtils.sol:PackingUtils": packlingUtils.target,
+            "contracts/libraries/trade/PackingUtils.sol:PackingUtils": "0xE438848bb41658a2203a245CA0c7d466e75AEB31",
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
+            "0x4eEc1274C3FE6106bEfB3ceDC74C5D9E6fAeAe23",
             "contracts/libraries/trade/updateLeverage/UpdateLeverageUtils.sol:UpdateLeverageUtils":
-                updateLeverageUtils.target,
+                "0x95BfE80f4e5B1AF9bd653E3c43Be5557C8B4fcDC",
             "contracts/libraries/trade/updatePositionSize/UpdatePositionSizeUtils.sol:UpdatePositionSizeUtils":
-                updatePositionSizeUtils.target,
+                "0xAa7Cb943C6819365bbeB8C3dbF8fE1aD829d6fB9",
         },
     });
     const tradingInteractions = await tradingInteractionsFactory.deploy();
@@ -117,36 +118,36 @@ async function main() {
     ``;
 
     logDeploy("JavTradingInteractions", await tradingInteractions.getAddress());
-
-    const tradingProcessingFactory = await ethers.getContractFactory("JavTradingProcessing", {
-        libraries: {
-            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
-        },
-    });
-    const tradingProcessing = await tradingProcessingFactory.deploy();
-    await tradingProcessing.waitForDeployment();
-
-    logDeploy("JavTradingProcessing", await tradingProcessing.getAddress());
-
-    const borrowingFeesFactory = await ethers.getContractFactory("JavBorrowingFees", {
-        libraries: {
-            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
-        },
-    });
-    const borrowingFees = await borrowingFeesFactory.deploy();
-    await borrowingFees.waitForDeployment();
-
-    logDeploy("JavBorrowingFees", await borrowingFees.getAddress());
-
-    const priceAggregatorFactory = await ethers.getContractFactory(
-        "contracts/trade/JavPriceAggregator.sol:JavPriceAggregator",
-    );
-    const priceAggregator = await priceAggregatorFactory.deploy();
-    await priceAggregator.waitForDeployment();
-
-    logDeploy("JavPriceAggregator", await priceAggregator.getAddress());
+    //
+    // const tradingProcessingFactory = await ethers.getContractFactory("JavTradingProcessing", {
+    //     libraries: {
+    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+    //         "0x4eEc1274C3FE6106bEfB3ceDC74C5D9E6fAeAe23",
+    //     },
+    // });
+    // const tradingProcessing = await tradingProcessingFactory.deploy();
+    // await tradingProcessing.waitForDeployment();
+    //
+    // logDeploy("JavTradingProcessing", await tradingProcessing.getAddress());
+    //
+    // const borrowingFeesFactory = await ethers.getContractFactory("JavBorrowingFees", {
+    //     libraries: {
+    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+    //         tradingCommonUtils.target,
+    //     },
+    // });
+    // const borrowingFees = await borrowingFeesFactory.deploy();
+    // await borrowingFees.waitForDeployment();
+    //
+    // logDeploy("JavBorrowingFees", await borrowingFees.getAddress());
+    //
+    // const priceAggregatorFactory = await ethers.getContractFactory(
+    //     "contracts/trade/JavPriceAggregator.sol:JavPriceAggregator",
+    // );
+    // const priceAggregator = await priceAggregatorFactory.deploy();
+    // await priceAggregator.waitForDeployment();
+    //
+    // logDeploy("JavPriceAggregator", await priceAggregator.getAddress());
 
     // // localhost
     // const tokenFactory = await ethers.getContractFactory("TestToken");

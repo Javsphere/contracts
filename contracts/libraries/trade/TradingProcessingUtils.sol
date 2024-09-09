@@ -101,61 +101,6 @@ library TradingProcessingUtils {
      */
     function validateTriggerOpenOrder(
         ITradingStorage.Id memory _tradeId,
-        ITradingStorage.PendingOrderType _orderType,
-        uint64 _open,
-        uint64 _high,
-        uint64 _low
-    )
-        internal
-        view
-        returns (
-            ITradingStorage.Trade memory t,
-            ITradingProcessing.CancelReason cancelReason,
-            uint256 priceImpactP,
-            uint256 priceAfterImpact,
-            bool exactExecution
-        )
-    {
-        if (
-            _orderType != ITradingStorage.PendingOrderType.LIMIT_OPEN &&
-            _orderType != ITradingStorage.PendingOrderType.STOP_OPEN
-        ) {
-            revert IGeneralErrors.WrongOrderType();
-        }
-
-        t = _getTrade(_tradeId.user, _tradeId.index);
-
-        // Return early if trade is not open
-        if (!t.isOpen) {
-            cancelReason = ITradingProcessing.CancelReason.NO_TRADE;
-            return (t, cancelReason, priceImpactP, priceAfterImpact, exactExecution);
-        }
-
-        exactExecution = (_high >= t.openPrice && _low <= t.openPrice);
-
-        (priceImpactP, priceAfterImpact, cancelReason) = _openTradePrep(
-            t,
-            exactExecution ? t.openPrice : _open,
-            _open,
-            _getMultiCollatDiamond().pairSpreadP(t.pairIndex),
-            _getTradeInfo(t.user, t.index).maxSlippageP
-        );
-
-        if (
-            !exactExecution &&
-            (
-                t.tradeType == ITradingStorage.TradeType.STOP
-                    ? (t.long ? _open < t.openPrice : _open > t.openPrice)
-                    : (t.long ? _open > t.openPrice : _open < t.openPrice)
-            )
-        ) cancelReason = ITradingProcessing.CancelReason.NOT_HIT;
-    }
-
-    /**
-     * @dev Check ITradingProcessingUtils interface for documentation
-     */
-    function validateTriggerOpenOrder(
-        ITradingStorage.Id memory _tradeId,
         ITradingStorage.PendingOrder memory _pendingOrder
     )
         internal

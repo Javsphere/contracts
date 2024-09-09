@@ -271,6 +271,7 @@ library TradingInteractionsUtils {
         pendingOrder.trade.index = t.index;
         pendingOrder.trade.pairIndex = t.pairIndex;
         pendingOrder.user = sender;
+        pendingOrder.orderType = orderType;
         pendingOrder.isOpen = t.isOpen;
         pendingOrder.price = uint64(_getMultiCollatDiamond().getPrice(t.pairIndex));
 
