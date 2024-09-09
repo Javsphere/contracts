@@ -11,18 +11,38 @@ async function main() {
 
     logDeploy("PackingUtils", packlingUtils.target);
 
-    const UpdateLeverageUtils = await ethers.getContractFactory("UpdateLeverageUtils");
+    const ArrayGetters = await ethers.getContractFactory("ArrayGetters");
+    const arrayGetters = await ArrayGetters.deploy();
+
+    logDeploy("ArrayGetters", arrayGetters.target);
+
+    const TradingCommonUtils = await ethers.getContractFactory("TradingCommonUtils");
+    const tradingCommonUtils = await TradingCommonUtils.deploy();
+
+    logDeploy("TradingCommonUtils", tradingCommonUtils.target);
+
+    const UpdateLeverageUtils = await ethers.getContractFactory("UpdateLeverageUtils", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+                tradingCommonUtils.target,
+        },
+    });
     const updateLeverageUtils = await UpdateLeverageUtils.deploy();
 
     logDeploy("UpdateLeverageUtils", updateLeverageUtils.target);
 
-    const UpdatePositionSizeUtils = await ethers.getContractFactory("UpdatePositionSizeUtils");
+    const UpdatePositionSizeUtils = await ethers.getContractFactory("UpdatePositionSizeUtils", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+            tradingCommonUtils.target,
+        },
+    });
     const updatePositionSizeUtils = await UpdatePositionSizeUtils.deploy();
 
     logDeploy("UpdatePositionSizeUtils", updatePositionSizeUtils.target);
 
-    // const managerAddress = "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb";
-    const managerAddress = "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199";
+    const managerAddress = "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb";
+    // const managerAddress = "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199";
     const multiCollatDiamondFactory = await ethers.getContractFactory("JavMultiCollatDiamond");
     const multiCollatDiamond = await upgrades.deployProxy(
         multiCollatDiamondFactory,
@@ -33,9 +53,6 @@ async function main() {
         {
             initializer: "initialize",
             kind: "uups",
-            txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei"),
-            },
         },
     );
     await multiCollatDiamond.waitForDeployment();
@@ -60,13 +77,25 @@ async function main() {
 
     logDeploy("JavFeeTiers", await feeTiers.getAddress());
 
-    const priceImpactFactory = await ethers.getContractFactory("JavPriceImpact");
+    const priceImpactFactory = await ethers.getContractFactory("JavPriceImpact", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+            tradingCommonUtils.target,
+        },
+    });
     const priceImpact = await priceImpactFactory.deploy();
     await priceImpact.waitForDeployment();
 
     logDeploy("JavPriceImpact", await priceImpact.getAddress());
 
-    const tradingStorageFactory = await ethers.getContractFactory("JavTradingStorage");
+    const tradingStorageFactory = await ethers.getContractFactory("JavTradingStorage", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+            tradingCommonUtils.target,
+            "contracts/libraries/trade/ArrayGetters.sol:ArrayGetters":
+            arrayGetters.target,
+        },
+    });
     const tradingStorage = await tradingStorageFactory.deploy();
     await tradingStorage.waitForDeployment();
 
@@ -75,6 +104,8 @@ async function main() {
     const tradingInteractionsFactory = await ethers.getContractFactory("JavTradingInteractions", {
         libraries: {
             "contracts/libraries/trade/PackingUtils.sol:PackingUtils": packlingUtils.target,
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+            tradingCommonUtils.target,
             "contracts/libraries/trade/updateLeverage/UpdateLeverageUtils.sol:UpdateLeverageUtils":
                 updateLeverageUtils.target,
             "contracts/libraries/trade/updatePositionSize/UpdatePositionSizeUtils.sol:UpdatePositionSizeUtils":
@@ -87,13 +118,23 @@ async function main() {
 
     logDeploy("JavTradingInteractions", await tradingInteractions.getAddress());
 
-    const tradingProcessingFactory = await ethers.getContractFactory("JavTradingProcessing");
+    const tradingProcessingFactory = await ethers.getContractFactory("JavTradingProcessing", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+            tradingCommonUtils.target,
+        },
+    });
     const tradingProcessing = await tradingProcessingFactory.deploy();
     await tradingProcessing.waitForDeployment();
 
     logDeploy("JavTradingProcessing", await tradingProcessing.getAddress());
 
-    const borrowingFeesFactory = await ethers.getContractFactory("JavBorrowingFees");
+    const borrowingFeesFactory = await ethers.getContractFactory("JavBorrowingFees", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+            tradingCommonUtils.target,
+        },
+    });
     const borrowingFees = await borrowingFeesFactory.deploy();
     await borrowingFees.waitForDeployment();
 
@@ -107,23 +148,23 @@ async function main() {
 
     logDeploy("JavPriceAggregator", await priceAggregator.getAddress());
 
-    // localhost
-    const tokenFactory = await ethers.getContractFactory("TestToken");
-    const token1 = await tokenFactory.deploy(["Test USDT", "USDT"]);
-    await token1.waitForDeployment();
-
-    logDeploy("TestUSDT", await token1.getAddress());
-
-    const token2 = await tokenFactory.deploy(["Test USDT1", "USDT1"]);
-    await token2.waitForDeployment();
-
-    logDeploy("TestUSDT1", await token2.getAddress());
-
-    const rewardsCollectorFactory = await ethers.getContractFactory("RewardsCollector");
-    const rewardsCollector = await rewardsCollectorFactory.deploy();
-    await rewardsCollector.waitForDeployment();
-
-    logDeploy("RewardsCollector", await rewardsCollector.getAddress());
+    // // localhost
+    // const tokenFactory = await ethers.getContractFactory("TestToken");
+    // const token1 = await tokenFactory.deploy(["Test USDT", "USDT"]);
+    // await token1.waitForDeployment();
+    //
+    // logDeploy("TestUSDT", await token1.getAddress());
+    //
+    // const token2 = await tokenFactory.deploy(["Test USDT1", "USDT1"]);
+    // await token2.waitForDeployment();
+    //
+    // logDeploy("TestUSDT1", await token2.getAddress());
+    //
+    // const rewardsCollectorFactory = await ethers.getContractFactory("RewardsCollector");
+    // const rewardsCollector = await rewardsCollectorFactory.deploy();
+    // await rewardsCollector.waitForDeployment();
+    //
+    // logDeploy("RewardsCollector", await rewardsCollector.getAddress());
 }
 
 main()

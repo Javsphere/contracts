@@ -32,7 +32,7 @@ async function main() {
 
     logDeploy("tUSDT", await token2.getAddress());
 
-    const token3 = await upgrades.deployProxy(tokenFactory, ["Test USDC", "tUSDC"], {
+    const token3 = await upgrades.deployProxy(tokenFactory, ["Test WETH", "tWETH"], {
         initializer: "initialize",
         kind: "uups",
     });
