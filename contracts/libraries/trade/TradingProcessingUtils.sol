@@ -344,10 +344,6 @@ library TradingProcessingUtils {
             _pendingOrder.trade.user,
             _pendingOrder.trade.index
         );
-        ITradingStorage.TradeInfo memory i = _getTradeInfo(
-            _pendingOrder.trade.user,
-            _pendingOrder.trade.index
-        );
 
         (uint256 priceImpactP, uint256 priceAfterImpact, ) = TradingCommonUtils
             .getTradeClosingPriceImpact(

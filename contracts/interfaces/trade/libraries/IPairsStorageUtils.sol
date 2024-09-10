@@ -67,6 +67,16 @@ interface IPairsStorageUtils is IPairsStorage {
     ) external;
 
     /**
+     * @dev Updates group liquidation params (will only apply for trades opened after the change)
+     * @param _groupIndex index of group
+     * @param _params new liquidation params
+     */
+    function setGroupLiquidationParams(
+        uint256 _groupIndex,
+        IPairsStorage.GroupLiquidationParams memory _params
+    ) external;
+
+    /**
      * @dev Returns pair feed fot get price
      * @param _pairIndex index of pair
      */

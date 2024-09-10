@@ -19,7 +19,6 @@ interface ITradingProcessing {
         MAX_LEVERAGE,
         NO_TRADE,
         NOT_HIT
-
     }
 
     // Useful to avoid stack too deep errors

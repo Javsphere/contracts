@@ -72,6 +72,14 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
         PairsStorageUtils.setPairCustomMaxLeverages(_indices, _values);
     }
 
+    /// @inheritdoc IPairsStorageUtils
+    function setGroupLiquidationParams(
+        uint256 _groupIndex,
+        IPairsStorage.GroupLiquidationParams memory _params
+    ) external onlyRole(Role.GOV) {
+        PairsStorageUtils.setGroupLiquidationParams(_groupIndex, _params);
+    }
+
     // Getters
 
     /// @inheritdoc IPairsStorageUtils
