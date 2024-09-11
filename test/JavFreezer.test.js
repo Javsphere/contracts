@@ -165,6 +165,32 @@ describe("JavFreezer contract", () => {
             await expect(poolInfo[4]).to.be.equal(accRewardPerShare);
         });
 
+        it("Should revert when addPoolFee", async () => {
+            const poolFee = {
+                depositFee: 0.5 * 1e4,
+                withdrawFee: 0.5 * 1e4,
+                claimFee: 0.5 * 1e4,
+            };
+            await expect(hhJavFreezer.connect(addr1).addPoolFee(poolFee)).to.be.revertedWith(
+                ADMIN_ERROR,
+            );
+        });
+
+        it("Should addPoolFee", async () => {
+            const fee = {
+                depositFee: 1 * 1e4,
+                withdrawFee: 1 * 1e4,
+                claimFee: 1 * 1e4,
+            };
+
+            await hhJavFreezer.addPoolFee(fee);
+            const poolFee = await hhJavFreezer.poolFee(0);
+
+            await expect(poolFee.depositFee).to.be.equal(1 * 1e4);
+            await expect(poolFee.withdrawFee).to.be.equal(1 * 1e4);
+            await expect(poolFee.claimFee).to.be.equal(1 * 1e4);
+        });
+
         it("Should revert when addPoolRewardsInfo", async () => {
             await expect(hhJavFreezer.connect(addr1).addPoolRewardsInfo()).to.be.revertedWith(
                 ADMIN_ERROR,
@@ -220,6 +246,43 @@ describe("JavFreezer contract", () => {
 
             await expect(poolInfo[3]).to.be.equal(lastRewardBlock);
             await expect(poolInfo[4]).to.be.equal(accRewardPerShare);
+        });
+
+        it("Should revert when setPoolFee - admin error", async () => {
+            const poolFee = {
+                depositFee: 0.5 * 1e4,
+                withdrawFee: 0.5 * 1e4,
+                claimFee: 0.5 * 1e4,
+            };
+            await expect(hhJavFreezer.connect(addr1).setPoolFee(0, poolFee)).to.be.revertedWith(
+                ADMIN_ERROR,
+            );
+        });
+
+        it("Should revert when setPoolFee - poolError", async () => {
+            const poolFee = {
+                depositFee: 0.5 * 1e4,
+                withdrawFee: 0.5 * 1e4,
+                claimFee: 0.5 * 1e4,
+            };
+            await expect(hhJavFreezer.setPoolFee(5, poolFee)).to.be.revertedWith(poolError);
+        });
+
+        it("Should setPoolFee", async () => {
+            const _pid = 0;
+            const poolFee = {
+                depositFee: 5,
+                withdrawFee: 5,
+                claimFee: 5,
+            };
+
+            await hhJavFreezer.setPoolFee(_pid, poolFee);
+
+            const poolFeeInfo = await hhJavFreezer.poolFee(_pid);
+
+            await expect(poolFeeInfo[0]).to.be.equal(5);
+            await expect(poolFeeInfo[1]).to.be.equal(5);
+            await expect(poolFeeInfo[2]).to.be.equal(5);
         });
 
         it("Should revert when setLockPeriod - admin error", async () => {
@@ -363,6 +426,7 @@ describe("JavFreezer contract", () => {
             const lockId = 0;
             const amount = ethers.parseEther("1");
             const lockPeriod = await hhJavFreezer.lockPeriod(lockId);
+            const poolFee = await hhJavFreezer.poolFee(pid);
 
             await erc20Token.mint(addr1.address, amount);
             await erc20Token.connect(addr1).approve(hhJavFreezer.target, amount);
@@ -371,6 +435,7 @@ describe("JavFreezer contract", () => {
             const poolInfoBefore = await hhJavFreezer.poolInfo(pid);
             const userInfoBefore = await hhJavFreezer.userInfo(addr1.address, pid);
             const tvlBefore = await hhJavFreezer.tvl(pid, lockId);
+            const burnAmount = (amount * poolFee.depositFee) / BigInt(1e4);
 
             await hhJavFreezer.connect(addr1).deposit(pid, lockId, amount);
 
@@ -381,18 +446,18 @@ describe("JavFreezer contract", () => {
             const blockNumber = await ethers.provider.getBlockNumber();
             const blockTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
 
-            const rewardDebt = (amount * poolInfo[4]) / ethers.parseEther("1");
+            const rewardDebt = ((amount - burnAmount) * poolInfo[4]) / ethers.parseEther("1");
 
-            await expect(contractBalance).to.be.equal(contractBalanceBefore + amount);
+            await expect(contractBalance).to.be.equal(contractBalanceBefore + amount - burnAmount);
             await expect(poolInfo[0]).to.be.equal(poolInfoBefore[0]);
             await expect(poolInfo[1]).to.be.equal(poolInfoBefore[1]);
-            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] + amount);
+            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] + amount - burnAmount);
             await expect(poolInfo[3]).to.be.equal(blockNumber);
             // await expect(poolInfo[4]).to.be.equal(poolInfoBefore[4]);
-            await expect(userInfo[0]).to.be.equal(userInfoBefore[0] + amount);
+            await expect(userInfo[0]).to.be.equal(userInfoBefore[0] + amount - burnAmount);
             await expect(userInfo[1]).to.be.equal(userInfoBefore[1] + BigInt(1));
             await expect(userInfo[2]).to.be.equal(userInfoBefore[2]);
-            await expect(userDeposit[0]).to.be.equal(amount);
+            await expect(userDeposit[0]).to.be.equal(amount - burnAmount);
             await expect(userDeposit[1]).to.be.equal(lockId);
             await expect(userDeposit[2]).to.be.equal(blockTimestamp);
             await expect(userDeposit[3]).to.be.equal(BigInt(blockTimestamp) + lockPeriod);
@@ -400,7 +465,9 @@ describe("JavFreezer contract", () => {
             await expect(userDeposit[5]).to.be.equal(rewardDebt);
             await expect(userDeposit[6]).to.be.equal(false);
             await expect(await hhJavFreezer.pendingReward(pid, 0, addr1.address)).to.be.equal(0);
-            await expect(await hhJavFreezer.tvl(pid, lockId)).to.be.equal(tvlBefore + amount);
+            await expect(await hhJavFreezer.tvl(pid, lockId)).to.be.equal(
+                tvlBefore + amount - burnAmount,
+            );
         });
 
         it("Should deposit - 2", async () => {
@@ -408,6 +475,7 @@ describe("JavFreezer contract", () => {
             const lockId = 0;
             const amount = ethers.parseEther("5");
             const lockPeriod = await hhJavFreezer.lockPeriod(lockId);
+            const poolFee = await hhJavFreezer.poolFee(pid);
 
             await erc20Token.mint(addr1.address, amount);
             await erc20Token.connect(addr1).approve(hhJavFreezer.target, amount);
@@ -416,6 +484,7 @@ describe("JavFreezer contract", () => {
             const poolInfoBefore = await hhJavFreezer.poolInfo(pid);
             const userInfoBefore = await hhJavFreezer.userInfo(addr1.address, pid);
             const tvlBefore = await hhJavFreezer.tvl(pid, lockId);
+            const burnAmount = (amount * poolFee.depositFee) / BigInt(1e4);
 
             await hhJavFreezer.connect(addr1).deposit(pid, lockId, amount);
 
@@ -426,18 +495,18 @@ describe("JavFreezer contract", () => {
             const blockNumber = await ethers.provider.getBlockNumber();
             const blockTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
 
-            const rewardDebt = (amount * poolInfo[4]) / ethers.parseEther("1");
+            const rewardDebt = ((amount - burnAmount) * poolInfo[4]) / ethers.parseEther("1");
             const accRewardPerShare = await expect(contractBalance).to.be.equal(
-                contractBalanceBefore + amount,
+                contractBalanceBefore + amount - burnAmount,
             );
             await expect(poolInfo[0]).to.be.equal(poolInfoBefore[0]);
             await expect(poolInfo[1]).to.be.equal(poolInfoBefore[1]);
-            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] + amount);
+            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] + amount - burnAmount);
             await expect(poolInfo[3]).to.be.equal(blockNumber);
-            await expect(userInfo[0]).to.be.equal(userInfoBefore[0] + amount);
+            await expect(userInfo[0]).to.be.equal(userInfoBefore[0] + amount - burnAmount);
             await expect(userInfo[1]).to.be.equal(userInfoBefore[1] + BigInt(1));
             await expect(userInfo[2]).to.be.equal(userInfoBefore[2]);
-            await expect(userDeposit[0]).to.be.equal(amount);
+            await expect(userDeposit[0]).to.be.equal(amount - burnAmount);
             await expect(userDeposit[1]).to.be.equal(lockId);
             await expect(userDeposit[2]).to.be.equal(blockTimestamp);
             await expect(userDeposit[3]).to.be.equal(BigInt(blockTimestamp) + lockPeriod);
@@ -445,7 +514,9 @@ describe("JavFreezer contract", () => {
             await expect(userDeposit[5]).to.be.equal(rewardDebt);
             await expect(userDeposit[6]).to.be.equal(false);
             await expect(await hhJavFreezer.pendingReward(pid, 2, addr1.address)).to.be.equal(0);
-            await expect(await hhJavFreezer.tvl(pid, lockId)).to.be.equal(tvlBefore + amount);
+            await expect(await hhJavFreezer.tvl(pid, lockId)).to.be.equal(
+                tvlBefore + amount - burnAmount,
+            );
         });
 
         it("Should deposit - 3, with diff lockId", async () => {
@@ -453,6 +524,7 @@ describe("JavFreezer contract", () => {
             const lockId = 1;
             const amount = ethers.parseEther("5");
             const lockPeriod = await hhJavFreezer.lockPeriod(lockId);
+            const poolFee = await hhJavFreezer.poolFee(pid);
 
             await erc20Token.mint(addr1.address, amount);
             await erc20Token.connect(addr1).approve(hhJavFreezer.target, amount);
@@ -461,6 +533,7 @@ describe("JavFreezer contract", () => {
             const poolInfoBefore = await hhJavFreezer.poolInfo(pid);
             const userInfoBefore = await hhJavFreezer.userInfo(addr1.address, pid);
             const tvlBefore = await hhJavFreezer.tvl(pid, lockId);
+            const burnAmount = (amount * poolFee.depositFee) / BigInt(1e4);
 
             await hhJavFreezer.connect(addr1).deposit(pid, lockId, amount);
 
@@ -471,18 +544,18 @@ describe("JavFreezer contract", () => {
             const blockNumber = await ethers.provider.getBlockNumber();
             const blockTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
 
-            const rewardDebt = (amount * poolInfo[4]) / ethers.parseEther("1");
+            const rewardDebt = ((amount - burnAmount) * poolInfo[4]) / ethers.parseEther("1");
             const accRewardPerShare = await expect(contractBalance).to.be.equal(
-                contractBalanceBefore + amount,
+                contractBalanceBefore + amount - burnAmount,
             );
             await expect(poolInfo[0]).to.be.equal(poolInfoBefore[0]);
             await expect(poolInfo[1]).to.be.equal(poolInfoBefore[1]);
-            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] + amount);
+            await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] + amount - burnAmount);
             await expect(poolInfo[3]).to.be.equal(blockNumber);
-            await expect(userInfo[0]).to.be.equal(userInfoBefore[0] + amount);
+            await expect(userInfo[0]).to.be.equal(userInfoBefore[0] + amount - burnAmount);
             await expect(userInfo[1]).to.be.equal(userInfoBefore[1] + BigInt(1));
             await expect(userInfo[2]).to.be.equal(userInfoBefore[2]);
-            await expect(userDeposit[0]).to.be.equal(amount);
+            await expect(userDeposit[0]).to.be.equal(amount - burnAmount);
             await expect(userDeposit[1]).to.be.equal(lockId);
             await expect(userDeposit[2]).to.be.equal(blockTimestamp);
             await expect(userDeposit[3]).to.be.equal(BigInt(blockTimestamp) + lockPeriod);
@@ -490,7 +563,9 @@ describe("JavFreezer contract", () => {
             await expect(userDeposit[5]).to.be.equal(rewardDebt);
             await expect(userDeposit[6]).to.be.equal(false);
             await expect(await hhJavFreezer.pendingReward(pid, 3, addr1.address)).to.be.equal(0);
-            await expect(await hhJavFreezer.tvl(pid, lockId)).to.be.equal(tvlBefore + amount);
+            await expect(await hhJavFreezer.tvl(pid, lockId)).to.be.equal(
+                tvlBefore + amount - burnAmount,
+            );
         });
 
         it("Should get pendingReward = 0, block = lastRewardBlock", async () => {
@@ -620,10 +695,16 @@ describe("JavFreezer contract", () => {
             const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
 
             const pendingRewards = userInfo[2] - userInfoBefore[2];
+            const claimFee =
+                contractBalanceBefore -
+                pendingRewards -
+                (await erc20Token.balanceOf(hhJavFreezer.target));
 
             await expect(userInfo[2]).to.be.equal(userInfoBefore[2] + pendingRewards);
             await expect(userBalance).to.be.equal(userBalanceBefore + pendingRewards);
-            await expect(contractBalance).to.be.equal(contractBalanceBefore - pendingRewards);
+            await expect(contractBalance).to.be.equal(
+                contractBalanceBefore - pendingRewards - claimFee,
+            );
             await expect(await hhJavFreezer.pendingRewardTotal(pid, addr1.address)).to.be.equal(0);
         });
 
@@ -641,6 +722,7 @@ describe("JavFreezer contract", () => {
             const pid = 0;
             const depositId = 1;
             const lockId = 0;
+            const poolFee = await hhJavFreezer.poolFee(pid);
             await erc20Token.mint(hhJavFreezer.target, ethers.parseEther("10"));
             await helpers.mine(50);
 
@@ -657,6 +739,7 @@ describe("JavFreezer contract", () => {
             const tvlBefore = await hhJavFreezer.tvl(pid, lockId);
 
             await hhJavFreezer.connect(addr1).withdraw(pid, depositId);
+            const burnAmount = (depositTokens * poolFee.withdrawFee) / BigInt(1e4);
 
             const userBalance = await erc20Token.balanceOf(addr1.address);
             const contractBalance = await erc20Token.balanceOf(hhJavFreezer.target);
@@ -669,9 +752,11 @@ describe("JavFreezer contract", () => {
             await expect(userInfo[0]).to.be.equal(userInfoBefore[0] - depositTokens);
             await expect(poolInfo[2]).to.be.equal(poolInfoBefore[2] - depositTokens);
             await expect(userDeposit[6]).to.be.equal(true);
-            await expect(userBalance).to.be.equal(userBalanceBefore + depositTokens + claimAmount);
-            await expect(contractBalance).to.be.equal(
-                contractBalanceBefore - depositTokens - claimAmount,
+            await expect(userBalance).to.be.equal(
+                userBalanceBefore + depositTokens + claimAmount - burnAmount,
+            );
+            await expect(contractBalance).to.be.below(
+                contractBalanceBefore - depositTokens - claimAmount - burnAmount,
             );
             await expect(
                 await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
@@ -846,11 +931,14 @@ describe("JavFreezer contract", () => {
             const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
             const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, depositId);
             const pendingRewards = userInfo[2] - userInfoBefore[2];
+            const burnFee = contractBalanceBefore - contractBalance - pendingRewards;
 
             await expect(userInfo[2]).to.be.equal(userInfoBefore[2] + pendingRewards);
             await expect(userDeposit[4]).to.be.equal(userDepositBefore[4] + pendingRewards);
             await expect(userBalance).to.be.equal(userBalanceBefore + pendingRewards);
-            await expect(contractBalance).to.be.equal(contractBalanceBefore - pendingRewards);
+            await expect(contractBalance).to.be.equal(
+                contractBalanceBefore - pendingRewards - burnFee,
+            );
             await expect(
                 await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
             ).to.be.equal(0);
@@ -905,11 +993,14 @@ describe("JavFreezer contract", () => {
             const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
             const userDeposit = await hhJavFreezer.userDeposits(addr1.address, pid, depositId);
             const pendingRewards = userInfo[2] - userInfoBefore[2];
+            const burnFee = contractBalanceBefore - contractBalance - pendingRewards;
 
             await expect(userInfo[2]).to.be.equal(userInfoBefore[2] + pendingRewards);
             await expect(userDeposit[4]).to.be.equal(userDepositBefore[4] + pendingRewards);
             await expect(userBalance).to.be.equal(userBalanceBefore + pendingRewards);
-            await expect(contractBalance).to.be.equal(contractBalanceBefore - pendingRewards);
+            await expect(contractBalance).to.be.equal(
+                contractBalanceBefore - pendingRewards - burnFee,
+            );
             await expect(
                 await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
             ).to.be.equal(0);
@@ -952,10 +1043,13 @@ describe("JavFreezer contract", () => {
             const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
 
             const pendingRewards = userInfo[2] - userInfoBefore[2];
+            const burnFee = contractBalanceBefore - contractBalance - pendingRewards;
 
             await expect(userInfo[2]).to.be.equal(userInfoBefore[2] + pendingRewards);
             await expect(userBalance).to.be.equal(userBalanceBefore + pendingRewards);
-            await expect(contractBalance).to.be.equal(contractBalanceBefore - pendingRewards);
+            await expect(contractBalance).to.be.equal(
+                contractBalanceBefore - pendingRewards - burnFee,
+            );
 
             await expect(
                 await hhJavFreezer.pendingRewardByLockId(0, lockId, addr1.address),

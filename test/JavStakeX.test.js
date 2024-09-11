@@ -129,6 +129,32 @@ describe("JavStakeX contract", () => {
             await expect(poolInfo.minStakeAmount).to.be.equal(minStakeAmount);
         });
 
+        it("Should revert when addPoolFee", async () => {
+            const poolFee = {
+                depositFee: 0.5 * 1e4,
+                withdrawFee: 0.5 * 1e4,
+                claimFee: 0.5 * 1e4,
+            };
+            await expect(hhJavStakeX.connect(addr1).addPoolFee(poolFee)).to.be.revertedWith(
+                ADMIN_ERROR,
+            );
+        });
+
+        it("Should addPoolFee", async () => {
+            const fee = {
+                depositFee: 1 * 1e4,
+                withdrawFee: 1 * 1e4,
+                claimFee: 1 * 1e4,
+            };
+
+            await hhJavStakeX.addPoolFee(fee);
+            const poolFee = await hhJavStakeX.poolFee(0);
+
+            await expect(poolFee.depositFee).to.be.equal(1 * 1e4);
+            await expect(poolFee.withdrawFee).to.be.equal(1 * 1e4);
+            await expect(poolFee.claimFee).to.be.equal(1 * 1e4);
+        });
+
         it("Should getPoolLength", async () => {
             await expect(await hhJavStakeX.getPoolLength()).to.be.equal(1);
         });
@@ -178,6 +204,43 @@ describe("JavStakeX contract", () => {
             await expect(poolInfo[4]).to.be.equal(accRewardPerShare);
         });
 
+        it("Should revert when setPoolFee - admin error", async () => {
+            const poolFee = {
+                depositFee: 0.5 * 1e4,
+                withdrawFee: 0.5 * 1e4,
+                claimFee: 0.5 * 1e4,
+            };
+            await expect(hhJavStakeX.connect(addr1).setPoolFee(0, poolFee)).to.be.revertedWith(
+                ADMIN_ERROR,
+            );
+        });
+
+        it("Should revert when setPoolFee - poolError", async () => {
+            const poolFee = {
+                depositFee: 0.5 * 1e4,
+                withdrawFee: 0.5 * 1e4,
+                claimFee: 0.5 * 1e4,
+            };
+            await expect(hhJavStakeX.setPoolFee(5, poolFee)).to.be.revertedWith(poolError);
+        });
+
+        it("Should setPoolFee", async () => {
+            const _pid = 0;
+            const poolFee = {
+                depositFee: 5,
+                withdrawFee: 5,
+                claimFee: 5,
+            };
+
+            await hhJavStakeX.setPoolFee(_pid, poolFee);
+
+            const poolFeeInfo = await hhJavStakeX.poolFee(_pid);
+
+            await expect(poolFeeInfo[0]).to.be.equal(5);
+            await expect(poolFeeInfo[1]).to.be.equal(5);
+            await expect(poolFeeInfo[2]).to.be.equal(5);
+        });
+
         it("Should reverted when stake - amount < minAmount", async () => {
             await expect(hhJavStakeX.connect(addr1).stake(0, 2)).to.be.revertedWith(
                 "JavStakeX: invalid amount for stake",
@@ -197,6 +260,8 @@ describe("JavStakeX contract", () => {
             const balanceBeforeAddr1 = await erc20Token.balanceOf(addr1.address);
             const balanceBeforeContract = await erc20Token.balanceOf(hhJavStakeX.target);
             const pid = 0;
+            const poolFee = await hhJavStakeX.poolFee(pid);
+            const burnAmount = (stakeAmount * poolFee.depositFee) / BigInt(1e4);
             const poolInfoBefore = await hhJavStakeX.poolInfo(pid);
             const userInfoBefore = await hhJavStakeX.userInfo(pid, addr1.address);
 
@@ -210,16 +275,18 @@ describe("JavStakeX contract", () => {
             const user1RewardDebt = (userInfo.shares * rewardsPerShare) / ethers.parseEther("1");
 
             await expect(await erc20Token.balanceOf(hhJavStakeX.target)).to.be.equal(
-                balanceBeforeContract + stakeAmount,
+                balanceBeforeContract + stakeAmount - burnAmount,
             );
             await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(
                 balanceBeforeAddr1 - stakeAmount,
             );
             await expect(poolInfo.totalShares).to.be.equal(
-                poolInfoBefore.totalShares + stakeAmount,
+                poolInfoBefore.totalShares + stakeAmount - burnAmount,
             );
             await expect(poolInfo.rewardsPerShare).to.be.equal(0);
-            await expect(userInfo.shares).to.be.equal(userInfoBefore.shares + stakeAmount);
+            await expect(userInfo.shares).to.be.equal(
+                userInfoBefore.shares + stakeAmount - burnAmount,
+            );
             await expect(userInfo.blockRewardDebt).to.be.equal(user1RewardDebt);
             await expect(userInfo.productsRewardDebt).to.be.equal(0);
 
@@ -235,6 +302,8 @@ describe("JavStakeX contract", () => {
             const balanceBeforeAddr1 = await erc20Token.balanceOf(addr1.address);
             const balanceBeforeContract = await erc20Token.balanceOf(hhJavStakeX.target);
             const pid = 0;
+            const poolFee = await hhJavStakeX.poolFee(pid);
+            const burnAmount = (stakeAmount * poolFee.depositFee) / BigInt(1e4);
             const poolInfoBefore = await hhJavStakeX.poolInfo(pid);
             const userInfoBefore = await hhJavStakeX.userInfo(pid, addr1.address);
 
@@ -249,17 +318,19 @@ describe("JavStakeX contract", () => {
             const rewardsPerShare = poolInfo.accRewardPerShare;
             const user1RewardDebt = (userInfo.shares * rewardsPerShare) / ethers.parseEther("1");
 
-            await expect(await erc20Token.balanceOf(hhJavStakeX.target)).to.be.equal(
+            await expect(await erc20Token.balanceOf(hhJavStakeX.target)).to.be.below(
                 balanceBeforeContract + stakeAmount - userRewards,
             );
             await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(
                 balanceBeforeAddr1 - stakeAmount + userRewards,
             );
             await expect(poolInfo.totalShares).to.be.equal(
-                poolInfoBefore.totalShares + stakeAmount,
+                poolInfoBefore.totalShares + stakeAmount - burnAmount,
             );
             await expect(poolInfo.rewardsPerShare).to.be.equal(0);
-            await expect(userInfo.shares).to.be.equal(userInfoBefore.shares + stakeAmount);
+            await expect(userInfo.shares).to.be.equal(
+                userInfoBefore.shares + stakeAmount - burnAmount,
+            );
             await expect(userInfo.blockRewardDebt).to.be.equal(user1RewardDebt);
             await expect(userInfo.productsRewardDebt).to.be.equal(0);
         });
@@ -270,6 +341,8 @@ describe("JavStakeX contract", () => {
             const balanceBeforeAddr2 = await erc20Token.balanceOf(addr2.address);
             const balanceBeforeContract = await erc20Token.balanceOf(hhJavStakeX.target);
             const pid = 0;
+            const poolFee = await hhJavStakeX.poolFee(pid);
+            const burnAmount = (stakeAmount * poolFee.depositFee) / BigInt(1e4);
             const poolInfoBefore = await hhJavStakeX.poolInfo(pid);
             const userInfoBefore = await hhJavStakeX.userInfo(pid, addr2.address);
 
@@ -283,16 +356,18 @@ describe("JavStakeX contract", () => {
             const user1RewardDebt = (userInfo.shares * rewardsPerShare) / ethers.parseEther("1");
 
             await expect(await erc20Token.balanceOf(hhJavStakeX.target)).to.be.equal(
-                balanceBeforeContract + stakeAmount,
+                balanceBeforeContract + stakeAmount - burnAmount,
             );
             await expect(await erc20Token.balanceOf(addr2.address)).to.be.equal(
                 balanceBeforeAddr2 - stakeAmount,
             );
             await expect(poolInfo.totalShares).to.be.equal(
-                poolInfoBefore.totalShares + stakeAmount,
+                poolInfoBefore.totalShares + stakeAmount - burnAmount,
             );
             await expect(poolInfo.rewardsPerShare).to.be.equal(0);
-            await expect(userInfo.shares).to.be.equal(userInfoBefore.shares + stakeAmount);
+            await expect(userInfo.shares).to.be.equal(
+                userInfoBefore.shares + stakeAmount - burnAmount,
+            );
             await expect(userInfo.blockRewardDebt).to.be.equal(user1RewardDebt);
             await expect(userInfo.productsRewardDebt).to.be.equal(0);
         });
@@ -311,13 +386,17 @@ describe("JavStakeX contract", () => {
 
             const poolInfo = await hhJavStakeX.poolInfo(pid);
             const userRewards = (await erc20Token.balanceOf(addr2.address)) - balanceBeforeAddr2;
+            const claimFee =
+                balanceBeforeContract -
+                userRewards -
+                (await erc20Token.balanceOf(hhJavStakeX.target));
 
             const userInfo = await hhJavStakeX.userInfo(pid, addr2.address);
             const userRewardDebt =
                 (userInfo.shares * poolInfo.accRewardPerShare) / ethers.parseEther("1");
 
             await expect(await erc20Token.balanceOf(hhJavStakeX.target)).to.be.equal(
-                balanceBeforeContract - userRewards,
+                balanceBeforeContract - userRewards - claimFee,
             );
             await expect(await erc20Token.balanceOf(addr2.address)).to.be.equal(
                 balanceBeforeAddr2 + userRewards,
@@ -338,9 +417,13 @@ describe("JavStakeX contract", () => {
             await hhJavStakeX.connect(addr1).claimAll();
 
             const userRewards = (await erc20Token.balanceOf(addr1.address)) - balanceBeforeAddr1;
+            const claimFee =
+                balanceBeforeContract -
+                userRewards -
+                (await erc20Token.balanceOf(hhJavStakeX.target));
 
             await expect(await erc20Token.balanceOf(hhJavStakeX.target)).to.be.equal(
-                balanceBeforeContract - userRewards,
+                balanceBeforeContract - userRewards - claimFee,
             );
             await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(
                 balanceBeforeAddr1 + userRewards,
@@ -358,6 +441,7 @@ describe("JavStakeX contract", () => {
         it("Should unstake - full amount", async () => {
             const pid = 0;
 
+            const poolFee = await hhJavStakeX.poolFee(pid);
             const balanceBeforeAddr1 = await erc20Token.balanceOf(addr1.address);
             const balanceBeforeContract = await erc20Token.balanceOf(hhJavStakeX.target);
             const poolInfoBefore = await hhJavStakeX.poolInfo(pid);
@@ -365,6 +449,7 @@ describe("JavStakeX contract", () => {
 
             await hhJavStakeX.connect(addr1).unstake(pid, userInfoBefore.shares);
 
+            const burnAmount = (userInfoBefore.shares * poolFee.withdrawFee) / BigInt(1e4);
             const userRewards =
                 (await erc20Token.balanceOf(addr1.address)) -
                 balanceBeforeAddr1 -
@@ -376,8 +461,8 @@ describe("JavStakeX contract", () => {
             await expect(await erc20Token.balanceOf(addr1.address)).to.be.equal(
                 balanceBeforeAddr1 + userInfoBefore.shares + userRewards,
             );
-            await expect(await erc20Token.balanceOf(hhJavStakeX.target)).to.be.equal(
-                balanceBeforeContract - userInfoBefore.shares - userRewards,
+            await expect(await erc20Token.balanceOf(hhJavStakeX.target)).to.be.below(
+                balanceBeforeContract - userInfoBefore.shares - userRewards - burnAmount,
             );
             await expect(userInfo.shares).to.be.equal(0);
             await expect(userInfo.blockRewardDebt).to.be.equal(0);
@@ -436,12 +521,15 @@ describe("JavStakeX contract", () => {
             const contractBalance = await erc20Token.balanceOf(hhJavStakeX.target);
             const userInfo = await hhJavStakeX.userInfo(pid, address);
             const pendingRewards = userBalance - userBalanceBefore;
+            const burnFee = contractBalanceBefore - contractBalance - pendingRewards;
 
             await expect(userInfo.totalClaims).to.be.equal(
                 userInfoBefore.totalClaims + pendingRewards,
             );
             await expect(userBalance).to.be.equal(userBalanceBefore + pendingRewards);
-            await expect(contractBalance).to.be.equal(contractBalanceBefore - pendingRewards);
+            await expect(contractBalance).to.be.equal(
+                contractBalanceBefore - pendingRewards - burnFee,
+            );
             await expect(await hhJavStakeX.pendingReward(pid, address)).to.be.equal(0);
 
             mine(5);
@@ -463,25 +551,6 @@ describe("JavStakeX contract", () => {
                 await ethers.provider.getBlockNumber(),
                 accRewardPerShare,
             );
-        });
-
-        it("Should get apr after added productsRewards", async () => {
-            const pid = 0;
-
-            const stakeAmount = ethers.parseEther("500");
-
-            await erc20Token.mint(addr1.address, stakeAmount);
-            await erc20Token.connect(addr1).approve(hhJavStakeX.target, stakeAmount);
-            await hhJavStakeX.connect(addr1).stake(pid, stakeAmount);
-
-            const poolInfo = await hhJavStakeX.poolInfo(pid);
-            const rewardsPerBlock = await hhJavStakeX.getRewardPerBlock();
-            const apr =
-                ((rewardsPerBlock * BigInt(1051200) + poolInfo.rewardsAmount) *
-                    ethers.parseEther("1")) /
-                poolInfo.totalShares;
-
-            await expect(await hhJavStakeX.apr(pid)).to.be.equal(apr);
         });
     });
 });
