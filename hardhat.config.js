@@ -47,11 +47,17 @@ module.exports = {
             url: "https://dmc.mydefichain.com/mainnet",
             accounts: [process.env.OWNER_KEY],
         },
+        sepolia_base: {
+            chainId: 84532,
+            url: "https://sepolia.base.org",
+            accounts: [process.env.OWNER_KEY],
+        },
     },
     etherscan: {
         apiKey: {
             testnet: "abc",
             mainnet: "abc",
+            sepolia_base: "abc",
         },
         customChains: [
             {
@@ -72,6 +78,16 @@ module.exports = {
                     // apiURL: "https://mainnet-dmc.mydefichain.com/api",
                     browserURL: "https://blockscout.mainnet.ocean.jellyfishsdk.com",
                     // browserURL: "https://mainnet-dmc.mydefichain.com",
+                },
+            },
+            {
+                network: "sepolia_base",
+                chainId: 84532,
+                urls: {
+                    // apiURL: "https://base-sepolia.blockscout.com/api",
+                    apiURL: "https://api-sepolia.basescan.org/api",
+                    // browserURL: "https://base-sepolia.blockscout.com/",
+                    browserURL: "https://sepolia.basescan.org/",
                 },
             },
         ],

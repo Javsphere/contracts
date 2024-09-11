@@ -3,6 +3,8 @@
 pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "../interfaces/IJavPriceAggregator.sol";
 import "../base/BaseUpgradable.sol";
 
@@ -22,68 +24,121 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
         uint64 publishTime;
     }
 
-    EnumerableSet.AddressSet private _allowedAddresses;
-
+    EnumerableSet.AddressSet private _allowedSigners;
     mapping(bytes32 => IJavPriceAggregator.Price) private _latestPriceInfo;
 
-    /* ========== EVENTS ========== */
-    event AddAllowedAddress(address indexed _address);
-    event RemoveAllowedAddress(address indexed _address);
-    event UpdatePriceFeed(bytes32 indexed id, int64 price, uint64 publishTime);
+    uint256 public priceUpdateFee;
 
-    modifier onlyAllowedAddresses() {
-        require(
-            _allowedAddresses.contains(msg.sender),
-            "JavPriceAggregator: only allowed addresses"
-        );
-        _;
-    }
+    /* ========== EVENTS ========== */
+    event AddAllowedSigner(address indexed _address);
+    event RemoveAllowedSigner(address indexed _address);
+    event SetPriceUpdateFee(uint256 indexed _priceUpdateFee);
+    event UpdatePriceFeed(bytes32 indexed id, int64 price, uint64 publishTime);
+    event ClaimFee(address indexed to, uint256 amount);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address[] memory _allowedAddresses_) external initializer {
-        for (uint256 i = 0; i < _allowedAddresses_.length; i++) {
-            _allowedAddresses.add(_allowedAddresses_[i]);
+    function initialize(
+        uint256 _priceUpdateFee,
+        address[] memory _allowedSigners_
+    ) external initializer {
+        priceUpdateFee = _priceUpdateFee;
+
+        for (uint256 i = 0; i < _allowedSigners_.length; i++) {
+            _allowedSigners.add(_allowedSigners_[i]);
         }
 
         __Base_init();
     }
 
-    function addAllowedAddress(address _address) external onlyAdmin {
-        _allowedAddresses.add(_address);
+    function addAllowedSigner(address _address) external onlyAdmin {
+        _allowedSigners.add(_address);
 
-        emit AddAllowedAddress(_address);
+        emit AddAllowedSigner(_address);
     }
 
-    function removeAllowedAddress(address _address) external onlyAdmin {
-        _allowedAddresses.remove(_address);
+    function removeAllowedSigner(address _address) external onlyAdmin {
+        _allowedSigners.remove(_address);
 
-        emit RemoveAllowedAddress(_address);
+        emit RemoveAllowedSigner(_address);
+    }
+
+    function setPriceUpdateFee(uint256 _priceUpdateFee) external onlyAdmin {
+        priceUpdateFee = _priceUpdateFee;
+
+        emit SetPriceUpdateFee(_priceUpdateFee);
     }
 
     /**
      * @notice Function to get all allowed addresses
      */
-    function getAllowedAddresses() external view returns (address[] memory) {
-        return _allowedAddresses.values();
+    function getAllowedSigners() external view returns (address[] memory) {
+        return _allowedSigners.values();
+    }
+
+    function getUpdateFee(bytes[] calldata updateData) external view returns (uint) {
+        return updateData.length * priceUpdateFee;
     }
 
     function getPrice(bytes32 id) external view returns (IJavPriceAggregator.Price memory price) {
         return _latestPriceInfo[id];
     }
 
-    function updatePriceFeeds(UpdatePriceInfo[] memory _priceInfo) external onlyAllowedAddresses {
-        for (uint256 i = 0; i < _priceInfo.length; i++) {
-            _latestPriceInfo[_priceInfo[i].id] = IJavPriceAggregator.Price({
-                price: _priceInfo[i].price,
-                conf: _priceInfo[i].conf,
-                expo: _priceInfo[i].expo,
-                publishTime: _priceInfo[i].publishTime
+    function getPriceUnsafe(
+        bytes32 id
+    ) external view returns (IJavPriceAggregator.Price memory price) {
+        return _latestPriceInfo[id];
+    }
+
+    function updatePriceFeeds(bytes[] calldata updateData) external payable {
+        for (uint256 i = 0; i < updateData.length; i++) {
+            bytes memory data = updateData[i];
+            require(data.length >= 65, "JavPriceAggregator: invalid data length"); // 65 bytes for the signature
+
+            // Extract the signature (first 65 bytes)
+            bytes memory signature = _slice(data, 0, 65);
+
+            // Extract the UpdatePriceInfo struct (remaining bytes)
+            bytes memory encodedData = _slice(data, 65, data.length - 65);
+
+            // Verify the signature
+            address signer = _recover(keccak256(encodedData), signature);
+            require(_allowedSigners.contains(signer), "JavPriceAggregator: Invalid signature");
+
+            UpdatePriceInfo memory _priceInfo = abi.decode(encodedData, (UpdatePriceInfo));
+            _latestPriceInfo[_priceInfo.id] = IJavPriceAggregator.Price({
+                price: _priceInfo.price,
+                conf: _priceInfo.conf,
+                expo: _priceInfo.expo,
+                publishTime: _priceInfo.publishTime
             });
-            emit UpdatePriceFeed(_priceInfo[i].id, _priceInfo[i].price, _priceInfo[i].publishTime);
+            emit UpdatePriceFeed(_priceInfo.id, _priceInfo.price, _priceInfo.publishTime);
         }
+    }
+
+    function claimFee(address payable _to) external onlyAdmin {
+        uint256 _amount = address(this).balance;
+        _to.transfer(_amount);
+
+        emit ClaimFee(_to, _amount);
+    }
+
+    function _slice(
+        bytes memory data,
+        uint256 start,
+        uint256 length
+    ) private pure returns (bytes memory) {
+        bytes memory result = new bytes(length);
+        for (uint256 i = 0; i < length; i++) {
+            result[i] = data[start + i];
+        }
+        return result;
+    }
+
+    function _recover(bytes32 messageHash, bytes memory signature) private pure returns (address) {
+        return ECDSA.recover(MessageHashUtils.toEthSignedMessageHash(messageHash), signature);
     }
 }
