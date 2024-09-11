@@ -437,6 +437,7 @@ library PairsStorageUtils {
         p.spreadP = _pair.spreadP;
         p.groupIndex = _pair.groupIndex;
         p.feeIndex = _pair.feeIndex;
+        p.feedId = _pair.feedId;
 
         emit IPairsStorageUtils.PairUpdated(_pairIndex);
     }
