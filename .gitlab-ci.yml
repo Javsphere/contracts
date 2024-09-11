@@ -1,0 +1,18 @@
+image: node:20-alpine
+
+stages:
+  - test
+
+cache:
+  key: ${CI_PIPELINE_ID}
+  paths:
+    - node_modules/
+    - artifacts/
+    - cache/
+
+run_tests:
+  stage: test
+  script:
+    - echo "OWNER_KEY=${OWNER_KEY}" >> .env
+    - npm install
+    - npx hardhat compile

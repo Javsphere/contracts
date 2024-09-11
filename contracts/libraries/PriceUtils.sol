@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.23;
 
-library PythUtils {
+library PriceUtils {
     /// @notice Converts a price to a uint256 with a target number of decimals
     /// @param price The price
     /// @param expo The price exponent
@@ -15,7 +15,7 @@ library PythUtils {
         int64 price,
         int32 expo,
         uint8 targetDecimals
-    ) public pure returns (uint256) {
+    ) internal pure returns (uint256) {
         if (price < 0 || expo > 0 || expo < -255) {
             revert();
         }
