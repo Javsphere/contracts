@@ -265,7 +265,8 @@ library TradingCommonUtils {
                     _trade.long,
                     _trade.collateralAmount,
                     _trade.leverage,
-                    _useBorrowingFees
+                    _useBorrowingFees,
+                    _getMultiCollatDiamond().getTradeLiquidationParams(_trade.user, _trade.index)
                 )
             );
     }

@@ -194,7 +194,8 @@ library UpdateLeverageUtils {
                 _trade.long,
                 _isIncrease ? values.newCollateralAmount : _trade.collateralAmount,
                 _isIncrease ? values.newLeverage : _trade.leverage,
-                true
+                true,
+                _getMultiCollatDiamond().getTradeLiquidationParams(_trade.user, _trade.index)
             )
         ); // for increase leverage we calculate new trade liquidation price and for decrease leverage we calculate existing trade liquidation price
     }

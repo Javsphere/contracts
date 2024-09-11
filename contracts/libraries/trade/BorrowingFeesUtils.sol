@@ -15,9 +15,6 @@ import "./TradingCommonUtils.sol";
  * @dev JavBorrowingFees facet internal library
  */
 library BorrowingFeesUtils {
-    uint256 internal constant LIQ_THRESHOLD_P = 90; // -90% pnl
-    uint256 internal constant P_1 = 1e10;
-
     /**
      * @dev Check IBorrowingFeesUtils interface for documentation
      */
@@ -208,8 +205,8 @@ library BorrowingFeesUtils {
             IBorrowingFees.PendingBorrowingAccFeesInput(
                 group.accFeeLong,
                 group.accFeeShort,
-                (uint256(groupOi.long) * collateralPrecision) / P_1,
-                (uint256(groupOi.short) * collateralPrecision) / P_1,
+                (uint256(groupOi.long) * collateralPrecision) / ConstantsUtils.P_10,
+                (uint256(groupOi.short) * collateralPrecision) / ConstantsUtils.P_10,
                 group.feePerBlock,
                 _currentBlock,
                 group.accLastUpdatedBlock,
@@ -279,7 +276,7 @@ library BorrowingFeesUtils {
         feeAmountCollateral =
             (_input.collateral * _input.leverage * borrowingFeeP) /
             1e3 /
-            P_1 /
+            ConstantsUtils.P_10 /
             100; // collateral precision
     }
 
@@ -289,15 +286,11 @@ library BorrowingFeesUtils {
     function getTradeLiquidationPrice(
         IBorrowingFees.LiqPriceInput calldata _input
     ) internal view returns (uint256) {
-        uint256 closingFeesCollateral = (TradingCommonUtils.getPositionSizeCollateralBasis(
+        uint256 closingFeesCollateral = TradingCommonUtils.getTotalClosingFeesCollateral(
             _input.collateralIndex,
             _input.pairIndex,
             (_input.collateral * _input.leverage) / 1e3
-        ) *
-            (_getMultiCollatDiamond().pairCloseFeeP(_input.pairIndex) +
-                _getMultiCollatDiamond().pairTriggerOrderFeeP(_input.pairIndex))) /
-            ConstantsUtils.P_10 /
-            100;
+        );
 
         uint256 borrowingFeesCollateral = _input.useBorrowingFees
             ? getTradeBorrowingFee(
@@ -320,7 +313,9 @@ library BorrowingFeesUtils {
                 _input.collateral,
                 _input.leverage,
                 borrowingFeesCollateral + closingFeesCollateral,
-                _getMultiCollatDiamond().getCollateral(_input.collateralIndex).precisionDelta
+                _getMultiCollatDiamond().getCollateral(_input.collateralIndex).precisionDelta,
+                _input.liquidationParams,
+                _getMultiCollatDiamond().pairSpreadP(_input.pairIndex)
             );
     }
 
@@ -337,8 +332,8 @@ library BorrowingFeesUtils {
         ITradingStorageUtils.Collateral memory collateralConfig = _getMultiCollatDiamond()
             .getCollateral(_collateralIndex);
         return (
-            (pairOi.long * collateralConfig.precision) / P_1,
-            (pairOi.short * collateralConfig.precision) / P_1
+            (pairOi.long * collateralConfig.precision) / ConstantsUtils.P_10,
+            (pairOi.short * collateralConfig.precision) / ConstantsUtils.P_10
         );
     }
 
@@ -649,30 +644,49 @@ library BorrowingFeesUtils {
      * @param _long true if long, false if short
      * @param _collateral trade collateral (collateral precision)
      * @param _leverage trade leverage (1e3 precision)
-     * @param _borrowingFeeCollateral borrowing fee amount (collateral precision)
+     * @param _feesCollateral closing fees + borrowing fees amount (collateral precision)
      * @param _collateralPrecisionDelta collateral precision delta (10^18/10^decimals)
+     * @param _liquidationParams liquidation parameters for the trade
+     * @param _pairSpreadP pair spread percentage (1e10)
      */
     function _getTradeLiquidationPrice(
         uint256 _openPrice,
         bool _long,
         uint256 _collateral,
         uint256 _leverage,
-        uint256 _borrowingFeeCollateral,
-        uint128 _collateralPrecisionDelta
+        uint256 _feesCollateral,
+        uint256 _collateralPrecisionDelta,
+        IPairsStorage.GroupLiquidationParams memory _liquidationParams,
+        uint256 _pairSpreadP
     ) internal pure returns (uint256) {
-        uint256 precisionDeltaUint = uint256(_collateralPrecisionDelta);
-
+        uint256 liqPnlThresholdP = TradingCommonUtils.getLiqPnlThresholdP(
+            _liquidationParams,
+            _leverage
+        );
         int256 openPriceInt = int256(_openPrice);
-        int256 collateralLiqNegativePnlInt = int256(
-            (_collateral * LIQ_THRESHOLD_P * precisionDeltaUint * 1e3) / 100
-        ); // 1e18 * 1e3
-        int256 borrowingFeeInt = int256(_borrowingFeeCollateral * precisionDeltaUint * 1e3); // 1e18 * 1e3
 
-        // PRECISION
-        int256 liqPriceDistance = (openPriceInt * (collateralLiqNegativePnlInt - borrowingFeeInt)) / // 1e10 * 1e18 * 1e3
+        int256 collateralLiqNegativePnlInt = int256(
+            (_collateral * liqPnlThresholdP * _collateralPrecisionDelta * 1e3) /
+                100 /
+                ConstantsUtils.P_10
+        ); // 1e18 * 1e3
+        int256 feesInt = int256(_feesCollateral * _collateralPrecisionDelta * 1e3); // 1e18 * 1e3
+
+        // 1e10
+        int256 liqPriceDistance = (openPriceInt * (collateralLiqNegativePnlInt - feesInt)) / // 1e10 * 1e18 * 1e3
             int256(_collateral) /
             int256(_leverage) /
-            int256(precisionDeltaUint); // 1e10
+            int256(_collateralPrecisionDelta); // 1e10
+
+        // Apply closing spread to liquidation price only for trades opened from v9.2
+        uint256 closingSpreadP = _pairSpreadP / 2;
+        closingSpreadP = closingSpreadP > _liquidationParams.maxLiqSpreadP
+            ? _liquidationParams.maxLiqSpreadP
+            : closingSpreadP;
+        liqPriceDistance -=
+            (openPriceInt * int256(closingSpreadP)) /
+            int256(ConstantsUtils.P_10) /
+            100;
 
         int256 liqPrice = _long ? openPriceInt - liqPriceDistance : openPriceInt + liqPriceDistance; // 1e10
 
@@ -815,7 +829,7 @@ library BorrowingFeesUtils {
         uint256 _amountCollateral,
         uint128 _collateralPrecision
     ) internal returns (uint72 newOiLong, uint72 newOiShort, uint72 delta) {
-        _amountCollateral = (_amountCollateral * P_1) / _collateralPrecision; // 1e10
+        _amountCollateral = (_amountCollateral * ConstantsUtils.P_10) / _collateralPrecision; // 1e10
 
         if (_amountCollateral > type(uint72).max) {
             revert IGeneralErrors.Overflow();

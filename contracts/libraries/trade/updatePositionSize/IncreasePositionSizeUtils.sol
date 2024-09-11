@@ -209,7 +209,8 @@ library IncreasePositionSizeUtils {
                 _existingTrade.long,
                 values.newCollateralAmount,
                 values.newLeverage,
-                false
+                false,
+                _getMultiCollatDiamond().getPairLiquidationParams(_existingTrade.pairIndex) // new liquidation params
             )
         );
     }

@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.23;
 
+import "./IPairsStorage.sol";
+
 /**
  * @custom:version 8
  * @dev Contains the types for the JavBorrowingFees facet
@@ -84,6 +86,7 @@ interface IBorrowingFees {
         uint256 collateral; // 1e18 | 1e6 (collateral)
         uint256 leverage; // 1e3
         bool useBorrowingFees;
+        IPairsStorage.GroupLiquidationParams liquidationParams;
     }
 
     struct PendingBorrowingAccFeesInput {
