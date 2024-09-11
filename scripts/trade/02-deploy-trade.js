@@ -78,57 +78,56 @@ async function main() {
     //
     // logDeploy("JavFeeTiers", await feeTiers.getAddress());
     //
-    // const priceImpactFactory = await ethers.getContractFactory("JavPriceImpact", {
-    //     libraries: {
-    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-    //         tradingCommonUtils.target,
-    //     },
-    // });
-    // const priceImpact = await priceImpactFactory.deploy();
-    // await priceImpact.waitForDeployment();
-    //
-    // logDeploy("JavPriceImpact", await priceImpact.getAddress());
-    //
-    // const tradingStorageFactory = await ethers.getContractFactory("JavTradingStorage", {
-    //     libraries: {
-    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-    //         tradingCommonUtils.target,
-    //         "contracts/libraries/trade/ArrayGetters.sol:ArrayGetters":
-    //         arrayGetters.target,
-    //     },
-    // });
-    // const tradingStorage = await tradingStorageFactory.deploy();
-    // await tradingStorage.waitForDeployment();
-    //
-    // logDeploy("JavTradingStorage", await tradingStorage.getAddress());
-    //
+    const priceImpactFactory = await ethers.getContractFactory("JavPriceImpact", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+                "0x1264C5e3b88996E3d0C3f8F62E293C16CCA99C31",
+        },
+    });
+    const priceImpact = await priceImpactFactory.deploy();
+    await priceImpact.waitForDeployment();
+
+    logDeploy("JavPriceImpact", await priceImpact.getAddress());
+
+    const tradingStorageFactory = await ethers.getContractFactory("JavTradingStorage", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+                "0x1264C5e3b88996E3d0C3f8F62E293C16CCA99C31",
+            "contracts/libraries/trade/ArrayGetters.sol:ArrayGetters":
+                "0x459Ebe1C4E1b1c2dEBc6E1866D412dFB30B938b9",
+        },
+    });
+    const tradingStorage = await tradingStorageFactory.deploy();
+    await tradingStorage.waitForDeployment();
+
+    logDeploy("JavTradingStorage", await tradingStorage.getAddress());
+
     const tradingInteractionsFactory = await ethers.getContractFactory("JavTradingInteractions", {
         libraries: {
             "contracts/libraries/trade/PackingUtils.sol:PackingUtils": "0xE438848bb41658a2203a245CA0c7d466e75AEB31",
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            "0x4eEc1274C3FE6106bEfB3ceDC74C5D9E6fAeAe23",
+                "0x1264C5e3b88996E3d0C3f8F62E293C16CCA99C31",
             "contracts/libraries/trade/updateLeverage/UpdateLeverageUtils.sol:UpdateLeverageUtils":
-                "0x95BfE80f4e5B1AF9bd653E3c43Be5557C8B4fcDC",
+                "0x900eD05e6c662D1A410d75A9ec30840647B4F1B0",
             "contracts/libraries/trade/updatePositionSize/UpdatePositionSizeUtils.sol:UpdatePositionSizeUtils":
-                "0xAa7Cb943C6819365bbeB8C3dbF8fE1aD829d6fB9",
+                "0x59b396bbF4a0cC1bB5f021CE0C85785A2458Ed06",
         },
     });
     const tradingInteractions = await tradingInteractionsFactory.deploy();
     await tradingInteractions.waitForDeployment();
-    ``;
 
     logDeploy("JavTradingInteractions", await tradingInteractions.getAddress());
-    //
-    // const tradingProcessingFactory = await ethers.getContractFactory("JavTradingProcessing", {
-    //     libraries: {
-    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-    //         "0x4eEc1274C3FE6106bEfB3ceDC74C5D9E6fAeAe23",
-    //     },
-    // });
-    // const tradingProcessing = await tradingProcessingFactory.deploy();
-    // await tradingProcessing.waitForDeployment();
-    //
-    // logDeploy("JavTradingProcessing", await tradingProcessing.getAddress());
+
+    const tradingProcessingFactory = await ethers.getContractFactory("JavTradingProcessing", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+                "0x1264C5e3b88996E3d0C3f8F62E293C16CCA99C31",
+        },
+    });
+    const tradingProcessing = await tradingProcessingFactory.deploy();
+    await tradingProcessing.waitForDeployment();
+
+    logDeploy("JavTradingProcessing", await tradingProcessing.getAddress());
     //
     // const borrowingFeesFactory = await ethers.getContractFactory("JavBorrowingFees", {
     //     libraries: {

@@ -18,7 +18,6 @@ module.exports = {
                         enabled: true,
                         runs: 200,
                     },
-                    viaIR: true,
                 },
             },
             {
@@ -85,18 +84,20 @@ module.exports = {
                 network: "sepolia_base",
                 chainId: 84532,
                 urls: {
-                    apiURL: "https://base-sepolia.blockscout.com/api",
-                    browserURL: "https://base-sepolia.blockscout.com/",
+                    // apiURL: "https://base-sepolia.blockscout.com/api",
+                    apiURL: "https://api-sepolia.basescan.org/api",
+                    // browserURL: "https://base-sepolia.blockscout.com/",
+                    browserURL: "https://sepolia.basescan.org/",
                 },
             },
         ],
     },
     contractSizer: {
         alphaSort: true,
-        runOnCompile: false,
+        runOnCompile: true,
         disambiguatePaths: false,
     },
     gasReporter: {
-        enabled: false,
+        enabled: true,
     },
 };
