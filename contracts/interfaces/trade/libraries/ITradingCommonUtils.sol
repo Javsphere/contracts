@@ -45,18 +45,6 @@ interface ITradingCommonUtils {
      * @param collateralIndex index of the collateral
      * @param amountCollateral amount charged (collateral precision)
      */
-    event GnsStakingFeeCharged(
-        address indexed trader,
-        uint8 indexed collateralIndex,
-        uint256 amountCollateral
-    );
-
-    /**
-     *
-     * @param trader address of the trader
-     * @param collateralIndex index of the collateral
-     * @param amountCollateral amount charged (collateral precision)
-     */
     event BorrowingProviderFeeCharged(
         address indexed trader,
         uint8 indexed collateralIndex,
