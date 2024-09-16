@@ -75,6 +75,13 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         uint256 amountOut
     );
     event SetTokenAmount(uint256 tokenId, uint256 amount);
+    event UpdateToken(
+        uint256 indexed tokenId,
+        address asset,
+        bytes32 priceFeed,
+        uint256 targetWeightage,
+        bool isActive
+    );
 
     modifier validToken(uint256 _tokenId) {
         require(_tokenId < tokens.length, "JavBorrowingProvider: Invalid token");
@@ -115,6 +122,25 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         tokens.push(tokenInfo);
 
         emit AddToken(tokenInfo);
+    }
+
+    function updateToken(
+        uint256 _tokenId,
+        TokenInfo memory _tokenInfo
+    ) external onlyAdmin validToken(_tokenId) {
+        TokenInfo storage _token = tokens[_tokenId];
+        _token.asset = _tokenInfo.asset;
+        _token.priceFeed = _tokenInfo.priceFeed;
+        _token.targetWeightage = _tokenInfo.targetWeightage;
+        _token.isActive = _tokenInfo.isActive;
+
+        emit UpdateToken(
+            _tokenId,
+            _tokenInfo.asset,
+            _tokenInfo.priceFeed,
+            _tokenInfo.targetWeightage,
+            _tokenInfo.isActive
+        );
     }
 
     function setTokenAmount(

@@ -672,6 +672,11 @@ library BorrowingFeesUtils {
         ); // 1e18 * 1e3
         int256 feesInt = int256(_feesCollateral * _collateralPrecisionDelta * 1e3); // 1e18 * 1e3
 
+        //  validate if fees not bigger than the loss
+        if (feesInt >= collateralLiqNegativePnlInt) {
+            feesInt = 0;
+        }
+
         // 1e10
         int256 liqPriceDistance = (openPriceInt * (collateralLiqNegativePnlInt - feesInt)) / // 1e10 * 1e18 * 1e3
             int256(_collateral) /
