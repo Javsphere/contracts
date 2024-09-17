@@ -13,7 +13,12 @@ interface IJavBorrowingProvider {
 
     event ShareToAssetsPriceUpdated(uint256 newValue);
     event PnlHandlerUpdated(address newValue);
-    event RewardDistributed(address indexed sender, uint256 assets);
+    event RewardDistributed(
+        address indexed sender,
+        uint256 indexed collateralIndex,
+        uint256 assets,
+        uint256 usdAmount
+    );
     event AssetsSent(address indexed sender, address indexed receiver, uint256 assets);
     event AssetsReceived(
         address indexed sender,

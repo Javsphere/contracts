@@ -199,8 +199,12 @@ library TradingProcessingUtils {
                     : v.liqPrice
             );
 
-        v.exactExecution = triggerPrice > 0 && _pendingOrder.price == triggerPrice;
-        v.executionPrice = v.exactExecution ? triggerPrice : _pendingOrder.price;
+        v.exactExecution =
+            (triggerPrice > 0 && _pendingOrder.price == triggerPrice) ||
+            triggerPrice == 1;
+        v.executionPrice = v.exactExecution && triggerPrice != 1
+            ? triggerPrice
+            : _pendingOrder.price;
 
         // Apply closing spread and price impact for TPs and SLs, not liquidations (because trade value is 0 already)
         if (_pendingOrder.orderType != ITradingStorage.PendingOrderType.LIQ_CLOSE) {

@@ -55,6 +55,20 @@ library PriceImpactUtils {
     /**
      * @dev Check IPriceImpactUtils interface for documentation
      */
+    function initializePairFactors(
+        uint16[] calldata _pairIndices,
+        uint40[] calldata _protectionCloseFactors,
+        uint32[] calldata _protectionCloseFactorBlocks,
+        uint40[] calldata _cumulativeFactors
+    ) internal {
+        setProtectionCloseFactors(_pairIndices, _protectionCloseFactors);
+        setProtectionCloseFactorBlocks(_pairIndices, _protectionCloseFactorBlocks);
+        setCumulativeFactors(_pairIndices, _cumulativeFactors);
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
     function setPriceImpactWindowsCount(uint48 _newWindowsCount) internal {
         IPriceImpact.OiWindowsSettings storage settings = _getStorage().oiWindowsSettings;
 
