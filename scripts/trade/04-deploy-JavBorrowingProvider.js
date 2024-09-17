@@ -61,13 +61,13 @@ async function main() {
         [
             {
                 asset: "0xCfC5DD6AF77b5BccB6adceD68716f98c69463b03", //weth
-                priceFeed: "0x7f981f906d7cfe93f618804f1de89e0199ead306edc022d3230b3e8305f391b0",
+                priceFeed: "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
                 targetWeightage: 25,
                 isActive: true,
             },
             {
                 asset: "0xB86fBB7C463e189fE50529491E8bDc05714f6634", //tWBTC:
-                priceFeed: "0xc9d8b075a5c69303365ae23633d4e085199bf5c520a3b90fed1322a0342ffc33",
+                priceFeed: "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
                 targetWeightage: 25,
                 isActive: true,
             },

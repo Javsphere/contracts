@@ -56,6 +56,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
 
     // Parameters (adjustable)
     uint256 public lossesBurnP; // PRECISION_18 (% of all losses)
+    mapping(uint256 => uint256) public tokenAmount; // PRECISION_18
 
     /* ========== EVENTS ========== */
     event AddToken(TokenInfo tokenInfo);
@@ -72,6 +73,14 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         address tokenOut,
         uint256 amountIn,
         uint256 amountOut
+    );
+    event SetTokenAmount(uint256 tokenId, uint256 amount);
+    event UpdateToken(
+        uint256 indexed tokenId,
+        address asset,
+        bytes32 priceFeed,
+        uint256 targetWeightage,
+        bool isActive
     );
 
     modifier validToken(uint256 _tokenId) {
@@ -115,6 +124,34 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         emit AddToken(tokenInfo);
     }
 
+    function updateToken(
+        uint256 _tokenId,
+        TokenInfo memory _tokenInfo
+    ) external onlyAdmin validToken(_tokenId) {
+        TokenInfo storage _token = tokens[_tokenId];
+        _token.asset = _tokenInfo.asset;
+        _token.priceFeed = _tokenInfo.priceFeed;
+        _token.targetWeightage = _tokenInfo.targetWeightage;
+        _token.isActive = _tokenInfo.isActive;
+
+        emit UpdateToken(
+            _tokenId,
+            _tokenInfo.asset,
+            _tokenInfo.priceFeed,
+            _tokenInfo.targetWeightage,
+            _tokenInfo.isActive
+        );
+    }
+
+    function setTokenAmount(
+        uint256 _inputToken,
+        uint256 _amount
+    ) external onlyAdmin validToken(_inputToken) {
+        tokenAmount[_inputToken] = _amount;
+
+        emit SetTokenAmount(_inputToken, _amount);
+    }
+
     function initialBuy(
         uint256 _inputToken,
         uint256 _amount,
@@ -125,6 +162,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
             "JavBorrowingProvider: Purchase not available"
         );
         TokenInfo memory _token = tokens[_inputToken];
+        tokenAmount[_inputToken] += _amount;
 
         IERC20(_token.asset).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
@@ -148,7 +186,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
             "JavBorrowingProvider: invalid balance for buy"
         );
 
-        _buyLLP(_token, _amount);
+        _buyLLP(_inputToken, _token, _amount);
     }
 
     /**
@@ -167,7 +205,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
             "JavBorrowingProvider: invalid balance for sell"
         );
 
-        _sellLLP(_token, _amount);
+        _sellLLP(_outputToken, _token, _amount);
     }
 
     function rebalanceTokens() external {
@@ -196,7 +234,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
             (assets * PRECISION_18) /
             IERC20(llpToken).totalSupply();
 
-        emit RewardDistributed(sender, assets);
+        emit RewardDistributed(sender, _collateralIndex, assets, usdAmount);
     }
 
     // PnL interactions (happens often, so also used to trigger other actions)
@@ -217,6 +255,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         if (accPnlPerToken[_collateralIndex] > int256(maxAccPnlPerToken(_collateralIndex)))
             revert NotEnoughAssets();
 
+        tokenAmount[_collateralIndex] -= assets;
         IERC20(_token.asset).safeTransfer(receiver, assets);
 
         emit AssetsSent(sender, receiver, assets);
@@ -230,6 +269,8 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         TokenInfo memory _token = tokens[_collateralIndex];
         address sender = _msgSender();
         IERC20(_token.asset).safeTransferFrom(sender, address(this), assets);
+
+        tokenAmount[_collateralIndex] += assets;
 
         uint256 assetsLessDeplete = assets;
 
@@ -262,7 +303,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
 
     function tokenTvl(uint256 _tokenId) external view validToken(_tokenId) returns (uint256) {
         TokenInfo memory _token = tokens[_tokenId];
-        return _calculateTvlUsd(_token);
+        return _calculateTvlUsd(_tokenId, _token);
     }
 
     function llpPrice() external view returns (uint256) {
@@ -273,11 +314,12 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         return tokens.length;
     }
 
-    function _buyLLP(TokenInfo memory _inputToken, uint256 _amount) private {
+    function _buyLLP(uint256 _tokenId, TokenInfo memory _inputToken, uint256 _amount) private {
         uint256 _inputAmountUsd = (_amount * _getUsdPrice(_inputToken.priceFeed)) / 1e18;
         // calculate llp amount
         uint256 _fee = (_inputAmountUsd * buyFee) / 1e4;
         uint256 _llpAmount = ((_inputAmountUsd - _fee) * 1e18) / _llpPrice();
+        tokenAmount[_tokenId] += _amount;
 
         IERC20(_inputToken.asset).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
@@ -285,12 +327,13 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         emit BuyLLP(msg.sender, _inputToken.asset, llpToken, _amount, _llpAmount);
     }
 
-    function _sellLLP(TokenInfo memory _outputToken, uint256 _amount) private {
+    function _sellLLP(uint256 _tokenId, TokenInfo memory _outputToken, uint256 _amount) private {
         uint256 _inputAmountUsd = (_amount * _llpPrice()) / 1e18;
         // calculate tokens amount
         uint256 _fee = (_inputAmountUsd * sellFee) / 1e4;
         uint256 _tokenUsdPrice = _getUsdPrice(_outputToken.priceFeed);
         uint256 _tokensAmount = ((_inputAmountUsd - _fee) * 1e18) / _tokenUsdPrice;
+        tokenAmount[_tokenId] -= _tokensAmount;
 
         IERC20Extended(llpToken).burnFrom(msg.sender, _amount);
         IERC20(_outputToken.asset).safeTransfer(msg.sender, _tokensAmount);
@@ -308,15 +351,17 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         for (uint8 i = 0; i < tokens.length; ++i) {
             TokenInfo memory _token = tokens[i];
             if (_token.isActive) {
-                _tvl += _calculateTvlUsd(_token);
+                _tvl += _calculateTvlUsd(i, _token);
             }
         }
         return _tvl;
     }
 
-    function _calculateTvlUsd(TokenInfo memory _token) private view returns (uint256) {
-        return
-            (IERC20(_token.asset).balanceOf(address(this)) * _getUsdPrice(_token.priceFeed)) / 1e18;
+    function _calculateTvlUsd(
+        uint256 _tokenId,
+        TokenInfo memory _token
+    ) private view returns (uint256) {
+        return (tokenAmount[_tokenId] * _getUsdPrice(_token.priceFeed)) / 1e18;
     }
 
     function _llpPrice() private view returns (uint256) {
@@ -333,7 +378,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         for (uint8 i = 0; i < tokens.length; ++i) {
             if (tokens[i].isActive) {
                 uint256 targetValue = (_totalTvl * tokens[i].targetWeightage) / 100;
-                uint256 currentValue = _calculateTvlUsd(tokens[i]);
+                uint256 currentValue = _calculateTvlUsd(i, tokens[i]);
                 bool isSell = currentValue >= targetValue ? true : false;
                 uint256 excessValue = isSell
                     ? currentValue - targetValue
@@ -455,6 +500,9 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         IERC20(_tokenIn).safeDecreaseAllowance(address(swapRouter), 0);
         IERC20(_tokenIn).safeIncreaseAllowance(address(swapRouter), _amount);
 
+        uint256 _tokenIdIn = _getTokenIdByAddress(_tokenIn);
+        uint256 _tokenIdOut = _getTokenIdByAddress(_tokenOut);
+
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: _tokenIn,
             tokenOut: _tokenOut,
@@ -464,6 +512,18 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
             amountOutMinimum: 0,
             sqrtPriceLimitX96: 0
         });
-        swapRouter.exactInputSingle(params);
+        uint256 _amountOut = swapRouter.exactInputSingle(params);
+
+        tokenAmount[_tokenIdIn] -= _amount;
+        tokenAmount[_tokenIdOut] -= _amountOut;
+    }
+
+    function _getTokenIdByAddress(address _tokenAddress) private view returns (uint256) {
+        for (uint8 i = 0; i < tokens.length; ++i) {
+            TokenInfo memory _token = tokens[i];
+            if (_token.isActive && _token.asset == _tokenAddress) {
+                return i;
+            }
+        }
     }
 }
