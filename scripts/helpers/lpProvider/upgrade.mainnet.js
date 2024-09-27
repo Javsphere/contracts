@@ -11,7 +11,7 @@ async function main() {
         kind: "uups",
         redeployImplementation: "always",
         txOverrides: {
-            gasLimit: ethers.parseUnits("0.03", "gwei"),
+            gasLimit: ethers.parseUnits("0.01", "gwei"),
         },
     });
     await impl.waitForDeployment();

@@ -5,40 +5,31 @@ async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    // const Contract = await ethers.getContractFactory("TestUSDT");
-    // const contract = await upgrades.deployProxy(Contract, [], {
-    //     initializer: "initialize",
-    //     kind: "uups",
-    // });
-    // await contract.waitForDeployment();
-    //
-    // const contractAddress = await contract.getAddress();
-    // console.log(`TestUSDT contract deployed to: ${contractAddress}`);
 
     const tokenFactory = await ethers.getContractFactory("TestToken");
-    const token1 = await upgrades.deployProxy(tokenFactory, ["Test WBTC", "wBTC"], {
+    const token1 = await upgrades.deployProxy(tokenFactory, ["Leverage WBTC", "xWBTC"], {
         initializer: "initialize",
         kind: "uups",
     });
     await token1.waitForDeployment();
 
-    logDeploy("tWBTC", await token1.getAddress());
+    logDeploy("xWBTC", await token1.getAddress());
 
-    const token2 = await upgrades.deployProxy(tokenFactory, ["Test USDT", "tUSDT"], {
+    const token2 = await upgrades.deployProxy(tokenFactory, ["Leverage WETH", "xWETH"], {
         initializer: "initialize",
         kind: "uups",
     });
     await token2.waitForDeployment();
 
-    logDeploy("tUSDT", await token2.getAddress());
+    logDeploy("xWETH", await token2.getAddress());
 
-    const token3 = await upgrades.deployProxy(tokenFactory, ["Test WETH", "tWETH"], {
+    const token3 = await upgrades.deployProxy(tokenFactory, ["Leverage USDC", "xUSDC"], {
         initializer: "initialize",
         kind: "uups",
     });
     await token3.waitForDeployment();
 
-    logDeploy("tUSDC", await token3.getAddress());
+    logDeploy("xUSDC", await token3.getAddress());
 }
 
 main()
