@@ -11,6 +11,23 @@ library ArrayGetters {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
+    function getCollaterals() public view returns (ITradingStorage.Collateral[] memory) {
+        ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
+        uint256 collateralsCount = s.lastCollateralIndex + 1;
+        ITradingStorage.Collateral[] memory collaterals = new ITradingStorage.Collateral[](
+            collateralsCount
+        );
+
+        for (uint8 i; i < collateralsCount; ++i) {
+            collaterals[i] = s.collaterals[i];
+        }
+
+        return collaterals;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
     function getTraders(uint32 _offset, uint32 _limit) public view returns (address[] memory) {
         ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
 

@@ -1,4 +1,4 @@
-# Javlis smart contracts
+# Javsphere smart contracts
 
 ## Getting started
 

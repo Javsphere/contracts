@@ -164,7 +164,7 @@ library UpdatePositionSizeUtils {
     /**
      * @dev Returns current address as multi-collateral diamond interface to call other facets functions.
      */
-    function _getMultiCollatDiamond() internal view returns (IJavMultiCollatDiamond) {
+    function _getMultiCollatDiamond() private view returns (IJavMultiCollatDiamond) {
         return IJavMultiCollatDiamond(address(this));
     }
 
@@ -176,7 +176,7 @@ library UpdatePositionSizeUtils {
     function _baseValidateRequest(
         address _trader,
         uint32 _index
-    ) internal view returns (ITradingStorage.Trade memory trade) {
+    ) private view returns (ITradingStorage.Trade memory trade) {
         trade = _getMultiCollatDiamond().getTrade(_trader, _index);
 
         // 1. Check trade exists

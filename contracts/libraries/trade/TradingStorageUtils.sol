@@ -399,23 +399,6 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getCollaterals() internal view returns (ITradingStorage.Collateral[] memory) {
-        ITradingStorage.TradingStorage storage s = _getStorage();
-        uint256 collateralsCount = s.lastCollateralIndex + 1;
-        ITradingStorage.Collateral[] memory collaterals = new ITradingStorage.Collateral[](
-            collateralsCount
-        );
-
-        for (uint8 i; i < collateralsCount; ++i) {
-            collaterals[i] = s.collaterals[i];
-        }
-
-        return collaterals;
-    }
-
-    /**
-     * @dev Check ITradingStorageUtils interface for documentation
-     */
     function getCollateralIndex(address _collateral) internal view returns (uint8) {
         return _getStorage().collateralIndex[_collateral];
     }

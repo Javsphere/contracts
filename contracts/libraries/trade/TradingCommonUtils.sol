@@ -520,11 +520,11 @@ library TradingCommonUtils {
      * @param _amountCollateral amount of collateral to send to vault (collateral precision)
      * @param _trader trader address
      */
-    function sendCollateralToVault(
+    function _sendCollateralToVault(
         uint8 _collateralIndex,
         uint256 _amountCollateral,
         address _trader
-    ) internal {
+    ) private {
         getBorrowingProvider().receiveAssets(_collateralIndex, _amountCollateral, _trader);
     }
 
@@ -672,7 +672,7 @@ library TradingCommonUtils {
         address[] memory _tokens = new address[](1);
         _tokens[0] = collateral;
 
-        IERC20(collateral).safeTransferFrom(_trader, rewardsDistributor, _amountCollateral);
+        IERC20(collateral).safeTransfer(rewardsDistributor, _amountCollateral);
 
         IRewardsDistributor(rewardsDistributor).distributeRewards(_tokens);
         emit ITradingCommonUtils.RewardsFeeCharged(_trader, _collateralIndex, _amountCollateral);
@@ -709,14 +709,14 @@ library TradingCommonUtils {
 
         // 2. Charge referral fee (if applicable) and send collateral amount to vault
         if (_getMultiCollatDiamond().getTraderActiveReferrer(_trade.user) != address(0)) {
-            v.reward1 = distributeReferralFeeCollateral(
+            v.reward1 = _distributeReferralFeeCollateral(
                 _trade.collateralIndex,
                 _trade.user,
                 _getMultiCollatDiamond().calculateFeeAmount(_trade.user, v.positionSizeCollateral), // apply fee tiers here to v.positionSizeCollateral itself to make correct calculations inside referrals
                 _getMultiCollatDiamond().pairOpenFeeP(_trade.pairIndex)
             );
 
-            sendCollateralToVault(_trade.collateralIndex, v.reward1, _trade.user);
+            _sendCollateralToVault(_trade.collateralIndex, v.reward1, _trade.user);
             totalFeesCollateral += uint120(v.reward1);
 
             emit ITradingCommonUtils.ReferralFeeCharged(
@@ -750,7 +750,7 @@ library TradingCommonUtils {
         // 6. Send collateral amount to vault if applicable
         if (!ConstantsUtils.isOrderTypeMarket(_orderType)) {
             v.reward3 = (v.reward2 * 2) / 10; // 20% of limit fees
-            sendCollateralToVault(_trade.collateralIndex, v.reward3, _trade.user);
+            _sendCollateralToVault(_trade.collateralIndex, v.reward3, _trade.user);
         }
 
         // 7. Distribute staking fee (previous dev fee + market/limit fee - oracle reward)
@@ -836,7 +836,7 @@ library TradingCommonUtils {
      * @param _positionSizeCollateral position size in collateral tokens (collateral precision)
      * @param _pairOpenFeeP pair open fee percentage (1e10 precision)
      */
-    function distributeReferralFeeCollateral(
+    function _distributeReferralFeeCollateral(
         uint8 _collateralIndex,
         address _trader,
         uint256 _positionSizeCollateral, // collateralPrecision
@@ -926,7 +926,7 @@ library TradingCommonUtils {
     /**
      * @dev Returns current address as multi-collateral diamond interface to call other facets functions.
      */
-    function _getMultiCollatDiamond() internal view returns (IJavMultiCollatDiamond) {
+    function _getMultiCollatDiamond() private view returns (IJavMultiCollatDiamond) {
         return IJavMultiCollatDiamond(address(this));
     }
 }
