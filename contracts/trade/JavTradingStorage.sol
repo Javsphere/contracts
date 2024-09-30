@@ -157,7 +157,7 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
 
     /// @inheritdoc ITradingStorageUtils
     function getCollaterals() external view returns (Collateral[] memory) {
-        return TradingStorageUtils.getCollaterals();
+        return ArrayGetters.getCollaterals();
     }
 
     /// @inheritdoc ITradingStorageUtils
