@@ -39,6 +39,13 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
     event SwapToDFI(uint256 indexed amount);
     event WithdrawDFI(address indexed to, uint256 amount);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
+    event RemoveLiquidityV2(address indexed token, address indexed to, uint256 amount);
+    event RemoveLiquidityV3(
+        address indexed token,
+        uint256 nftId,
+        address indexed to,
+        uint256 amount
+    );
 
     modifier onlyBot() {
         require(msg.sender == botAddress, "LPProvider: only bot");
@@ -133,6 +140,73 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
         _to.transfer(_amount);
 
         emit WithdrawDFI(_to, _amount);
+    }
+
+    function removeLiquidityV2(
+        address _pairAddress,
+        address _tokenA,
+        address _tokenB,
+        address _to
+    ) external onlyAdmin {
+        uint256 liquidity = IERC20(_pairAddress).balanceOf(address(this));
+
+        IERC20(_pairAddress).safeDecreaseAllowance(address(routerV2), 0);
+        IERC20(_pairAddress).safeIncreaseAllowance(address(routerV2), liquidity);
+
+        (uint amountA, uint amountB) = routerV2.removeLiquidity(
+            _tokenA,
+            _tokenB,
+            liquidity,
+            1,
+            1,
+            _to,
+            block.timestamp + 1000
+        );
+
+        emit RemoveLiquidityV2(_tokenA, _to, amountA);
+        emit RemoveLiquidityV2(_tokenB, _to, amountB);
+    }
+
+    function removeLiquidityV3(uint256 _tokenId, address _to) external onlyAdmin {
+        (
+            ,
+            ,
+            address token0,
+            address token1,
+            ,
+            ,
+            ,
+            uint128 liquidity,
+            ,
+            ,
+            ,
+
+        ) = nonfungiblePositionManager.positions(_tokenId);
+
+        INonfungiblePositionManager.DecreaseLiquidityParams
+            memory params = INonfungiblePositionManager.DecreaseLiquidityParams({
+                tokenId: _tokenId,
+                liquidity: liquidity,
+                amount0Min: 0,
+                amount1Min: 0,
+                deadline: block.timestamp + 1000
+            });
+
+        (uint256 amount0, uint256 amount1) = nonfungiblePositionManager.decreaseLiquidity(params);
+
+        INonfungiblePositionManager.CollectParams memory feeParams = INonfungiblePositionManager
+            .CollectParams({
+                tokenId: _tokenId,
+                recipient: _to,
+                amount0Max: type(uint128).max,
+                amount1Max: type(uint128).max
+            });
+
+        nonfungiblePositionManager.collect(feeParams);
+        nonfungiblePositionManager.burn(_tokenId);
+
+        emit RemoveLiquidityV3(token0, _tokenId, _to, amount0);
+        emit RemoveLiquidityV3(token1, _tokenId, _to, amount1);
     }
 
     function addLiquidityV3(

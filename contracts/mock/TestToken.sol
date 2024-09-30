@@ -23,7 +23,7 @@ contract TestToken is ERC20BurnableUpgradeable, BaseUpgradable {
      * @param account address for mint
      * @param amount Amount of tokens
      */
-    function mint(address account, uint256 amount) external {
+    function mint(address account, uint256 amount) external onlyAdmin {
         _mint(account, amount);
     }
 }
