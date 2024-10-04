@@ -11,35 +11,35 @@ async function main() {
     //
     // logDeploy("PackingUtils", packlingUtils.target);
     //
-    // const ArrayGetters = await ethers.getContractFactory("ArrayGetters");
-    // const arrayGetters = await ArrayGetters.deploy();
-    //
-    // logDeploy("ArrayGetters", arrayGetters.target);
-    //
-    // const TradingCommonUtils = await ethers.getContractFactory("TradingCommonUtils");
-    // const tradingCommonUtils = await TradingCommonUtils.deploy();
-    //
-    // logDeploy("TradingCommonUtils", tradingCommonUtils.target);
-    //
-    // const UpdateLeverageUtils = await ethers.getContractFactory("UpdateLeverageUtils", {
-    //     libraries: {
-    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-    //             tradingCommonUtils.target,
-    //     },
-    // });
-    // const updateLeverageUtils = await UpdateLeverageUtils.deploy();
-    //
-    // logDeploy("UpdateLeverageUtils", updateLeverageUtils.target);
-    //
-    // const UpdatePositionSizeUtils = await ethers.getContractFactory("UpdatePositionSizeUtils", {
-    //     libraries: {
-    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-    //         tradingCommonUtils.target,
-    //     },
-    // });
-    // const updatePositionSizeUtils = await UpdatePositionSizeUtils.deploy();
-    //
-    // logDeploy("UpdatePositionSizeUtils", updatePositionSizeUtils.target);
+    const ArrayGetters = await ethers.getContractFactory("ArrayGetters");
+    const arrayGetters = await ArrayGetters.deploy();
+
+    logDeploy("ArrayGetters", arrayGetters.target);
+
+    const TradingCommonUtils = await ethers.getContractFactory("TradingCommonUtils");
+    const tradingCommonUtils = await TradingCommonUtils.deploy();
+
+    logDeploy("TradingCommonUtils", tradingCommonUtils.target);
+
+    const UpdateLeverageUtils = await ethers.getContractFactory("UpdateLeverageUtils", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+                tradingCommonUtils.target,
+        },
+    });
+    const updateLeverageUtils = await UpdateLeverageUtils.deploy();
+
+    logDeploy("UpdateLeverageUtils", updateLeverageUtils.target);
+
+    const UpdatePositionSizeUtils = await ethers.getContractFactory("UpdatePositionSizeUtils", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+            tradingCommonUtils.target,
+        },
+    });
+    const updatePositionSizeUtils = await UpdatePositionSizeUtils.deploy();
+
+    logDeploy("UpdatePositionSizeUtils", updatePositionSizeUtils.target);
 
     const managerAddress = "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb";
     // const managerAddress = "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199";
@@ -81,7 +81,7 @@ async function main() {
     const priceImpactFactory = await ethers.getContractFactory("JavPriceImpact", {
         libraries: {
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-                "0x1264C5e3b88996E3d0C3f8F62E293C16CCA99C31",
+                tradingCommonUtils.target,
         },
     });
     const priceImpact = await priceImpactFactory.deploy();
@@ -92,9 +92,9 @@ async function main() {
     const tradingStorageFactory = await ethers.getContractFactory("JavTradingStorage", {
         libraries: {
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-                "0x1264C5e3b88996E3d0C3f8F62E293C16CCA99C31",
+            tradingCommonUtils.target,
             "contracts/libraries/trade/ArrayGetters.sol:ArrayGetters":
-                "0x459Ebe1C4E1b1c2dEBc6E1866D412dFB30B938b9",
+                arrayGetters.target,
         },
     });
     const tradingStorage = await tradingStorageFactory.deploy();
@@ -106,11 +106,11 @@ async function main() {
         libraries: {
             "contracts/libraries/trade/PackingUtils.sol:PackingUtils": "0xE438848bb41658a2203a245CA0c7d466e75AEB31",
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-                "0x1264C5e3b88996E3d0C3f8F62E293C16CCA99C31",
+            tradingCommonUtils.target,
             "contracts/libraries/trade/updateLeverage/UpdateLeverageUtils.sol:UpdateLeverageUtils":
-                "0x900eD05e6c662D1A410d75A9ec30840647B4F1B0",
+                updateLeverageUtils.target,
             "contracts/libraries/trade/updatePositionSize/UpdatePositionSizeUtils.sol:UpdatePositionSizeUtils":
-                "0x59b396bbF4a0cC1bB5f021CE0C85785A2458Ed06",
+                updatePositionSizeUtils.target,
         },
     });
     const tradingInteractions = await tradingInteractionsFactory.deploy();
@@ -121,22 +121,22 @@ async function main() {
     const tradingProcessingFactory = await ethers.getContractFactory("JavTradingProcessing", {
         libraries: {
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-                "0x1264C5e3b88996E3d0C3f8F62E293C16CCA99C31",
+            tradingCommonUtils.target,
         },
     });
     const tradingProcessing = await tradingProcessingFactory.deploy();
     await tradingProcessing.waitForDeployment();
 
     logDeploy("JavTradingProcessing", await tradingProcessing.getAddress());
-    //
-    // const borrowingFeesFactory = await ethers.getContractFactory("JavBorrowingFees", {
-    //     libraries: {
-    //         "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-    //         tradingCommonUtils.target,
-    //     },
-    // });
-    // const borrowingFees = await borrowingFeesFactory.deploy();
-    // await borrowingFees.waitForDeployment();
+
+    const borrowingFeesFactory = await ethers.getContractFactory("JavBorrowingFees", {
+        libraries: {
+            "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
+            tradingCommonUtils.target,
+        },
+    });
+    const borrowingFees = await borrowingFeesFactory.deploy();
+    await borrowingFees.waitForDeployment();
     //
     // logDeploy("JavBorrowingFees", await borrowingFees.getAddress());
     //
