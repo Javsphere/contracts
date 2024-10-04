@@ -241,6 +241,8 @@ contract TokenVestingFreezer is ITokenVesting, BaseUpgradable, ReentrancyGuardUp
             ];
     }
 
+    function burnTokens(address _holder) external {}
+
     /**
      * @dev Computes the vesting schedule identifier for an address and an index.
      */

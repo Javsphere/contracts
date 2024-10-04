@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../base/BaseUpgradable.sol";
 import "../interfaces/ITokenVesting.sol";
+import "../interfaces/IERC20Extended.sol";
 
 contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -44,6 +45,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     uint256 public vestingSchedulesTotalAmount;
     mapping(bytes32 => VestingSchedule) public vestingSchedules;
     mapping(address => uint256) public holdersVestingCount;
+    address public migratorAddress;
 
     /* ========== EVENTS ========== */
     event VestingScheduleAdded(
@@ -61,6 +63,8 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     event Released(bytes32 indexed vestingScheduleId, address indexed to, uint256 amount);
     event AddAllowedAddress(address indexed _address);
     event RemoveAllowedAddress(address indexed _address);
+    event SetMigratorAddress(address indexed _address);
+    event BurnTokens(address indexed holder, uint256 amount);
 
     modifier onlyIfVestingScheduleNotRevoked(bytes32 _vestingScheduleId) {
         require(!vestingSchedules[_vestingScheduleId].revoked);
@@ -69,6 +73,11 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
 
     modifier onlyAllowedAddresses(address _sender) {
         require(_allowedAddresses.contains(_sender), "TokenVesting: only allowed addresses");
+        _;
+    }
+
+    modifier onlyMigrator() {
+        require(msg.sender == migratorAddress, "TokenVesting: only migrator addresses");
         _;
     }
 
@@ -97,6 +106,12 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         _allowedAddresses.remove(_address);
 
         emit RemoveAllowedAddress(_address);
+    }
+
+    function setMigratorAddress(address _address) external onlyAdmin {
+        migratorAddress = _address;
+
+        emit SetMigratorAddress(_address);
     }
 
     /**
@@ -171,6 +186,23 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         vestingSchedule.revoked = true;
 
         emit Revoked(vestingScheduleId, vestedAmount);
+    }
+
+    function burnTokens(address _holder) external onlyMigrator {
+        uint256 _burnAmount;
+        bytes32 _vestingScheduleId;
+        for (uint256 i = 0; i < holdersVestingCount[_holder]; ++i) {
+            _vestingScheduleId = _computeVestingScheduleIdForAddressAndIndex(_holder, i);
+            VestingSchedule storage vestingSchedule = vestingSchedules[_vestingScheduleId];
+            if (!vestingSchedule.revoked) {
+                _burnAmount += (vestingSchedule.amountTotal - vestingSchedule.released);
+                vestingSchedule.revoked = true;
+            }
+        }
+        if (_burnAmount > 0) {
+            IERC20Extended(address(token)).burn(_burnAmount);
+            emit BurnTokens(_holder, _burnAmount);
+        }
     }
 
     /**
