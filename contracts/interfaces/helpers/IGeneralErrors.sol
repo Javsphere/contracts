@@ -18,4 +18,5 @@ interface IGeneralErrors {
     error ZeroValue();
     error AlreadyExists();
     error DoesntExist();
+    error NotAllowed();
 }

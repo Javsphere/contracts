@@ -36,4 +36,8 @@ interface ITokenVesting {
         uint8 _vestingType,
         uint256 _lockId
     ) external;
+
+    function holdersVestingCount(address holder) external view returns (uint256);
+
+    function burnTokens(address _holder) external;
 }
