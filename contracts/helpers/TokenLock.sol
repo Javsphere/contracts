@@ -30,6 +30,12 @@ contract TokenLock is ITokenLock, BaseUpgradable {
         __Base_init();
     }
 
+    function setMigratorAddress(address _address) external onlyAdmin {
+        migratorAddress = _address;
+
+        emit SetMigratorAddress(_address);
+    }
+
     function lockTokens(address _from, uint256 _amount) external onlyMigrator {
         require(token.balanceOf(_from) >= _amount, InvalidAmount());
 

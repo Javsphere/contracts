@@ -34,7 +34,7 @@ async function main() {
     const UpdatePositionSizeUtils = await ethers.getContractFactory("UpdatePositionSizeUtils", {
         libraries: {
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
+                tradingCommonUtils.target,
         },
     });
     const updatePositionSizeUtils = await UpdatePositionSizeUtils.deploy();
@@ -92,9 +92,8 @@ async function main() {
     const tradingStorageFactory = await ethers.getContractFactory("JavTradingStorage", {
         libraries: {
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
-            "contracts/libraries/trade/ArrayGetters.sol:ArrayGetters":
-                arrayGetters.target,
+                tradingCommonUtils.target,
+            "contracts/libraries/trade/ArrayGetters.sol:ArrayGetters": arrayGetters.target,
         },
     });
     const tradingStorage = await tradingStorageFactory.deploy();
@@ -104,9 +103,10 @@ async function main() {
 
     const tradingInteractionsFactory = await ethers.getContractFactory("JavTradingInteractions", {
         libraries: {
-            "contracts/libraries/trade/PackingUtils.sol:PackingUtils": "0xE438848bb41658a2203a245CA0c7d466e75AEB31",
+            "contracts/libraries/trade/PackingUtils.sol:PackingUtils":
+                "0xE438848bb41658a2203a245CA0c7d466e75AEB31",
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
+                tradingCommonUtils.target,
             "contracts/libraries/trade/updateLeverage/UpdateLeverageUtils.sol:UpdateLeverageUtils":
                 updateLeverageUtils.target,
             "contracts/libraries/trade/updatePositionSize/UpdatePositionSizeUtils.sol:UpdatePositionSizeUtils":
@@ -121,7 +121,7 @@ async function main() {
     const tradingProcessingFactory = await ethers.getContractFactory("JavTradingProcessing", {
         libraries: {
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
+                tradingCommonUtils.target,
         },
     });
     const tradingProcessing = await tradingProcessingFactory.deploy();
@@ -132,7 +132,7 @@ async function main() {
     const borrowingFeesFactory = await ethers.getContractFactory("JavBorrowingFees", {
         libraries: {
             "contracts/libraries/trade/TradingCommonUtils.sol:TradingCommonUtils":
-            tradingCommonUtils.target,
+                tradingCommonUtils.target,
         },
     });
     const borrowingFees = await borrowingFeesFactory.deploy();

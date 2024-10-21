@@ -1,4 +1,4 @@
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 const UniswapV2FactoryArtifact = require("@uniswap/v2-core/build/UniswapV2Factory.json");
 const UniswapV3FactoryArtifact = require("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
 const UniswapV2PairArtifact = require("@uniswap/v2-core/build/UniswapV2Pair.json");
@@ -129,10 +129,21 @@ async function deployStateRelayerFixture() {
     return stateRelayer;
 }
 
+async function deployInfinityPassFixture() {
+    const infinityPassContractFactory = await ethers.getContractFactory("InfinityPass");
+    [owner, ...addrs] = await ethers.getSigners();
+    const infinityPass = await upgrades.deployProxy(infinityPassContractFactory, [], {
+        initializer: "initialize",
+    });
+    await infinityPass.waitForDeployment();
+    return infinityPass;
+}
+
 module.exports = {
     deployTokenFixture,
     deployToken2Fixture,
     deployUniswapV2Fixture,
     deployUniswapV3Fixture,
     deployStateRelayerFixture,
+    deployInfinityPassFixture,
 };

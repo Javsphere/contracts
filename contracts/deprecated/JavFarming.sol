@@ -6,10 +6,10 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/IVanillaRouter02.sol";
-import "./interfaces/IVanillaPair.sol";
-import "./helpers/RewardRateConfigurable.sol";
-import "./base/BaseUpgradable.sol";
+import "../interfaces/IVanillaRouter02.sol";
+import "../interfaces/IVanillaPair.sol";
+import "../helpers/RewardRateConfigurable.sol";
+import "../base/BaseUpgradable.sol";
 
 contract JavFarming is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConfigurable {
     using SafeERC20 for IERC20;

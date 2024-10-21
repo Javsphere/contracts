@@ -14,30 +14,6 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    struct VestingSchedule {
-        bool initialized;
-        // beneficiary of tokens after they are released
-        address beneficiary;
-        // cliff period in seconds
-        uint128 cliff;
-        // start time of the vesting period
-        uint128 start;
-        // duration of the vesting period in seconds
-        uint128 duration;
-        // duration of a slice period for the vesting in seconds
-        uint128 slicePeriodSeconds;
-        // whether or not the vesting is revocable
-        bool revocable;
-        // total amount of tokens to be released at the end of the vesting
-        uint128 amountTotal;
-        // amount of tokens released
-        uint128 released;
-        // whether or not the vesting has been revoked
-        bool revoked;
-        // vesting type
-        uint8 vestingType;
-    }
-
     EnumerableSet.AddressSet private _allowedAddresses;
 
     IERC20 public token;
@@ -193,6 +169,9 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         bytes32 _vestingScheduleId;
         for (uint256 i = 0; i < holdersVestingCount[_holder]; ++i) {
             _vestingScheduleId = _computeVestingScheduleIdForAddressAndIndex(_holder, i);
+            if (_computeReleasableAmount(vestingSchedules[_vestingScheduleId]) > 0) {
+                _release(_vestingScheduleId);
+            }
             VestingSchedule storage vestingSchedule = vestingSchedules[_vestingScheduleId];
             if (!vestingSchedule.revoked) {
                 _burnAmount += (vestingSchedule.amountTotal - vestingSchedule.released);
@@ -200,6 +179,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
             }
         }
         if (_burnAmount > 0) {
+            vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - _burnAmount;
             IERC20Extended(address(token)).burn(_burnAmount);
             emit BurnTokens(_holder, _burnAmount);
         }
@@ -346,7 +326,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     function _release(bytes32 vestingScheduleId) private {
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
         bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
-        bool isReleasor = msg.sender == owner();
+        bool isReleasor = msg.sender == owner() || msg.sender == migratorAddress;
 
         require(
             isBeneficiary || isReleasor,

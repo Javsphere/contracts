@@ -30,4 +30,20 @@ contract JavFreezerMock is IJavFreezer {
     function getUserLastDepositId(uint256 _pid, address _user) external view returns (uint256) {}
 
     function addRewards(uint256 _pid, uint256 _amount) external {}
+
+    function userDepositTokens(uint256 _pid, address _user) external view returns (uint256) {}
+
+    function burnTokens(uint256 _pid, address _holder) external {}
+
+    function userDeposit(
+        address _user,
+        uint256 _pid,
+        uint256 _id
+    ) external view returns (UserDeposit memory) {}
+
+    function makeMigration(
+        uint256 _pid,
+        address _holder,
+        UserDeposit[] memory _userDeposits
+    ) external {}
 }
