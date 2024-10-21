@@ -25,7 +25,7 @@ interface IPairsStorage {
         string from;
         string to;
         bytes32 feedId;
-        uint256 spreadP; // PRECISION
+        uint256 spreadP; // 1e10
         uint256 groupIndex;
         uint256 feeIndex;
         bool altPriceOracle;

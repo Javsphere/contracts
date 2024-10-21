@@ -25,13 +25,24 @@ contract InfinityPass is ERC721URIStorageUpgradeable, BaseUpgradable {
         tokenIndex++;
     }
 
+    function makeMigration(address to, uint256 _tokenId, string memory uri) external onlyAdmin {
+        _safeMint(to, _tokenId);
+        _setTokenURI(_tokenId, uri);
+        tokenIndex = _tokenId + 1;
+    }
+
+    function burn(uint256 tokenId) external {
+        require(_getApproved(tokenId) == msg.sender, "InfinityPass: not allowed");
+        _burn(tokenId);
+    }
+
     function _update(
         address to,
         uint256 tokenId,
         address auth
     ) internal virtual override returns (address) {
         address from = _ownerOf(tokenId);
-        require(from == address(0), "InfinityPass: token transfer is BLOCKED");
+        require(from == address(0) || to == address(0), "InfinityPass: token transfer is BLOCKED");
         return super._update(to, tokenId, auth);
     }
 }

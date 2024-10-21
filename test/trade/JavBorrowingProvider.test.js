@@ -237,31 +237,34 @@ describe("JavBorrowingProvider contract", () => {
         });
 
         it("Should set prices for JavPriceAggregator", async () => {
-            const prices = [
-                {
-                    id: token1PriceId,
-                    price: 10,
-                    conf: 0,
-                    expo: -1,
-                    publishTime: 10000000000,
-                },
-                {
-                    id: token2PriceId,
-                    price: 20,
-                    conf: 0,
-                    expo: -1,
-                    publishTime: 10000000000,
-                },
-                {
-                    id: token3PriceId,
-                    price: 50,
-                    conf: 0,
-                    expo: -1,
-                    publishTime: 10000000000,
-                },
-            ];
+            const AbiCoder = new ethers.AbiCoder();
+            const updatePriceInfo1 = AbiCoder.encode(
+                ["bytes32", "int64", "uint64", "int32", "uint64"],
+                [token1PriceId, 10, 0, -1, 10000000000],
+            );
+            const updatePriceInfo2 = AbiCoder.encode(
+                ["bytes32", "int64", "uint64", "int32", "uint64"],
+                [token1PriceId, 20, 0, -1, 10000000000],
+            );
+            const updatePriceInfo3 = AbiCoder.encode(
+                ["bytes32", "int64", "uint64", "int32", "uint64"],
+                [token1PriceId, 50, 0, -1, 10000000000],
+            );
+            const messageHash1 = ethers.keccak256(updatePriceInfo1);
+            const messageHash2 = ethers.keccak256(updatePriceInfo2);
+            const messageHash3 = ethers.keccak256(updatePriceInfo3);
 
-            await javPriceAggregator.updatePriceFeeds(prices);
+            const signature1 = await owner.signMessage(ethers.getBytes(messageHash1));
+            const signature2 = await owner.signMessage(ethers.getBytes(messageHash2));
+            const signature3 = await owner.signMessage(ethers.getBytes(messageHash3));
+
+            const signedData1 = ethers.concat([signature1, updatePriceInfo1]);
+            const signedData2 = ethers.concat([signature2, updatePriceInfo2]);
+            const signedData3 = ethers.concat([signature3, updatePriceInfo3]);
+
+            await javPriceAggregator.updatePriceFeeds([signedData1, signedData2, signedData3], {
+                value: 3,
+            });
         });
     });
 
@@ -306,7 +309,7 @@ describe("JavBorrowingProvider contract", () => {
             await expect(await hhJavBorrowingProvider.tvl()).to.equal(0);
         });
 
-        it("Should get tvl with tokens", async () => {
+        it("Should get tvl = 0 with tokens when just transfer tokens", async () => {
             const amount1 = ethers.parseEther("50"); //50 usd
             const amount2 = ethers.parseEther("50"); //100 usd
             const amount3 = ethers.parseEther("50"); //250 usd
@@ -316,7 +319,7 @@ describe("JavBorrowingProvider contract", () => {
             await wdfiTokenV3.deposit({ value: amount3 });
             await wdfiTokenV3.transfer(hhJavBorrowingProvider.target, amount3);
 
-            await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("400"));
+            await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("0"));
         });
 
         it("Should rebalance", async () => {
@@ -324,11 +327,11 @@ describe("JavBorrowingProvider contract", () => {
             const token1TvlBefore = await hhJavBorrowingProvider.tokenTvl(0);
             const token2TvlBefore = await hhJavBorrowingProvider.tokenTvl(1);
             const token3TvlBefore = await hhJavBorrowingProvider.tokenTvl(2);
-
-            console.log("token1TvlBefore", token1TvlBefore);
-            console.log("token2TvlBefore", token2TvlBefore);
-            console.log("token2TvlBefore", token3TvlBefore);
-            console.log("tvlBefore", tvlBefore);
+            //
+            // console.log("token1TvlBefore", token1TvlBefore);
+            // console.log("token2TvlBefore", token2TvlBefore);
+            // console.log("token2TvlBefore", token3TvlBefore);
+            // console.log("tvlBefore", tvlBefore);
 
             await hhJavBorrowingProvider.rebalanceTokens();
 
@@ -337,10 +340,10 @@ describe("JavBorrowingProvider contract", () => {
             const token2Tvl = await hhJavBorrowingProvider.tokenTvl(1);
             const token3Tvl = await hhJavBorrowingProvider.tokenTvl(2);
 
-            console.log("token1Tvl", token1Tvl);
-            console.log("token2Tvl", token2Tvl);
-            console.log("token3Tvl", token3Tvl);
-            console.log("tvl", tvl);
+            // console.log("token1Tvl", token1Tvl);
+            // console.log("token2Tvl", token2Tvl);
+            // console.log("token3Tvl", token3Tvl);
+            // console.log("tvl", tvl);
 
             // await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("400"));
         });
