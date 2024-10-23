@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -13,8 +13,14 @@ contract BaseUpgradable is OwnableUpgradeable, PausableUpgradeable, UUPSUpgradea
     event Initialized(address indexed executor, uint256 at);
     event SetAdminAddress(address indexed _address);
 
+    error AddressZero();
+
     modifier onlyAdmin() {
         require(msg.sender == adminAddress || msg.sender == owner(), "BaseUpgradable: only admin");
+        _;
+    }
+    modifier nonZeroAddress(address _address) {
+        require(_address != address(0), AddressZero());
         _;
     }
 
@@ -38,7 +44,7 @@ contract BaseUpgradable is OwnableUpgradeable, PausableUpgradeable, UUPSUpgradea
         _unpause();
     }
 
-    function setAdminAddress(address _address) external onlyAdmin {
+    function setAdminAddress(address _address) external nonZeroAddress(_address) onlyAdmin {
         adminAddress = _address;
 
         emit SetAdminAddress(_address);

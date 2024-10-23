@@ -4,7 +4,6 @@ pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../libraries/leverageX/PriceAggregatorUtils.sol";
 import "../base/BaseUpgradable.sol";
 
@@ -14,7 +13,6 @@ import "../interfaces/IERC20Extended.sol";
 import "../interfaces/ISwapRouter.sol";
 
 contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeable, BaseUpgradable {
-    using Math for uint256;
     using SafeERC20 for IERC20;
     struct TokenInfo {
         address asset;
@@ -247,9 +245,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         address sender = _msgSender();
         if (sender != pnlHandler) revert OnlyTradingPnlHandler();
 
-        int256 accPnlDelta = int256(
-            assets.mulDiv(PRECISION_18, IERC20(llpToken).totalSupply(), Math.Rounding.Ceil)
-        );
+        int256 accPnlDelta = int256((assets * PRECISION_18) / IERC20(llpToken).totalSupply());
 
         accPnlPerToken[_collateralIndex] += accPnlDelta;
         if (accPnlPerToken[_collateralIndex] > int256(maxAccPnlPerToken(_collateralIndex)))

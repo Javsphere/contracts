@@ -399,16 +399,6 @@ library BorrowingFeesUtils {
     /**
      * @dev Check IBorrowingFeesUtils interface for documentation
      */
-    function getBorrowingGroupOi(
-        uint8 _collateralIndex,
-        uint16 _groupIndex
-    ) internal view returns (IBorrowingFees.OpenInterest memory) {
-        return _getStorage().groupOis[_collateralIndex][_groupIndex];
-    }
-
-    /**
-     * @dev Check IBorrowingFeesUtils interface for documentation
-     */
     function getBorrowingPair(
         uint8 _collateralIndex,
         uint16 _pairIndex

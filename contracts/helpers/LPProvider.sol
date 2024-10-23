@@ -76,13 +76,15 @@ contract LPProvider is IERC721Receiver, BaseUpgradable {
         __Base_init();
     }
 
-    function setBotAddress(address _address) external onlyAdmin {
+    function setBotAddress(address _address) external nonZeroAddress(_address) onlyAdmin {
         botAddress = _address;
 
         emit SetBotAddress(_address);
     }
 
-    function setRewardsDistributorAddress(address _address) external onlyAdmin {
+    function setRewardsDistributorAddress(
+        address _address
+    ) external nonZeroAddress(_address) onlyAdmin {
         rewardsDistributorAddress = _address;
 
         emit SetRewardsDistributorAddress(_address);
