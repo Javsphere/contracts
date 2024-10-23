@@ -200,16 +200,6 @@ interface IBorrowingFeesUtils is IBorrowingFees {
     ) external view returns (BorrowingData memory group);
 
     /**
-     * @dev Returns a borrowing group's oi data
-     * @param _collateralIndex index of the collateral
-     * @param _groupIndex index of the borrowing group
-     */
-    function getBorrowingGroupOi(
-        uint8 _collateralIndex,
-        uint16 _groupIndex
-    ) external view returns (OpenInterest memory group);
-
-    /**
      * @dev Returns a borrowing pair's data
      * @param _collateralIndex index of the collateral
      * @param _pairIndex index of the pair

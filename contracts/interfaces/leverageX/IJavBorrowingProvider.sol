@@ -28,6 +28,5 @@ interface IJavBorrowingProvider {
     );
 
     error OnlyTradingPnlHandler();
-    error AddressZero();
     error NotEnoughAssets();
 }
