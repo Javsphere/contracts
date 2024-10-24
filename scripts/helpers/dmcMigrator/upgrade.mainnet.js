@@ -1,11 +1,11 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0xdfc8c41816Cd6CCa9739f946e73b4eeB17195836";
+const PROXY = "0x0000000000000000000000000000000000000000";
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("TokenLock");
+    const Contract = await ethers.getContractFactory("DMCMigrator");
 
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",
@@ -33,7 +33,7 @@ async function main() {
     }
 
     console.log(`New implementation Address: ${newImplementationAddress}`);
-    console.log(`TokenLock contract upgraded`);
+    console.log(`DMCMigrator contract upgraded`);
 }
 
 main()
