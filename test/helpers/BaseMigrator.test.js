@@ -394,72 +394,121 @@ describe("BaseMigrator contract", () => {
             await expect(await erc20Token.balanceOf(addr2.address)).to.be.equal(0);
         });
 
-        // it("Should migrateFunds - staking", async () => {
-        //     const lockAmount = await tokenLock.tokenAmount(addr2.address);
-        //     const stakeAmount = ethers.parseEther("2");
-        //     await erc20Token.mint(addr2.address, stakeAmount);
-        //     await erc20Token.connect(addr2).approve(staking.target, stakeAmount);
-        //
-        //     await staking.connect(addr2).stake(0, stakeAmount);
-        //     const userInfoBefore = await staking.userInfo(0, addr2.address);
-        //     const shares = userInfoBefore.shares;
-        //     await erc20Token.mint(staking.target, ethers.parseEther("1"));
-        //     const stakingBalance = await erc20Token.balanceOf(staking.target);
-        //
-        //     await erc20Token.connect(addr2).approve(tokenLock.target, MAX_UINT256);
-        //     await hhBaseMigrator.connect(addr2).migrateFunds(0);
-        //
-        //     const poolInfo = await staking.poolInfo(0);
-        //     const userInfo = await staking.userInfo(0, addr2.address);
-        //
-        //     const claimAmount = userInfo.totalClaims;
-        //
-        //     await expect(poolInfo.totalShares).to.be.equal(0);
-        //     await expect(poolInfo.rewardsPerShare).to.be.equal(0);
-        //     await expect(userInfo.shares).to.be.equal(0);
-        //     await expect(userInfo.blockRewardDebt).to.be.equal(0);
-        //     await expect(userInfo.productsRewardDebt).to.be.equal(0);
-        //
-        //     await expect(await staking.pendingReward(0, addr2.address)).to.be.equal(0);
-        //
-        //     await expect(await erc20Token.balanceOf(staking.target)).to.be.equal(
-        //         stakingBalance - shares - claimAmount,
-        //     );
-        //     await expect(await erc20Token.balanceOf(addr2.address)).to.be.equal(0);
-        //     await expect(await tokenLock.tokenAmount(addr2.address)).to.be.equal(
-        //         claimAmount + lockAmount,
-        //     );
-        // });
-        //
-        // it("Should migrateFunds - freezer", async () => {
-        //     const lockAmount = await tokenLock.tokenAmount(addr2.address);
-        //     const amount = ethers.parseEther("1");
-        //
-        //     await erc20Token.mint(addr2.address, amount);
-        //     await erc20Token.connect(addr2).approve(freezer.target, amount);
-        //
-        //     await freezer.connect(addr2).deposit(0, 0, amount);
-        //
-        //     await erc20Token.connect(addr2).approve(tokenLock.target, MAX_UINT256);
-        //     await hhBaseMigrator.connect(addr2).migrateFunds(0);
-        //
-        //     const poolInfo = await freezer.poolInfo(0);
-        //     const userInfo = await freezer.userInfo(addr2.address, 0);
-        //     const claimAmount = userInfo.totalClaim;
-        //
-        //     await expect(userInfo.totalDepositTokens).to.be.equal(0);
-        //     await expect(poolInfo.totalShares).to.be.equal(0);
-        //
-        //     await expect(await erc20Token.balanceOf(freezer.target)).to.be.equal(0);
-        //     await expect(await erc20Token.balanceOf(addr2.address)).to.be.equal(0);
-        //     await expect(await tokenLock.tokenAmount(addr2.address)).to.be.equal(
-        //         claimAmount + lockAmount,
-        //     );
-        // });
+        it("Should migrateFunds - staking", async () => {
+            const vestingAmount = await erc20Token.balanceOf(vesting.target);
+            const freezerAmount = await erc20Token.balanceOf(freezer.target);
+
+            const stakeAmount = ethers.parseEther("2");
+
+            const migrationInfo = {
+                user: addr2.address,
+                tokenAmount: 0,
+                stakingAmount: stakeAmount,
+                infinityPassTokenId: 0,
+                infinityPassUri: "",
+                vestingSchedules: [],
+                vestingFreezerSchedules: [],
+                freezerDeposits: [],
+            };
+
+            const migrationData = AbiCoder.encode(
+                [
+                    "(address user,uint256 tokenAmount,uint256 stakingAmount,uint256 infinityPassTokenId,string infinityPassUri,(address beneficiary,uint128 start,uint128 cliff,uint128 duration,uint128 slicePeriodSeconds,bool revocable,uint128 amount,uint8 vestingType,uint8 lockId)[] vestingSchedules,(address beneficiary,uint128 start,uint128 cliff,uint128 duration,uint128 slicePeriodSeconds,bool revocable,uint128 amount,uint8 vestingType,uint8 lockId)[] vestingFreezerSchedules,(uint256,uint256,uint256,uint256,uint256,uint256,bool)[] freezerDeposits)",
+                ],
+                [migrationInfo],
+            );
+
+            const messageHash = ethers.keccak256(migrationData);
+            const signature = await signer.signMessage(ethers.getBytes(messageHash));
+            const signedData = ethers.concat([signature, migrationData]);
+
+            await erc20Token.mint(hhBaseMigrator.target, stakeAmount);
+
+            await hhBaseMigrator.connect(addr2).makeMigration(signedData);
+
+            const userInfo = await staking.userInfo(0, addr2.address);
+
+            await expect(userInfo.shares).to.be.equal(stakeAmount);
+            await expect(await staking.pendingReward(0, addr2.address)).to.be.equal(0);
+
+            await expect(await erc20Token.balanceOf(vesting.target)).to.be.equal(vestingAmount);
+            await expect(await erc20Token.balanceOf(staking.target)).to.be.equal(stakeAmount);
+            await expect(await erc20Token.balanceOf(freezer.target)).to.be.equal(freezerAmount);
+            await expect(await infinityPass.balanceOf(addr2.address)).to.be.equal(0);
+            await expect(await erc20Token.balanceOf(addr2.address)).to.be.equal(0);
+            await expect(await erc20Token.balanceOf(hhBaseMigrator.target)).to.be.equal(0);
+        });
+
+        it("Should migrateFunds - freezer", async () => {
+            const vestingAmount = await erc20Token.balanceOf(vesting.target);
+            const freezerAmount = await erc20Token.balanceOf(freezer.target);
+            const stakingAmount = await erc20Token.balanceOf(staking.target);
+            const startTime = await time.latest();
+            const endTime = startTime + 100;
+
+            const amount = ethers.parseEther("1");
+
+            const migrationInfo = {
+                user: addr2.address,
+                tokenAmount: 0,
+                stakingAmount: 0,
+                infinityPassTokenId: 0,
+                infinityPassUri: "",
+                vestingSchedules: [],
+                vestingFreezerSchedules: [],
+                freezerDeposits: [
+                    {
+                        depositTokens: amount,
+                        stakePeriod: 0,
+                        depositTimestamp: startTime,
+                        withdrawalTimestamp: endTime,
+                        rewardsClaimed: 0,
+                        rewardDebt: 0,
+                        is_finished: false,
+                    },
+                ],
+            };
+
+            const migrationData = AbiCoder.encode(
+                [
+                    "(address user,uint256 tokenAmount,uint256 stakingAmount,uint256 infinityPassTokenId,string infinityPassUri,(address beneficiary,uint128 start,uint128 cliff,uint128 duration,uint128 slicePeriodSeconds,bool revocable,uint128 amount,uint8 vestingType,uint8 lockId)[] vestingSchedules,(address beneficiary,uint128 start,uint128 cliff,uint128 duration,uint128 slicePeriodSeconds,bool revocable,uint128 amount,uint8 vestingType,uint8 lockId)[] vestingFreezerSchedules,(uint256 depositTokens,uint256 stakePeriod,uint256 depositTimestamp,uint256 withdrawalTimestamp,uint256 rewardsClaimed,uint256 rewardDebt,bool is_finished)[] freezerDeposits)",
+                ],
+                [migrationInfo],
+            );
+
+            const messageHash = ethers.keccak256(migrationData);
+            const signature = await signer.signMessage(ethers.getBytes(messageHash));
+            const signedData = ethers.concat([signature, migrationData]);
+
+            await erc20Token.mint(hhBaseMigrator.target, amount);
+
+            await hhBaseMigrator.connect(addr2).makeMigration(signedData);
+
+            const userInfo = await freezer.userInfo(addr2.address, 0);
+            const userDeposit = await freezer.userDeposits(addr2.address, 0, 1);
+
+            await expect(userDeposit.depositTokens).to.be.equal(amount);
+            await expect(userDeposit.stakePeriod).to.be.equal(0);
+            await expect(userDeposit.depositTimestamp).to.be.equal(startTime);
+            await expect(userDeposit.withdrawalTimestamp).to.be.equal(endTime);
+            await expect(userDeposit.rewardsClaimed).to.be.equal(0);
+            await expect(userDeposit.is_finished).to.be.equal(false);
+
+            await expect(userInfo.depositId).to.be.equal(2);
+
+            await expect(await erc20Token.balanceOf(vesting.target)).to.be.equal(vestingAmount);
+            await expect(await erc20Token.balanceOf(staking.target)).to.be.equal(stakingAmount);
+            await expect(await erc20Token.balanceOf(freezer.target)).to.be.equal(
+                freezerAmount + amount,
+            );
+            await expect(await erc20Token.balanceOf(addr2.address)).to.be.equal(0);
+            await expect(await erc20Token.balanceOf(hhBaseMigrator.target)).to.be.equal(0);
+        });
 
         it("Should makeMigration - infinity pass", async () => {
             const vestingAmount = await erc20Token.balanceOf(vesting.target);
             const freezerAmount = await erc20Token.balanceOf(freezer.target);
+            const stakingAmount = await erc20Token.balanceOf(staking.target);
 
             const migrationInfo = {
                 user: addr2.address,
@@ -486,7 +535,7 @@ describe("BaseMigrator contract", () => {
             await hhBaseMigrator.connect(addr2).makeMigration(signedData);
 
             await expect(await erc20Token.balanceOf(vesting.target)).to.be.equal(vestingAmount);
-            await expect(await erc20Token.balanceOf(staking.target)).to.be.equal(0);
+            await expect(await erc20Token.balanceOf(staking.target)).to.be.equal(stakingAmount);
             await expect(await erc20Token.balanceOf(freezer.target)).to.be.equal(freezerAmount);
             await expect(await infinityPass.balanceOf(addr2.address)).to.be.equal(1);
             await expect(await infinityPass.ownerOf(13)).to.be.equal(addr2.address);
@@ -497,6 +546,7 @@ describe("BaseMigrator contract", () => {
         it("Should makeMigration - wallet balance", async () => {
             const vestingAmount = await erc20Token.balanceOf(vesting.target);
             const freezerAmount = await erc20Token.balanceOf(freezer.target);
+            const stakingAmount = await erc20Token.balanceOf(staking.target);
             const amount = ethers.parseEther("5");
             const migrationInfo = {
                 user: addr2.address,
@@ -524,97 +574,102 @@ describe("BaseMigrator contract", () => {
             await hhBaseMigrator.connect(addr2).makeMigration(signedData);
 
             await expect(await erc20Token.balanceOf(vesting.target)).to.be.equal(vestingAmount);
-            await expect(await erc20Token.balanceOf(staking.target)).to.be.equal(0);
+            await expect(await erc20Token.balanceOf(staking.target)).to.be.equal(stakingAmount);
             await expect(await erc20Token.balanceOf(freezer.target)).to.be.equal(freezerAmount);
             await expect(await infinityPass.balanceOf(addr2.address)).to.be.equal(1);
             await expect(await erc20Token.balanceOf(hhBaseMigrator.target)).to.be.equal(0);
             await expect(await erc20Token.balanceOf(addr2.address)).to.be.equal(amount);
         });
-        //
-        // it("Should migrateFunds - all", async () => {
-        //     const user = addr3.address;
-        //     const vestingAmount = ethers.parseEther("5");
-        //     const vestingFreezerAmount = ethers.parseEther("6");
-        //     const stakeAmount = ethers.parseEther("2");
-        //     const freezerAmount = ethers.parseEther("3");
-        //
-        //     await erc20Token.mint(vesting.target, vestingAmount);
-        //
-        //     await vesting.createVestingSchedule(
-        //         user,
-        //         await time.latest(),
-        //         2,
-        //         3500000,
-        //         1,
-        //         true,
-        //         vestingAmount,
-        //         0,
-        //         0,
-        //     );
-        //
-        //     await erc20Token.mint(freezer.target, vestingFreezerAmount);
-        //     await vestingFreezer.createVestingSchedule(
-        //         user,
-        //         await time.latest(),
-        //         2,
-        //         3500000,
-        //         1,
-        //         true,
-        //         vestingFreezerAmount,
-        //         1,
-        //         0,
-        //     );
-        //
-        //     await erc20Token.mint(addr3.address, stakeAmount);
-        //     await erc20Token.connect(addr3).approve(staking.target, stakeAmount);
-        //     await staking.connect(addr3).stake(0, stakeAmount);
-        //     const stakingBalance = await erc20Token.balanceOf(staking.target);
-        //     const userInfoBefore = await staking.userInfo(0, addr3.address);
-        //     const shares = userInfoBefore.shares;
-        //
-        //     await erc20Token.mint(addr3.address, freezerAmount);
-        //     await erc20Token.connect(addr3).approve(freezer.target, freezerAmount);
-        //
-        //     await freezer.connect(addr3).deposit(0, 0, freezerAmount);
-        //
-        //     await infinityPass.makeMigration(addr3.address, 1, "test");
-        //
-        //     await erc20Token.connect(addr3).approve(tokenLock.target, MAX_UINT256);
-        //     await infinityPass.connect(addr3).approve(hhBaseMigrator.target, 1);
-        //     await hhBaseMigrator.connect(addr3).migrateFunds(1);
-        //
-        //     const vestingScheduleForHolder = await vesting.getLastVestingScheduleForHolder(user);
-        //     const vestingReleased = vestingScheduleForHolder.released;
-        //
-        //     const vestingFreezerScheduleForHolder =
-        //         await vestingFreezer.getLastVestingScheduleForHolder(user);
-        //     const vestingFreezerReleased = vestingFreezerScheduleForHolder.released;
-        //
-        //     const userInfoStaking = await staking.userInfo(0, addr3.address);
-        //     const claimAmountStaking = userInfoStaking.totalClaims;
-        //
-        //     const userInfoFreezer = await freezer.userInfo(addr3.address, 0);
-        //     const claimAmountFreezer = userInfoFreezer.totalClaim;
-        //
-        //     await expect(vestingScheduleForHolder.revoked).to.be.equal(true);
-        //     await expect(await erc20Token.balanceOf(vesting.target)).to.be.equal(0);
-        //
-        //     await expect(vestingFreezerScheduleForHolder.revoked).to.be.equal(true);
-        //     await expect(await erc20Token.balanceOf(vestingFreezer.target)).to.be.equal(0);
-        //
-        //     await expect(await erc20Token.balanceOf(staking.target)).to.be.equal(
-        //         stakingBalance - shares - claimAmountStaking,
-        //     );
-        //
-        //     await expect(await erc20Token.balanceOf(freezer.target)).to.be.equal(0);
-        //
-        //     await expect(await erc20Token.balanceOf(addr3.address)).to.be.equal(0);
-        //
-        //     await expect(await infinityPass.balanceOf(addr3.address)).to.be.equal(0);
-        //
-        //     await expect(await tokenLock.tokenAmount(addr3.address)).to.be.equal(
-        //         vestingReleased + vestingFreezerReleased + claimAmountStaking + claimAmountFreezer,
-        //     );
-        // });
+        it("Should migrateFunds - all", async () => {
+            const vestingAmountBefore = await erc20Token.balanceOf(vesting.target);
+            const freezerAmountBefore = await erc20Token.balanceOf(freezer.target);
+            const stakingAmountBefore = await erc20Token.balanceOf(staking.target);
+
+            const startTime = await time.latest();
+            const endTime = startTime + 100;
+            const walletAmount = ethers.parseEther("5");
+            const stakingAmount = ethers.parseEther("2");
+            const freezerAmount = ethers.parseEther("3");
+            const vestingFreezerAmount = ethers.parseEther("4");
+            const vestingAmount = ethers.parseEther("1");
+
+            await erc20Token.mint(hhBaseMigrator.target, walletAmount);
+            await erc20Token.mint(hhBaseMigrator.target, stakingAmount);
+            await erc20Token.mint(hhBaseMigrator.target, freezerAmount);
+            await erc20Token.mint(hhBaseMigrator.target, vestingFreezerAmount);
+            await erc20Token.mint(hhBaseMigrator.target, vestingAmount);
+
+            const migrationInfo = {
+                user: addr3.address,
+                tokenAmount: walletAmount,
+                stakingAmount: stakingAmount,
+                infinityPassTokenId: 14,
+                infinityPassUri: "test1",
+                vestingSchedules: [
+                    {
+                        beneficiary: addr3.address,
+                        start: startTime,
+                        cliff: 1,
+                        duration: 222,
+                        slicePeriodSeconds: 1,
+                        revocable: true,
+                        amount: vestingAmount,
+                        vestingType: 1,
+                        lockId: 1,
+                    },
+                ],
+                vestingFreezerSchedules: [
+                    {
+                        beneficiary: addr3.address,
+                        start: startTime,
+                        cliff: 1,
+                        duration: 222,
+                        slicePeriodSeconds: 1,
+                        revocable: true,
+                        amount: vestingFreezerAmount,
+                        vestingType: 1,
+                        lockId: 1,
+                    },
+                ],
+                freezerDeposits: [
+                    {
+                        depositTokens: freezerAmount,
+                        stakePeriod: 0,
+                        depositTimestamp: startTime,
+                        withdrawalTimestamp: endTime,
+                        rewardsClaimed: 0,
+                        rewardDebt: 0,
+                        is_finished: false,
+                    },
+                ],
+            };
+
+            const migrationData = AbiCoder.encode(
+                [
+                    "(address user,uint256 tokenAmount,uint256 stakingAmount,uint256 infinityPassTokenId,string infinityPassUri,(address beneficiary,uint128 start,uint128 cliff,uint128 duration,uint128 slicePeriodSeconds,bool revocable,uint128 amount,uint8 vestingType,uint8 lockId)[] vestingSchedules,(address beneficiary,uint128 start,uint128 cliff,uint128 duration,uint128 slicePeriodSeconds,bool revocable,uint128 amount,uint8 vestingType,uint8 lockId)[] vestingFreezerSchedules,(uint256 depositTokens,uint256 stakePeriod,uint256 depositTimestamp,uint256 withdrawalTimestamp,uint256 rewardsClaimed,uint256 rewardDebt,bool is_finished)[] freezerDeposits)",
+                ],
+                [migrationInfo],
+            );
+
+            const messageHash = ethers.keccak256(migrationData);
+            const signature = await signer.signMessage(ethers.getBytes(messageHash));
+            const signedData = ethers.concat([signature, migrationData]);
+
+            await hhBaseMigrator.connect(addr3).makeMigration(signedData);
+
+            await expect(await erc20Token.balanceOf(staking.target)).to.be.equal(
+                stakingAmountBefore + stakingAmount,
+            );
+            await expect(await erc20Token.balanceOf(freezer.target)).to.be.equal(
+                freezerAmountBefore + freezerAmount + vestingFreezerAmount,
+            );
+            await expect(await erc20Token.balanceOf(vesting.target)).to.be.equal(
+                vestingAmountBefore + vestingAmount,
+            );
+            await expect(await infinityPass.balanceOf(addr3.address)).to.be.equal(1);
+            await expect(await infinityPass.ownerOf(14)).to.be.equal(addr3.address);
+            await expect(await erc20Token.balanceOf(addr3.address)).to.be.equal(walletAmount);
+            await expect(await erc20Token.balanceOf(hhBaseMigrator.target)).to.be.equal(0);
+        });
     });
 });

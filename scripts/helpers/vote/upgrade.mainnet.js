@@ -5,10 +5,7 @@ async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("WJavToken");
-
-    // const deployment = await upgrades.forceImport(PROXY, Contract);
-    // console.log("Proxy imported from:", deployment.address);
+    const Contract = await ethers.getContractFactory("Vote");
 
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",
@@ -36,7 +33,7 @@ async function main() {
     }
 
     console.log(`New implementation Address: ${newImplementationAddress}`);
-    console.log(`WJavToken contract upgraded`);
+    console.log(`Vote contract upgraded`);
 }
 
 main()

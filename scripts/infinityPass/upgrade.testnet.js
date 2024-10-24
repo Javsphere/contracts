@@ -1,11 +1,11 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0xdfc8c41816Cd6CCa9739f946e73b4eeB17195836";
+const PROXY = "0x60b6860F25A7503Bcb5A2ce0940E61D5e503A056";
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("TokenLock");
+    const Contract = await ethers.getContractFactory("InfinityPass");
 
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",
@@ -22,7 +22,7 @@ async function main() {
     let newImplementationAddress = await upgrades.erc1967.getImplementationAddress(PROXY);
 
     try {
-        await run("verify:verify", { address: PROXY });
+        await run("verify:verify", { address: newImplementationAddress });
     } catch (error) {
         if (!error.message.includes("Reason: Already Verified")) {
             console.error(error);
@@ -33,7 +33,7 @@ async function main() {
     }
 
     console.log(`New implementation Address: ${newImplementationAddress}`);
-    console.log(`TokenLock contract upgraded`);
+    console.log(`InfinityPass contract upgraded`);
 }
 
 main()

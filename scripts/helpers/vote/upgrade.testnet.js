@@ -1,14 +1,11 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0x0000000000000000000000000000000000000000";
+const PROXY = "0x1905BD89a2295bf30e11324AD28a6DCb0790C0A2";
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("WJavToken");
-
-    // const deployment = await upgrades.forceImport(PROXY, Contract);
-    // console.log("Proxy imported from:", deployment.address);
+    const Contract = await ethers.getContractFactory("Vote");
 
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",
@@ -25,7 +22,7 @@ async function main() {
     let newImplementationAddress = await upgrades.erc1967.getImplementationAddress(PROXY);
 
     try {
-        await run("verify:verify", { address: newImplementationAddress });
+        await run("verify:verify", { address: PROXY });
     } catch (error) {
         if (!error.message.includes("Reason: Already Verified")) {
             console.error(error);
@@ -34,8 +31,9 @@ async function main() {
             process.exit(1);
         }
     }
+
     console.log(`New implementation Address: ${newImplementationAddress}`);
-    console.log(`WJavToken contract upgraded`);
+    console.log(`Vote contract upgraded`);
 }
 
 main()
