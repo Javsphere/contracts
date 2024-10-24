@@ -12,6 +12,7 @@ contract Vote is IVote, BaseUpgradable {
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(bool => uint256)) public proposalWeight;
     mapping(address => mapping(uint256 => bool)) public votedProposal;
+    mapping(address => mapping(uint256 => bool)) public votedDirection;
     uint256 public proposalIndex;
 
     address public vestingAddress;
@@ -99,7 +100,8 @@ contract Vote is IVote, BaseUpgradable {
             proposalWeight[_proposalId][_voteType] +
             votingWeight;
         votedProposal[_msgSender()][_proposalId] = true;
-        emit VoteForProposal(_msgSender(), _proposalId, _voteType);
+        votedDirection[_msgSender()][_proposalId] = _voteType;
+        emit VoteForProposal(_msgSender(), _proposalId, _voteType, votingWeight);
     }
 
     function executeProposal(uint256 _proposalId) external onlyActiveProposal(_proposalId) {
