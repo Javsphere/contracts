@@ -231,6 +231,8 @@ describe("Vote contract", () => {
             await hhVote.connect(addr2).voteForProposal(id, true);
 
             await expect(await hhVote.proposalWeight(id, true)).to.be.equal(votingPower);
+            await expect(await hhVote.votedProposal(addr2.address, id)).to.be.equal(true);
+            await expect(await hhVote.votedDirection(addr2.address, id)).to.be.equal(true);
         });
 
         it("Should revert when executeProposal - NotEnded ", async () => {

@@ -22,7 +22,12 @@ interface IVote is IGeneralErrors {
         string descriptionId
     );
     event ExecuteProposal(uint256 indexed id, bool isApproved);
-    event VoteForProposal(address indexed user, uint256 indexed id, bool voteType);
+    event VoteForProposal(
+        address indexed user,
+        uint256 indexed id,
+        bool voteType,
+        uint256 votingPower
+    );
 
     error AlreadyExecuted();
     error AlreadyVoted();
