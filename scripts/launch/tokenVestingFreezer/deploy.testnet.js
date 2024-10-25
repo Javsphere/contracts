@@ -1,27 +1,24 @@
 const { ethers, upgrades } = require("hardhat");
+const { logDeploy } = require("../../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("TokenVesting");
+    const Contract = await ethers.getContractFactory("TokenVestingFreezer");
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x695D64AdEbD82480f22638E50dA04f6C95df6Ef5", //_token
+            "0x0000000000000000000000000000000000000000", //_freezerAddress
         ],
         {
             initializer: "initialize",
             kind: "uups",
-            txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei"),
-            },
         },
     );
     await contract.waitForDeployment();
 
-    const contractAddress = await contract.getAddress();
-    console.log(`TokenVesting contract deployed to: ${contractAddress}`);
+    logDeploy("TokenVestingFreezer", await contract.getAddress());
 }
 
 main()

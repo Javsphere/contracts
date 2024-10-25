@@ -251,6 +251,9 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         if (accPnlPerToken[_collateralIndex] > int256(maxAccPnlPerToken(_collateralIndex)))
             revert NotEnoughAssets();
 
+        if (assets > tokenAmount[_collateralIndex]) {
+            revert NotEnoughAssets();
+        }
         tokenAmount[_collateralIndex] -= assets;
         IERC20(_token.asset).safeTransfer(receiver, assets);
 

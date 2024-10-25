@@ -90,6 +90,8 @@ contract BaseMigrator is IGeneralErrors, BaseUpgradable {
 
         MigrationInfo memory migrationInfo = abi.decode(encodedData, (MigrationInfo));
 
+        require(_msgSender() == migrationInfo.user, InvalidAddresses());
+
         //         vesting
         if (migrationInfo.vestingSchedules.length > 0) {
             uint256 totalAmount = 0;
