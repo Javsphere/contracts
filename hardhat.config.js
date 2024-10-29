@@ -31,7 +31,6 @@ module.exports = {
                 },
                 viaIR: true,
             },
-
         ],
     },
     defaultNetwork: "hardhat",
@@ -60,7 +59,7 @@ module.exports = {
         apiKey: {
             testnet: "abc",
             mainnet: "abc",
-            sepolia_base: "abc",
+            sepolia_base: "A458CBUKBI4APAMMSCDR5DHYU2ZE5CGYD8",
         },
         customChains: [
             {
@@ -101,6 +100,6 @@ module.exports = {
         disambiguatePaths: false,
     },
     gasReporter: {
-        enabled: true,
+        enabled: false,
     },
 };

@@ -17,7 +17,8 @@ interface IPairsStorage {
         uint256 groupsCount;
         uint256 feesCount;
         mapping(uint256 => GroupLiquidationParams) groupLiquidationParams;
-        uint256[41] __gap;
+        mapping(uint256 => bool) isPairRemoved;
+        uint256[40] __gap;
     }
 
 

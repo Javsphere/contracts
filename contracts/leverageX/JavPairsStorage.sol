@@ -42,6 +42,13 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     }
 
     /// @inheritdoc IPairsStorageUtils
+    function removePairs(
+        uint256[] calldata _pairIndices
+    ) external onlyRole(Role.GOV) {
+        PairsStorageUtils.removePairs(_pairIndices);
+    }
+
+    /// @inheritdoc IPairsStorageUtils
     function addGroups(Group[] calldata _groups) external onlyRole(Role.GOV) {
         PairsStorageUtils.addGroups(_groups);
     }
