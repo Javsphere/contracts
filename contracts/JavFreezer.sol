@@ -702,11 +702,11 @@ contract JavFreezer is
 
         uint256 rewards = ((depositDetails.depositTokens * _accRewardPerShare) / 1e18) -
             depositDetails.rewardDebt;
-        uint256 productsRewards = (depositDetails.depositTokens * productsRewInfo.rewardsPerShare) /
-            1e18 >
+        uint256 depositProductRewards = depositDetails.depositTokens *
+            productsRewInfo.rewardsPerShare;
+        uint256 productsRewards = depositProductRewards / 1e18 >
             productsRewardsDebt[_user][_pid][_depositId]
-            ? ((depositDetails.depositTokens * productsRewInfo.rewardsPerShare) / 1e18) -
-                productsRewardsDebt[_user][_pid][_depositId]
+            ? (depositProductRewards / 1e18) - productsRewardsDebt[_user][_pid][_depositId]
             : 0;
         uint256 blockRewards = ((rewards * lockPeriodMultiplier[depositDetails.stakePeriod]) / 1e5);
 

@@ -438,9 +438,9 @@ contract JavStakeX is
         }
 
         uint256 blockRewards = ((user.shares * _accRewardPerShare) / 1e18) - user.blockRewardDebt;
-        uint256 productsRewards = ((user.shares * pool.rewardsPerShare) / 1e18) >
-            user.productsRewardDebt
-            ? ((user.shares * pool.rewardsPerShare) / 1e18) - user.productsRewardDebt
+        uint256 poolRewards = user.shares * pool.rewardsPerShare;
+        uint256 productsRewards = (poolRewards / 1e18) > user.productsRewardDebt
+            ? (poolRewards / 1e18) - user.productsRewardDebt
             : 0;
 
         uint256 nftRewards = IERC721(infinityPass).balanceOf(_user) > 0

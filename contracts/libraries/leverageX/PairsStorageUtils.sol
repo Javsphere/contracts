@@ -54,6 +54,17 @@ library PairsStorageUtils {
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
+    function removePairs(
+        uint256[] calldata _pairIndices
+    ) internal {
+        for (uint256 i = 0; i < _pairIndices.length; ++i) {
+            _removePair(_pairIndices[i]);
+        }
+    }
+
+    /**
+     * @dev Check IPairsStorageUtils interface for documentation
+     */
     function addGroups(IPairsStorage.Group[] calldata _groups) internal {
         for (uint256 i = 0; i < _groups.length; ++i) {
             _addGroup(_groups[i]);
@@ -174,7 +185,8 @@ library PairsStorageUtils {
      * @dev Check IPairsStorageUtils interface for documentation
      */
     function isPairIndexListed(uint256 _pairIndex) internal view returns (bool) {
-        return _pairIndex < _getStorage().pairsCount;
+        IPairsStorage.PairsStorage storage s = _getStorage();
+        return _pairIndex < s.pairsCount && !s.isPairRemoved[_pairIndex];
     }
 
     /**
@@ -285,9 +297,9 @@ library PairsStorageUtils {
     function pairsBackend(
         uint256 _index
     )
-        internal
-        view
-        returns (IPairsStorage.Pair memory, IPairsStorage.Group memory, IPairsStorage.Fee memory)
+    internal
+    view
+    returns (IPairsStorage.Pair memory, IPairsStorage.Group memory, IPairsStorage.Fee memory)
     {
         IPairsStorage.Pair memory p = pairs(_index);
         return (p, PairsStorageUtils.groups(p.groupIndex), PairsStorageUtils.fees(p.feeIndex));
@@ -440,6 +452,23 @@ library PairsStorageUtils {
         p.feedId = _pair.feedId;
 
         emit IPairsStorageUtils.PairUpdated(_pairIndex);
+    }
+
+    /**
+     * @dev Remove an existing trading pair
+     * @param _pairIndex index of pair to remove
+     */
+    function _removePair(
+        uint256 _pairIndex
+    ) internal {
+        IPairsStorage.PairsStorage storage s = _getStorage();
+
+        IPairsStorage.Pair memory p = s.pairs[_pairIndex];
+        if (!s.isPairListed[p.from][p.to]) revert IPairsStorageUtils.PairNotListed();
+
+        s.isPairRemoved[_pairIndex] = true;
+
+        emit IPairsStorageUtils.PairRemoved(_pairIndex);
     }
 
     /**
