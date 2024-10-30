@@ -54,9 +54,7 @@ library PairsStorageUtils {
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
-    function removePairs(
-        uint256[] calldata _pairIndices
-    ) internal {
+    function removePairs(uint256[] calldata _pairIndices) internal {
         for (uint256 i = 0; i < _pairIndices.length; ++i) {
             _removePair(_pairIndices[i]);
         }
@@ -297,9 +295,9 @@ library PairsStorageUtils {
     function pairsBackend(
         uint256 _index
     )
-    internal
-    view
-    returns (IPairsStorage.Pair memory, IPairsStorage.Group memory, IPairsStorage.Fee memory)
+        internal
+        view
+        returns (IPairsStorage.Pair memory, IPairsStorage.Group memory, IPairsStorage.Fee memory)
     {
         IPairsStorage.Pair memory p = pairs(_index);
         return (p, PairsStorageUtils.groups(p.groupIndex), PairsStorageUtils.fees(p.feeIndex));
@@ -458,9 +456,7 @@ library PairsStorageUtils {
      * @dev Remove an existing trading pair
      * @param _pairIndex index of pair to remove
      */
-    function _removePair(
-        uint256 _pairIndex
-    ) internal {
+    function _removePair(uint256 _pairIndex) internal {
         IPairsStorage.PairsStorage storage s = _getStorage();
 
         IPairsStorage.Pair memory p = s.pairs[_pairIndex];

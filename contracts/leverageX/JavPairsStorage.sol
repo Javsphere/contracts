@@ -42,9 +42,7 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     }
 
     /// @inheritdoc IPairsStorageUtils
-    function removePairs(
-        uint256[] calldata _pairIndices
-    ) external onlyRole(Role.GOV) {
+    function removePairs(uint256[] calldata _pairIndices) external onlyRole(Role.GOV) {
         PairsStorageUtils.removePairs(_pairIndices);
     }
 

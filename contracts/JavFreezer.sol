@@ -694,7 +694,11 @@ contract JavFreezer is
 
         uint256 _accRewardPerShare = pool.accRewardPerShare;
 
-        if (block.number > pool.lastRewardBlock && pool.totalShares != 0) {
+        if (
+            block.number > pool.lastRewardBlock &&
+            pool.totalShares != 0 &&
+            block.timestamp <= depositDetails.withdrawalTimestamp
+        ) {
             uint256 _multiplier = block.number - pool.lastRewardBlock;
             uint256 _reward = (_multiplier * getRewardPerBlock());
             _accRewardPerShare = _accRewardPerShare + ((_reward * 1e18) / pool.totalShares);

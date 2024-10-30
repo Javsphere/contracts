@@ -6,7 +6,7 @@ const {
     deployUniswapV3Fixture,
     deployToken2Fixture,
 } = require("../common/mocks");
-const { ADMIN_ERROR } = require("../common/constanst");
+const { ADMIN_ERROR, MANAGER_ERROR } = require("../common/constanst");
 const { encodeSqrtRatioX96 } = require("@uniswap/v3-sdk");
 const { mine } = require("@nomicfoundation/hardhat-network-helpers");
 
@@ -119,7 +119,9 @@ describe("RewardsDistributor contract", () => {
 
     describe("Transactions", () => {
         it("Should revert when set pause", async () => {
-            await expect(hhRewardsDistributor.connect(bot).pause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhRewardsDistributor.connect(bot).pause()).to.be.revertedWith(
+                MANAGER_ERROR,
+            );
         });
 
         it("Should set pause", async () => {
@@ -130,7 +132,7 @@ describe("RewardsDistributor contract", () => {
 
         it("Should revert when set unpause", async () => {
             await expect(hhRewardsDistributor.connect(bot).unpause()).to.be.revertedWith(
-                ADMIN_ERROR,
+                MANAGER_ERROR,
             );
         });
 

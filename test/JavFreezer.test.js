@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { ADMIN_ERROR } = require("./common/constanst");
+const { ADMIN_ERROR, MANAGER_ERROR } = require("./common/constanst");
 const { deployTokenFixture, deployInfinityPassFixture } = require("./common/mocks");
 const { time, mine } = require("@nomicfoundation/hardhat-network-helpers");
 
@@ -71,7 +71,7 @@ describe("JavFreezer contract", () => {
 
     describe("Transactions", () => {
         it("Should revert when set pause", async () => {
-            await expect(hhJavFreezer.connect(addr1).pause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhJavFreezer.connect(addr1).pause()).to.be.revertedWith(MANAGER_ERROR);
         });
 
         it("Should set pause", async () => {
@@ -81,7 +81,7 @@ describe("JavFreezer contract", () => {
         });
 
         it("Should revert when set unpause", async () => {
-            await expect(hhJavFreezer.connect(addr1).unpause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhJavFreezer.connect(addr1).unpause()).to.be.revertedWith(MANAGER_ERROR);
         });
 
         it("Should set unpause", async () => {
@@ -959,12 +959,6 @@ describe("JavFreezer contract", () => {
             await expect(
                 await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
             ).to.be.equal(0);
-
-            mine(5);
-
-            await expect(
-                await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
-            ).to.be.not.equal(0);
         });
 
         it("Should revert when addRewards", async () => {
@@ -1021,12 +1015,6 @@ describe("JavFreezer contract", () => {
             await expect(
                 await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
             ).to.be.equal(0);
-
-            mine(5);
-
-            await expect(
-                await hhJavFreezer.pendingReward(pid, depositId, addr1.address),
-            ).to.be.not.equal(0);
         });
 
         it("Should get pendingRewardByLockId - 3 deposit", async () => {

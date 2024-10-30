@@ -1,4 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
+const { logDeploy } = require("./utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -6,15 +7,15 @@ async function main() {
     console.log(`Deploying from ${owner.address}`);
 
     const owners = [
-        "0xFEeC64B26429C85e9B7176C718D53eb84e534669",
-        "0x0E8627A1E68dE2F6e657e7A1efaf4AFc0dB338B3",
-        "0x267A2a67a1E0c8be282D00C238b3F4bF17164f56",
+        "0x0c787ca33Ae184C6c7b943593c7C437e3b8A2498",
+        "0xd040d43981E9520425168A414c98A02AAD3DcaC2",
+        "0x2adB61b0EE29cA83E83a5157b99DB773C716e629",
     ];
     const minRequiredCount = 2;
 
     const Contract = await ethers.getContractFactory("MultiSigWallet");
     const contract = await Contract.deploy(owners, minRequiredCount);
-    console.log(`MultiSigWallet contract deployed to: ${contract.target}`);
+    logDeploy("MultiSigWallet", contract.target);
 }
 
 main()
