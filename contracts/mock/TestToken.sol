@@ -26,4 +26,8 @@ contract TestToken is ERC20BurnableUpgradeable, BaseUpgradable {
     function mint(address account, uint256 amount) external onlyAdmin {
         _mint(account, amount);
     }
+
+    function decimals() public view override returns (uint8) {
+        return 6;
+    }
 }

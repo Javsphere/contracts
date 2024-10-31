@@ -6,46 +6,30 @@ async function main() {
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
     const Contract = await ethers.getContractFactory("JavBorrowingProvider");
-    const mainnetArgs = [
-        "0x0000000000000000000000000000000000000000", //_priceAggregator,
+    const baseArgs = [
+        "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a", //_priceAggregator,
         "0x0000000000000000000000000000000000000000", // _swapRouter,
-        "0x0000000000000000000000000000000000000000", // _jlpToken,
-        "0x0000000000000000000000000000000000000000", // _pnlHandler,
-        1, // _buyFee,
-        2, // _sellFee,
-        [
-            {
-                asset: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-                priceFeed: "0x2c14b4d35d0e7061b86be6dd7d168ca1f919c069f54493ed09a91adabea60ce6",
-                targetWeightage: 50,
-                isActive: true,
-            },
-            {
-                asset: "0x9A676e781A523b5d0C0e43731313A708CB607508",
-                priceFeed: "0x2c14b4d35d0e7061b86be6dd7d168ca1f919c069f54493ed09a91adabea60ce6",
-                targetWeightage: 50,
-                isActive: true,
-            },
-        ], // _tokens
-    ];
-    const testnetArgs = [
-        "0x900eD05e6c662D1A410d75A9ec30840647B4F1B0", //_priceAggregator,
-        "0x0000000000000000000000000000000000000000", // _swapRouter,
-        "0xf87f1eA1Ddb9845ef19Dc102495229a6f87C26bd", // _jlpToken,
-        "0x9f907D14db8C20BE152e0296EC4a8f32cce4A632", // _pnlHandler,
+        "0x8Fdc017195Ba2D22186E4b442497F5B19f870a64", // _llpToken,
+        "0xDEFf0d5bAAb58985aC3b2E61B82108Cc1900aF8a", // _pnlHandler,
         5, // _buyFee,
         5, // _sellFee,
         [
             {
-                asset: "0x695D64AdEbD82480f22638E50dA04f6C95df6Ef5", //jav
-                priceFeed: "0x2c14b4d35d0e7061b86be6dd7d168ca1f919c069f54493ed09a91adabea60ce6",
-                targetWeightage: 50,
+                asset: "0x4200000000000000000000000000000000000006",  //weth
+                priceFeed: "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+                targetWeightage: 33,
                 isActive: true,
             },
             {
-                asset: "0xFF0000000000000000000000000000000000000B", //dusd
-                priceFeed: "0xb3b9faf5d52f4cc87ec09fd94cb22c9dc62a8c1759b2a045faae791f8771a723",
-                targetWeightage: 50,
+                asset: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", //cbTBC
+                priceFeed: "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+                targetWeightage: 33,
+                isActive: true,
+            },
+            {
+                asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", //usdc
+                priceFeed: "0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+                targetWeightage: 33,
                 isActive: true,
             },
         ], // _tokens
@@ -85,7 +69,7 @@ async function main() {
             },
         ], // _tokens
     ];
-    const contract = await upgrades.deployProxy(Contract, sepolia_baseArgs, {
+    const contract = await upgrades.deployProxy(Contract, baseArgs, {
         initializer: "initialize",
         kind: "uups",
     });
