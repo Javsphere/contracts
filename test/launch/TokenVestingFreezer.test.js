@@ -1,8 +1,9 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const { loadFixture, time } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { ADMIN_ERROR } = require("../common/constanst");
-const { deployTokenFixture } = require("../common/mocks");
+const { ADMIN_ERROR, MANAGER_ERROR } = require("../common/constanst");
+const { deployTokenFixture, deployInfinityPassFixture } = require("../common/mocks");
+const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 describe("TokenVestingFreezer contract", () => {
     let hhTokenVesting;
@@ -16,9 +17,17 @@ describe("TokenVestingFreezer contract", () => {
 
     async function deployFreezerFixture() {
         const javFreezerFactory = await ethers.getContractFactory("JavFreezer");
+        const infinityPass = await helpers.loadFixture(deployInfinityPassFixture);
         const javFreezer = await upgrades.deployProxy(
             javFreezerFactory,
-            [ethers.parseEther("0.05"), 864000, "0x0000000000000000000000000000000000000000"],
+            [
+                ethers.parseEther("0.05"),
+                864000,
+                "0x0000000000000000000000000000000000000000",
+                "5",
+                infinityPass.target,
+                "0x0000000000000000000000000000000000000000",
+            ],
 
             {
                 initializer: "initialize",
@@ -67,23 +76,19 @@ describe("TokenVestingFreezer contract", () => {
         it("Should create freezer pool", async () => {
             const lastRewardBlock = await ethers.provider.getBlockNumber();
             const accRewardPerShare = ethers.parseEther("0.01");
-
-            await freezerMock.addPool(
-                erc20Token.target,
-                erc20Token.target,
-                lastRewardBlock,
-                accRewardPerShare,
-            );
-        });
-
-        it("Should addPoolFee freezer", async () => {
             const fee = {
                 depositFee: 1 * 1e4,
                 withdrawFee: 1 * 1e4,
                 claimFee: 1 * 1e4,
             };
 
-            await freezerMock.addPoolFee(fee);
+            await freezerMock.addPool(
+                erc20Token.target,
+                erc20Token.target,
+                lastRewardBlock,
+                accRewardPerShare,
+                fee,
+            );
         });
 
         it("Should set vesting address", async () => {
@@ -93,7 +98,7 @@ describe("TokenVestingFreezer contract", () => {
 
     describe("Transactions", () => {
         it("Should revert when set pause", async () => {
-            await expect(hhTokenVesting.connect(addr1).pause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhTokenVesting.connect(addr1).pause()).to.be.revertedWith(MANAGER_ERROR);
         });
 
         it("Should set pause", async () => {
@@ -103,7 +108,7 @@ describe("TokenVestingFreezer contract", () => {
         });
 
         it("Should revert when set unpause", async () => {
-            await expect(hhTokenVesting.connect(addr1).unpause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhTokenVesting.connect(addr1).unpause()).to.be.revertedWith(MANAGER_ERROR);
         });
 
         it("Should set unpause", async () => {

@@ -3,13 +3,8 @@ const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const {
     deployTokenFixture,
-    deployUniswapV3Fixture,
-    deployToken2Fixture,
 } = require("../common/mocks");
-const { ADMIN_ERROR } = require("../common/constanst");
-const { encodeSqrtRatioX96 } = require("@uniswap/v3-sdk");
-const { mine } = require("@nomicfoundation/hardhat-network-helpers");
-
+const { ADMIN_ERROR, MANAGER_ERROR, MAX_UINT256} = require("../common/constanst");
 describe("JavBorrowingProvider contract", () => {
     let hhJavBorrowingProvider;
     let owner;
@@ -20,14 +15,9 @@ describe("JavBorrowingProvider contract", () => {
     let nonZeroAddress;
     let erc20Token;
     let erc20Token2;
-    let wdfiTokenV3;
-    let uniswapV3Factory;
-    let uniswapV3Router;
-    let uniswapV3Pool;
-    let nonfungiblePositionManager;
+    let llpToken;
     const token1PriceId = "0x12635656e5b860830354ee353bce5f76d17342f9dbb560e3180d878b5d53bae3";
     const token2PriceId = "0x2c14b4d35d0e7061b86be6dd7d168ca1f919c069f54493ed09a91adabea60ce6";
-    const token3PriceId = "0xb3b9faf5d52f4cc87ec09fd94cb22c9dc62a8c1759b2a045faae791f8771a723";
 
     async function deployJavPriceAggregator() {
         const javPriceAggregatorFactory = await ethers.getContractFactory(
@@ -45,32 +35,47 @@ describe("JavBorrowingProvider contract", () => {
         return javPriceAggregator;
     }
 
+    async function deployLLPToken() {
+        const llpTokenFactory = await ethers.getContractFactory(
+            "LLPToken",
+        );
+        [owner, ...addrs] = await ethers.getSigners();
+        const llpToken = await upgrades.deployProxy(
+            llpTokenFactory,
+            [],
+            {
+                initializer: "initialize",
+            },
+        );
+        await llpToken.waitForDeployment();
+        return llpToken;
+    }
+
+    async function deployToken2Fixture() {
+        const erc20ContractFactory = await ethers.getContractFactory("ERC20Mock");
+        const erc20Token = await erc20ContractFactory.deploy("Mock2ERC20", "MOCK2", 6);
+        await erc20Token.waitForDeployment();
+        return erc20Token;
+    }
+
     before(async () => {
         const JavBorrowingProvider = await ethers.getContractFactory("JavBorrowingProvider");
         [owner, bot, addr2, addr3, ...addrs] = await ethers.getSigners();
         nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await helpers.loadFixture(deployTokenFixture);
         erc20Token2 = await helpers.loadFixture(deployToken2Fixture);
+        llpToken = await helpers.loadFixture(deployLLPToken);
         javPriceAggregator = await helpers.loadFixture(deployJavPriceAggregator);
-
-        const dataV3 = await helpers.loadFixture(deployUniswapV3Fixture);
-        [
-            wdfiTokenV3,
-            uniswapV3Factory,
-            uniswapV3Router,
-            uniswapV3Pool,
-            nonfungiblePositionManager,
-        ] = Object.values(dataV3);
 
         hhJavBorrowingProvider = await upgrades.deployProxy(
             JavBorrowingProvider,
             [
                 javPriceAggregator.target, //  _priceAggregator,
-                uniswapV3Router.target, // _swapRouter,
-                "0x0000000000000000000000000000000000000000", //  _jlpToken,
+                "0x0000000000000000000000000000000000000000", // _swapRouter,
+                llpToken.target, //  _jlpToken,
                 "0x0000000000000000000000000000000000000000", //  _pnlHandler,
-                0, // _buyFee,
-                0, // _sellFee,
+                5, // _buyFee,
+                6, // _sellFee,
                 [
                     {
                         asset: erc20Token.target,
@@ -83,13 +88,7 @@ describe("JavBorrowingProvider contract", () => {
                         priceFeed: token2PriceId,
                         targetWeightage: 20,
                         isActive: true,
-                    },
-                    {
-                        asset: wdfiTokenV3.target,
-                        priceFeed: token3PriceId,
-                        targetWeightage: 30,
-                        isActive: true,
-                    },
+                    }
                 ], // _tokens
             ],
             {
@@ -97,130 +96,6 @@ describe("JavBorrowingProvider contract", () => {
             },
         );
 
-        // create pairs
-        const fee = 3000;
-
-        let amount0ToMint;
-        let amount1ToMint;
-        let poolAddress;
-        let pool;
-        let price;
-        let tick;
-        let tickLower;
-        let tickUpper;
-        let tickSpacing;
-        let mintParams;
-
-        // pool 1
-        amount0ToMint = ethers.parseEther("1000");
-        amount1ToMint = ethers.parseEther("200");
-
-        await erc20Token.mint(owner.address, amount0ToMint);
-        await wdfiTokenV3.deposit({ value: amount1ToMint });
-
-        await erc20Token.approve(nonfungiblePositionManager.target, amount0ToMint);
-        await wdfiTokenV3.approve(nonfungiblePositionManager.target, amount1ToMint);
-
-        await uniswapV3Factory.createPool(erc20Token.target, wdfiTokenV3.target, fee);
-        poolAddress = await uniswapV3Factory.getPool(erc20Token.target, wdfiTokenV3.target, fee);
-        pool = uniswapV3Pool.attach(poolAddress);
-        price = encodeSqrtRatioX96(1, 5).toString();
-
-        await pool.initialize(price);
-        tick = Number((await pool.slot0()).tick);
-        tickSpacing = Number(await pool.tickSpacing());
-
-        tickLower = Math.floor(tick / tickSpacing) * tickSpacing;
-        tickUpper = Math.ceil(tick / tickSpacing) * tickSpacing;
-
-        mintParams = {
-            token0: erc20Token.target,
-            token1: wdfiTokenV3.target,
-            fee: fee,
-            tickLower: tickLower,
-            tickUpper: tickUpper,
-            amount0Desired: amount0ToMint,
-            amount1Desired: amount1ToMint,
-            amount0Min: 0,
-            amount1Min: 0,
-            recipient: owner.address,
-            deadline: 10000000000,
-        };
-        await nonfungiblePositionManager.mint(mintParams);
-
-        // pool 2
-        amount0ToMint = ethers.parseEther("1000");
-        amount1ToMint = ethers.parseEther("500");
-
-        await erc20Token.mint(owner.address, amount0ToMint);
-        await erc20Token2.mint(owner.address, amount1ToMint);
-
-        await erc20Token.approve(nonfungiblePositionManager.target, amount0ToMint);
-        await erc20Token2.approve(nonfungiblePositionManager.target, amount1ToMint);
-
-        await uniswapV3Factory.createPool(erc20Token.target, erc20Token2.target, fee);
-        poolAddress = await uniswapV3Factory.getPool(erc20Token.target, erc20Token2.target, fee);
-        pool = uniswapV3Pool.attach(poolAddress);
-        price = encodeSqrtRatioX96(1, 2).toString();
-
-        await pool.initialize(price);
-        tick = Number((await pool.slot0()).tick);
-        tickSpacing = Number(await pool.tickSpacing());
-
-        tickLower = Math.floor(tick / tickSpacing) * tickSpacing;
-        tickUpper = Math.ceil(tick / tickSpacing) * tickSpacing;
-
-        mintParams = {
-            token0: erc20Token.target,
-            token1: erc20Token2.target,
-            fee: fee,
-            tickLower: tickLower,
-            tickUpper: tickUpper,
-            amount0Desired: amount0ToMint,
-            amount1Desired: amount1ToMint,
-            amount0Min: 0,
-            amount1Min: 0,
-            recipient: owner.address,
-            deadline: 10000000000,
-        };
-        await nonfungiblePositionManager.mint(mintParams);
-
-        // pool 3
-        amount0ToMint = ethers.parseEther("1000");
-        amount1ToMint = ethers.parseEther("400");
-
-        await erc20Token2.mint(owner.address, amount0ToMint);
-        await wdfiTokenV3.deposit({ value: amount1ToMint });
-
-        await erc20Token2.approve(nonfungiblePositionManager.target, amount0ToMint);
-        await wdfiTokenV3.approve(nonfungiblePositionManager.target, amount1ToMint);
-
-        await uniswapV3Factory.createPool(erc20Token2.target, wdfiTokenV3.target, fee);
-        poolAddress = await uniswapV3Factory.getPool(wdfiTokenV3.target, erc20Token2.target, fee);
-        pool = uniswapV3Pool.attach(poolAddress);
-        price = encodeSqrtRatioX96(4, 10).toString();
-
-        await pool.initialize(price);
-        tick = Number((await pool.slot0()).tick);
-        tickSpacing = Number(await pool.tickSpacing());
-
-        tickLower = Math.floor(tick / tickSpacing) * tickSpacing;
-        tickUpper = Math.ceil(tick / tickSpacing) * tickSpacing;
-
-        mintParams = {
-            token0: wdfiTokenV3.target,
-            token1: erc20Token2.target,
-            fee: fee,
-            tickLower: tickLower,
-            tickUpper: tickUpper,
-            amount0Desired: amount1ToMint,
-            amount1Desired: amount0ToMint,
-            amount0Min: 0,
-            amount1Min: 0,
-            recipient: owner.address,
-            deadline: 10000000000,
-        };
-        await nonfungiblePositionManager.mint(mintParams);
     });
 
     describe("Deployment", () => {
@@ -237,38 +112,42 @@ describe("JavBorrowingProvider contract", () => {
         });
 
         it("Should set prices for JavPriceAggregator", async () => {
-            const prices = [
-                {
-                    id: token1PriceId,
-                    price: 10,
-                    conf: 0,
-                    expo: -1,
-                    publishTime: 10000000000,
-                },
-                {
-                    id: token2PriceId,
-                    price: 20,
-                    conf: 0,
-                    expo: -1,
-                    publishTime: 10000000000,
-                },
-                {
-                    id: token3PriceId,
-                    price: 50,
-                    conf: 0,
-                    expo: -1,
-                    publishTime: 10000000000,
-                },
-            ];
+            const AbiCoder = new ethers.AbiCoder();
+            const updatePriceInfo1 = AbiCoder.encode(
+                ["bytes32", "int64", "uint64", "int32", "uint64"],
+                [token1PriceId, 10, 0, -1, 10000000000],
+            );
+            const updatePriceInfo2 = AbiCoder.encode(
+                ["bytes32", "int64", "uint64", "int32", "uint64"],
+                [token2PriceId, 20, 0, -1, 10000000000],
+            );
 
-            await javPriceAggregator.updatePriceFeeds(prices);
+            const messageHash1 = ethers.keccak256(updatePriceInfo1);
+            const messageHash2 = ethers.keccak256(updatePriceInfo2);
+
+            const signature1 = await owner.signMessage(ethers.getBytes(messageHash1));
+            const signature2 = await owner.signMessage(ethers.getBytes(messageHash2));
+
+            const signedData1 = ethers.concat([signature1, updatePriceInfo1]);
+            const signedData2 = ethers.concat([signature2, updatePriceInfo2]);
+
+            await javPriceAggregator.updatePriceFeeds([signedData1, signedData2], {
+                value: 3,
+            });
+        });
+
+        it("configuration", async () => {
+            await llpToken.setBorrowingProvider(hhJavBorrowingProvider.target);
+            await erc20Token.connect(owner).approve(hhJavBorrowingProvider.target, MAX_UINT256);
+            await erc20Token2.connect(owner).approve(hhJavBorrowingProvider.target, MAX_UINT256);
+            await erc20Token2.connect(addr2).approve(hhJavBorrowingProvider.target, MAX_UINT256);
         });
     });
 
     describe("Transactions", () => {
         it("Should revert when set pause", async () => {
             await expect(hhJavBorrowingProvider.connect(bot).pause()).to.be.revertedWith(
-                ADMIN_ERROR,
+                MANAGER_ERROR,
             );
         });
 
@@ -280,7 +159,7 @@ describe("JavBorrowingProvider contract", () => {
 
         it("Should revert when set unpause", async () => {
             await expect(hhJavBorrowingProvider.connect(bot).unpause()).to.be.revertedWith(
-                ADMIN_ERROR,
+                MANAGER_ERROR,
             );
         });
 
@@ -306,43 +185,67 @@ describe("JavBorrowingProvider contract", () => {
             await expect(await hhJavBorrowingProvider.tvl()).to.equal(0);
         });
 
-        it("Should get tvl with tokens", async () => {
+        it("Should get tvl = 0 with tokens when just transfer tokens", async () => {
             const amount1 = ethers.parseEther("50"); //50 usd
             const amount2 = ethers.parseEther("50"); //100 usd
             const amount3 = ethers.parseEther("50"); //250 usd
 
             await erc20Token.mint(hhJavBorrowingProvider.target, amount1);
             await erc20Token2.mint(hhJavBorrowingProvider.target, amount2);
-            await wdfiTokenV3.deposit({ value: amount3 });
-            await wdfiTokenV3.transfer(hhJavBorrowingProvider.target, amount3);
 
-            await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("400"));
+            await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("0"));
         });
 
-        it("Should rebalance", async () => {
-            const tvlBefore = await hhJavBorrowingProvider.tvl();
-            const token1TvlBefore = await hhJavBorrowingProvider.tokenTvl(0);
-            const token2TvlBefore = await hhJavBorrowingProvider.tokenTvl(1);
-            const token3TvlBefore = await hhJavBorrowingProvider.tokenTvl(2);
+        it("Should initial buy", async () => {
+            const amount1 = ethers.parseEther("1");
+            await erc20Token.mint(owner.address, amount1);
 
-            console.log("token1TvlBefore", token1TvlBefore);
-            console.log("token2TvlBefore", token2TvlBefore);
-            console.log("token2TvlBefore", token3TvlBefore);
-            console.log("tvlBefore", tvlBefore);
+            await hhJavBorrowingProvider.initialBuy(0, amount1,amount1);
 
-            await hhJavBorrowingProvider.rebalanceTokens();
+            await expect(await erc20Token.balanceOf(owner.address)).to.be.equal(0);
+            await expect(await llpToken.balanceOf(owner.address)).to.be.equal(amount1);
+            await expect(await hhJavBorrowingProvider.tokenAmount(0)).to.be.equal(amount1);
 
-            const tvl = await hhJavBorrowingProvider.tvl();
-            const token1Tvl = await hhJavBorrowingProvider.tokenTvl(0);
-            const token2Tvl = await hhJavBorrowingProvider.tokenTvl(1);
-            const token3Tvl = await hhJavBorrowingProvider.tokenTvl(2);
-
-            console.log("token1Tvl", token1Tvl);
-            console.log("token2Tvl", token2Tvl);
-            console.log("token3Tvl", token3Tvl);
-            console.log("tvl", tvl);
-
-            // await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("400"));
+            await expect(await hhJavBorrowingProvider.llpPrice()).to.equal(ethers.parseEther("1"));
         });
+
+
+        it("Should buyLLP", async () => {
+            const amount = ethers.parseUnits("1", 6);
+            await erc20Token2.mint(addr2.address, amount);
+
+            await hhJavBorrowingProvider.connect(addr2).buyLLP(1, amount);
+
+            await expect(await erc20Token2.balanceOf(addr2.address)).to.be.equal(0);
+            await expect(await llpToken.balanceOf(addr2.address)).to.be.equal(amount * BigInt(2));
+            await expect(await hhJavBorrowingProvider.tokenAmount(1)).to.be.equal(amount);
+
+        });
+
+        // it("Should rebalance", async () => {
+        //     const tvlBefore = await hhJavBorrowingProvider.tvl();
+        //     const token1TvlBefore = await hhJavBorrowingProvider.tokenTvl(0);
+        //     const token2TvlBefore = await hhJavBorrowingProvider.tokenTvl(1);
+        //     const token3TvlBefore = await hhJavBorrowingProvider.tokenTvl(2);
+        //     //
+        //     // console.log("token1TvlBefore", token1TvlBefore);
+        //     // console.log("token2TvlBefore", token2TvlBefore);
+        //     // console.log("token2TvlBefore", token3TvlBefore);
+        //     // console.log("tvlBefore", tvlBefore);
+        //
+        //     await hhJavBorrowingProvider.rebalanceTokens();
+        //
+        //     const tvl = await hhJavBorrowingProvider.tvl();
+        //     const token1Tvl = await hhJavBorrowingProvider.tokenTvl(0);
+        //     const token2Tvl = await hhJavBorrowingProvider.tokenTvl(1);
+        //     const token3Tvl = await hhJavBorrowingProvider.tokenTvl(2);
+        //
+        //     // console.log("token1Tvl", token1Tvl);
+        //     // console.log("token2Tvl", token2Tvl);
+        //     // console.log("token3Tvl", token3Tvl);
+        //     // console.log("tvl", tvl);
+        //
+        //     // await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("400"));
+        // });
     });
 });

@@ -8,34 +8,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../base/BaseUpgradable.sol";
 import "../interfaces/ITokenVesting.sol";
+import "../interfaces/IERC20Extended.sol";
 
 contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
-
-    struct VestingSchedule {
-        bool initialized;
-        // beneficiary of tokens after they are released
-        address beneficiary;
-        // cliff period in seconds
-        uint128 cliff;
-        // start time of the vesting period
-        uint128 start;
-        // duration of the vesting period in seconds
-        uint128 duration;
-        // duration of a slice period for the vesting in seconds
-        uint128 slicePeriodSeconds;
-        // whether or not the vesting is revocable
-        bool revocable;
-        // total amount of tokens to be released at the end of the vesting
-        uint128 amountTotal;
-        // amount of tokens released
-        uint128 released;
-        // whether or not the vesting has been revoked
-        bool revoked;
-        // vesting type
-        uint8 vestingType;
-    }
 
     EnumerableSet.AddressSet private _allowedAddresses;
 
@@ -44,6 +21,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     uint256 public vestingSchedulesTotalAmount;
     mapping(bytes32 => VestingSchedule) public vestingSchedules;
     mapping(address => uint256) public holdersVestingCount;
+    address public migratorAddress;
 
     /* ========== EVENTS ========== */
     event VestingScheduleAdded(
@@ -61,6 +39,8 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     event Released(bytes32 indexed vestingScheduleId, address indexed to, uint256 amount);
     event AddAllowedAddress(address indexed _address);
     event RemoveAllowedAddress(address indexed _address);
+    event SetMigratorAddress(address indexed _address);
+    event BurnTokens(address indexed holder, uint256 amount);
 
     modifier onlyIfVestingScheduleNotRevoked(bytes32 _vestingScheduleId) {
         require(!vestingSchedules[_vestingScheduleId].revoked);
@@ -69,6 +49,11 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
 
     modifier onlyAllowedAddresses(address _sender) {
         require(_allowedAddresses.contains(_sender), "TokenVesting: only allowed addresses");
+        _;
+    }
+
+    modifier onlyMigrator() {
+        require(msg.sender == migratorAddress, "TokenVesting: only migrator addresses");
         _;
     }
 
@@ -97,6 +82,12 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         _allowedAddresses.remove(_address);
 
         emit RemoveAllowedAddress(_address);
+    }
+
+    function setMigratorAddress(address _address) external onlyAdmin {
+        migratorAddress = _address;
+
+        emit SetMigratorAddress(_address);
     }
 
     /**
@@ -171,6 +162,27 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
         vestingSchedule.revoked = true;
 
         emit Revoked(vestingScheduleId, vestedAmount);
+    }
+
+    function burnTokens(address _holder) external onlyMigrator {
+        uint256 _burnAmount;
+        bytes32 _vestingScheduleId;
+        for (uint256 i = 0; i < holdersVestingCount[_holder]; ++i) {
+            _vestingScheduleId = _computeVestingScheduleIdForAddressAndIndex(_holder, i);
+            if (_computeReleasableAmount(vestingSchedules[_vestingScheduleId]) > 0) {
+                _release(_vestingScheduleId);
+            }
+            VestingSchedule storage vestingSchedule = vestingSchedules[_vestingScheduleId];
+            if (!vestingSchedule.revoked) {
+                _burnAmount += (vestingSchedule.amountTotal - vestingSchedule.released);
+                vestingSchedule.revoked = true;
+            }
+        }
+        if (_burnAmount > 0) {
+            vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - _burnAmount;
+            IERC20Extended(address(token)).burn(_burnAmount);
+            emit BurnTokens(_holder, _burnAmount);
+        }
     }
 
     /**
@@ -314,7 +326,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     function _release(bytes32 vestingScheduleId) private {
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
         bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
-        bool isReleasor = msg.sender == owner();
+        bool isReleasor = msg.sender == owner() || msg.sender == migratorAddress;
 
         require(
             isBeneficiary || isReleasor,

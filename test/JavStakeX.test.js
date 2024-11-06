@@ -2,8 +2,8 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { min } = require("hardhat/internal/util/bigint");
-const { ADMIN_ERROR } = require("./common/constanst");
-const { deployTokenFixture } = require("./common/mocks");
+const { ADMIN_ERROR, MANAGER_ERROR } = require("./common/constanst");
+const { deployTokenFixture, deployInfinityPassFixture } = require("./common/mocks");
 const { mine } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("JavStakeX contract", () => {
@@ -14,27 +14,34 @@ describe("JavStakeX contract", () => {
     let addr3;
     let bot;
     let erc20Token;
+    let infinityPass;
     let rewardsDistributor;
-    let poolError;
 
     before(async () => {
         const javStakeX = await ethers.getContractFactory("JavStakeX");
         [owner, addr1, addr2, addr3, bot, rewardsDistributor, ...addrs] = await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await helpers.loadFixture(deployTokenFixture);
+        infinityPass = await helpers.loadFixture(deployInfinityPassFixture);
         const rewardPerBlock = ethers.parseEther("0.05");
         const rewardUpdateBlocksInterval = 864000;
+        const infinityPassPercent = 5;
 
         hhJavStakeX = await upgrades.deployProxy(
             javStakeX,
-            [rewardPerBlock, rewardUpdateBlocksInterval, rewardsDistributor.address],
+            [
+                rewardPerBlock,
+                rewardUpdateBlocksInterval,
+                rewardsDistributor.address,
+                infinityPassPercent,
+                infinityPass.target,
+                nonZeroAddress,
+            ],
 
             {
                 initializer: "initialize",
             },
         );
-
-        poolError = "JavStakeX: Unknown pool";
     });
 
     describe("Deployment", () => {
@@ -53,7 +60,7 @@ describe("JavStakeX contract", () => {
 
     describe("Transactions", () => {
         it("Should revert when set pause", async () => {
-            await expect(hhJavStakeX.connect(addr1).pause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhJavStakeX.connect(addr1).pause()).to.be.revertedWith(MANAGER_ERROR);
         });
 
         it("Should set pause", async () => {
@@ -63,7 +70,7 @@ describe("JavStakeX contract", () => {
         });
 
         it("Should revert when set unpause", async () => {
-            await expect(hhJavStakeX.connect(addr1).unpause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhJavStakeX.connect(addr1).unpause()).to.be.revertedWith(MANAGER_ERROR);
         });
 
         it("Should set unpause", async () => {
@@ -99,10 +106,22 @@ describe("JavStakeX contract", () => {
         });
 
         it("Should revert when addPool", async () => {
+            const poolFee = {
+                depositFee: 0.5 * 1e4,
+                withdrawFee: 0.5 * 1e4,
+                claimFee: 0.5 * 1e4,
+            };
             await expect(
                 hhJavStakeX
                     .connect(addr1)
-                    .addPool(erc20Token.target, erc20Token.target, 1, 1, ethers.parseEther("1")),
+                    .addPool(
+                        erc20Token.target,
+                        erc20Token.target,
+                        1,
+                        1,
+                        ethers.parseEther("1"),
+                        poolFee,
+                    ),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
@@ -110,6 +129,11 @@ describe("JavStakeX contract", () => {
             const minStakeAmount = ethers.parseEther("1");
             const lastRewardBlock = await ethers.provider.getBlockNumber();
             const accRewardPerShare = ethers.parseEther("0.00");
+            const fee = {
+                depositFee: 1 * 1e4,
+                withdrawFee: 1 * 1e4,
+                claimFee: 1 * 1e4,
+            };
 
             await hhJavStakeX.addPool(
                 erc20Token.target,
@@ -117,8 +141,10 @@ describe("JavStakeX contract", () => {
                 lastRewardBlock,
                 accRewardPerShare,
                 minStakeAmount,
+                fee,
             );
             const poolInfo = await hhJavStakeX.poolInfo(0);
+            const poolFee = await hhJavStakeX.poolFee(0);
 
             await expect(await hhJavStakeX.getPoolLength()).to.be.equal(1);
             await expect(poolInfo.baseToken).to.be.equal(erc20Token.target);
@@ -127,29 +153,6 @@ describe("JavStakeX contract", () => {
             await expect(poolInfo.rewardsAmount).to.be.equal(0);
             await expect(poolInfo.rewardsPerShare).to.be.equal(0);
             await expect(poolInfo.minStakeAmount).to.be.equal(minStakeAmount);
-        });
-
-        it("Should revert when addPoolFee", async () => {
-            const poolFee = {
-                depositFee: 0.5 * 1e4,
-                withdrawFee: 0.5 * 1e4,
-                claimFee: 0.5 * 1e4,
-            };
-            await expect(hhJavStakeX.connect(addr1).addPoolFee(poolFee)).to.be.revertedWith(
-                ADMIN_ERROR,
-            );
-        });
-
-        it("Should addPoolFee", async () => {
-            const fee = {
-                depositFee: 1 * 1e4,
-                withdrawFee: 1 * 1e4,
-                claimFee: 1 * 1e4,
-            };
-
-            await hhJavStakeX.addPoolFee(fee);
-            const poolFee = await hhJavStakeX.poolFee(0);
-
             await expect(poolFee.depositFee).to.be.equal(1 * 1e4);
             await expect(poolFee.withdrawFee).to.be.equal(1 * 1e4);
             await expect(poolFee.claimFee).to.be.equal(1 * 1e4);
@@ -188,7 +191,10 @@ describe("JavStakeX contract", () => {
         });
 
         it("Should revert when setPoolInfo - poolError", async () => {
-            await expect(hhJavStakeX.setPoolInfo(5, 1, 1)).to.be.revertedWith(poolError);
+            await expect(hhJavStakeX.setPoolInfo(5, 1, 1)).to.be.revertedWithCustomError(
+                hhJavStakeX,
+                "WrongPool",
+            );
         });
 
         it("Should setPoolInfo", async () => {
@@ -221,7 +227,10 @@ describe("JavStakeX contract", () => {
                 withdrawFee: 0.5 * 1e4,
                 claimFee: 0.5 * 1e4,
             };
-            await expect(hhJavStakeX.setPoolFee(5, poolFee)).to.be.revertedWith(poolError);
+            await expect(hhJavStakeX.setPoolFee(5, poolFee)).to.be.revertedWithCustomError(
+                hhJavStakeX,
+                "WrongPool",
+            );
         });
 
         it("Should setPoolFee", async () => {
@@ -242,8 +251,9 @@ describe("JavStakeX contract", () => {
         });
 
         it("Should reverted when stake - amount < minAmount", async () => {
-            await expect(hhJavStakeX.connect(addr1).stake(0, 2)).to.be.revertedWith(
-                "JavStakeX: invalid amount for stake",
+            await expect(hhJavStakeX.connect(addr1).stake(0, 2)).to.be.revertedWithCustomError(
+                hhJavStakeX,
+                "InvalidAmount",
             );
         });
 
@@ -251,7 +261,7 @@ describe("JavStakeX contract", () => {
             const poolInfo = await hhJavStakeX.poolInfo(0);
             await expect(
                 hhJavStakeX.connect(addr1).stake(0, poolInfo.minStakeAmount),
-            ).to.be.revertedWith("JavStakeX: invalid balance for stake");
+            ).to.be.revertedWithCustomError(hhJavStakeX, "InvalidAmount");
         });
 
         it("Should stake - first time addr1", async () => {
@@ -435,7 +445,7 @@ describe("JavStakeX contract", () => {
 
             await expect(
                 hhJavStakeX.connect(addr3).unstake(pid, ethers.parseEther("1")),
-            ).to.be.revertedWith("JavStakeX: invalid amount for unstake");
+            ).to.be.revertedWithCustomError(hhJavStakeX, "InvalidAmount");
         });
 
         it("Should unstake - full amount", async () => {
@@ -485,8 +495,9 @@ describe("JavStakeX contract", () => {
         });
 
         it("Should revert when addRewards", async () => {
-            await expect(hhJavStakeX.connect(addr1).addRewards(1, 1)).to.be.revertedWith(
-                "JavFreezer: only rewardsDistributor",
+            await expect(hhJavStakeX.connect(addr1).addRewards(1, 1)).to.be.revertedWithCustomError(
+                hhJavStakeX,
+                "NotAllowed",
             );
         });
 

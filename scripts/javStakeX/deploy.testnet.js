@@ -1,4 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
+const { logDeploy } = require("../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -8,22 +9,21 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            ethers.parseEther("1"), //_rewardPerBlock
+            ethers.parseEther("60"), //_rewardPerBlock
             0, //_rewardUpdateBlocksInterval
             "0x0000000000000000000000000000000000000000", //_rewardsDistributorAddress
+            5, //_infinityPassPercent
+            "0xdcD2ECce51a80Ccf23e8a767A0BFe3546CDAE7a6", //_infinityPass
+            "0x0000000000000000000000000000000000000000", //_migratorAddress
         ],
         {
             initializer: "initialize",
             kind: "uups",
-            txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei"),
-            },
         },
     );
     await contract.waitForDeployment();
 
-    const contractAddress = await contract.getAddress();
-    console.log(`JavStakeX contract deployed to: ${contractAddress}`);
+    logDeploy("JavStakeX", await contract.getAddress());
 }
 
 main()

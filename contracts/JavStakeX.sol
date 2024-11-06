@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -9,8 +9,14 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "./helpers/RewardRateConfigurable.sol";
 import "./interfaces/IERC20Extended.sol";
 import "./base/BaseUpgradable.sol";
+import "./interfaces/IJavStakeX.sol";
 
-contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConfigurable {
+contract JavStakeX is
+    IJavStakeX,
+    BaseUpgradable,
+    ReentrancyGuardUpgradeable,
+    RewardRateConfigurable
+{
     using SafeERC20 for IERC20;
 
     /**
@@ -53,37 +59,24 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     PoolFee[] public poolFee;
     uint256 public infinityPassPercent;
     address public infinityPass;
+    address public migratorAddress;
 
     /* ========== EVENTS ========== */
-    event AddPool(
-        address indexed _baseToken,
-        address indexed _rewardToken,
-        uint128 _minStakeAmount
-    );
-    event UpdatePool(
-        uint256 indexed _pid,
-        uint256 _totalShares,
-        uint256 _rewardsAmount,
-        uint256 _rewardsPerShare
-    );
-    event SetPoolInfo(uint256 _pid, uint256 _lastRewardBlock, uint256 _accRewardPerShare);
-    event SetRewardsDistributorAddress(address indexed _address);
-    event Stake(address indexed _address, uint256 indexed _pid, uint256 _amount);
-    event Unstake(address indexed _address, uint256 _pid, uint256 _amount);
-    event Claim(address indexed _token, address indexed _user, uint256 _amount);
-    event AddRewards(uint256 indexed pid, uint256 amount);
+
     event SetPoolFee(uint256 _pid, PoolFee _poolFee);
-    event Burn(address _token, uint256 _amount);
-    event SetInfinityPassPercent(uint256 indexed _percent);
-    event SetInfinityPass(address indexed _address);
 
     modifier poolExists(uint256 _pid) {
-        require(_pid < poolInfo.length, "JavStakeX: Unknown pool");
+        require(_pid < poolInfo.length, WrongPool());
         _;
     }
 
     modifier onlyRewardsDistributor() {
-        require(msg.sender == rewardsDistributorAddress, "JavFreezer: only rewardsDistributor");
+        require(_msgSender() == rewardsDistributorAddress, NotAllowed());
+        _;
+    }
+
+    modifier onlyMigrator() {
+        require(_msgSender() == migratorAddress, NotAllowed());
         _;
     }
 
@@ -95,15 +88,21 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     function initialize(
         uint256 _rewardPerBlock,
         uint256 _rewardUpdateBlocksInterval,
-        address _rewardsDistributorAddress
+        address _rewardsDistributorAddress,
+        uint256 _infinityPassPercent,
+        address _infinityPass,
+        address _migratorAddress
     ) external initializer {
         rewardsDistributorAddress = _rewardsDistributorAddress;
+        infinityPassPercent = _infinityPassPercent;
+        infinityPass = _infinityPass;
+        migratorAddress = _migratorAddress;
 
         __Base_init();
         __ReentrancyGuard_init();
         __RewardRateConfigurable_init(_rewardPerBlock, _rewardUpdateBlocksInterval);
 
-        emit Initialized(msg.sender, block.number);
+        emit Initialized(_msgSender(), block.number);
     }
 
     function setRewardsDistributorAddress(address _address) external onlyAdmin {
@@ -124,6 +123,12 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
         emit SetInfinityPass(_address);
     }
 
+    function setMigratorAddress(address _address) external onlyAdmin {
+        migratorAddress = _address;
+
+        emit SetMigratorAddress(_address);
+    }
+
     function setRewardConfiguration(
         uint256 rewardPerBlock,
         uint256 updateBlocksInterval
@@ -142,7 +147,8 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
         address _rewardToken,
         uint256 _lastRewardBlock,
         uint256 _accRewardPerShare,
-        uint128 _minStakeAmount
+        uint128 _minStakeAmount,
+        PoolFee memory _poolFee
     ) external onlyAdmin {
         poolInfo.push(
             PoolInfo({
@@ -156,7 +162,8 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
                 minStakeAmount: _minStakeAmount
             })
         );
-
+        poolFee.push(_poolFee);
+        emit SetPoolFee(poolFee.length - 1, _poolFee);
         emit AddPool(_baseToken, _rewardToken, _minStakeAmount);
     }
 
@@ -174,14 +181,50 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
         emit SetPoolInfo(pid, lastRewardBlock, accRewardPerShare);
     }
 
-    function addPoolFee(PoolFee memory _poolFee) external onlyAdmin {
-        poolFee.push(_poolFee);
-        emit SetPoolFee(poolFee.length - 1, _poolFee);
-    }
-
     function setPoolFee(uint256 pid, PoolFee memory _poolFee) external onlyAdmin poolExists(pid) {
         poolFee[pid] = _poolFee;
         emit SetPoolFee(pid, _poolFee);
+    }
+
+    function burnTokens(uint256 _pid, address _holder) external onlyMigrator poolExists(_pid) {
+        _updatePool(_pid, 0);
+        _claim(_pid, _holder);
+
+        PoolInfo storage pool = poolInfo[_pid];
+        UserInfo storage user = userInfo[_pid][_holder];
+        uint256 _burnAmount = user.shares;
+
+        user.shares = 0;
+        user.blockRewardDebt = 0;
+        user.productsRewardDebt = 0;
+
+        pool.totalShares -= _burnAmount;
+
+        _burnToken(address(pool.baseToken), _burnAmount);
+
+        emit BurnTokens(_pid, _holder, _burnAmount);
+    }
+
+    function makeMigration(
+        uint256 _pid,
+        uint256 _amount,
+        address _holder
+    ) external onlyMigrator poolExists(_pid) {
+        UserInfo storage user = userInfo[_pid][_holder];
+        PoolInfo storage pool = poolInfo[_pid];
+        _updatePool(_pid, 0);
+
+        require(pool.baseToken.balanceOf(_msgSender()) >= _amount, InvalidAmount());
+
+        pool.baseToken.safeTransferFrom(_msgSender(), address(this), _amount);
+
+        pool.totalShares += _amount;
+
+        user.shares += _amount;
+        user.blockRewardDebt = (user.shares * (pool.accRewardPerShare)) / (1e18);
+        user.productsRewardDebt = (user.shares * (pool.rewardsPerShare)) / (1e18);
+
+        emit Stake(_holder, _pid, _amount);
     }
 
     /**
@@ -191,12 +234,9 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
      */
     function stake(uint256 _pid, uint256 _amount) external nonReentrant whenNotPaused {
         PoolInfo memory pool = poolInfo[_pid];
-        require(pool.minStakeAmount <= _amount, "JavStakeX: invalid amount for stake");
-        require(
-            pool.baseToken.balanceOf(msg.sender) >= _amount,
-            "JavStakeX: invalid balance for stake"
-        );
-        _stake(_pid, msg.sender, _amount);
+        require(pool.minStakeAmount <= _amount, InvalidAmount());
+        require(pool.baseToken.balanceOf(_msgSender()) >= _amount, InvalidAmount());
+        _stake(_pid, _msgSender(), _amount);
     }
 
     /**
@@ -206,7 +246,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
      */
     function unstake(uint256 _pid, uint256 _amount) external nonReentrant whenNotPaused {
         _updatePool(_pid, 0);
-        _unstake(_pid, msg.sender, _amount);
+        _unstake(_pid, _msgSender(), _amount);
     }
 
     /**
@@ -215,7 +255,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
      */
     function claim(uint256 _pid) external nonReentrant whenNotPaused {
         _updatePool(_pid, 0);
-        _claim(_pid, msg.sender);
+        _claim(_pid, _msgSender());
     }
 
     /**
@@ -224,7 +264,7 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
     function claimAll() external nonReentrant whenNotPaused {
         for (uint256 pid = 0; pid < getPoolLength(); ++pid) {
             _updatePool(pid, 0);
-            _claim(pid, msg.sender);
+            _claim(pid, _msgSender());
         }
     }
 
@@ -264,6 +304,13 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
         return (getRewardPerBlock() * 1051200 * 1e18) / totalShares;
     }
 
+    function userShares(
+        uint256 _pid,
+        address _user
+    ) external view poolExists(_pid) returns (uint256) {
+        return userInfo[_pid][_user].shares;
+    }
+
     /**
      * @notice Private function to stake user asserts
      * @param _pid: Pool id where user has assets
@@ -301,9 +348,9 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         PoolFee memory fee = poolFee[_pid];
-        require(user.shares >= _amount, "JavStakeX: invalid amount for unstake");
+        require(user.shares >= _amount, InvalidAmount());
 
-        _claim(_pid, msg.sender);
+        _claim(_pid, _msgSender());
         user.shares -= _amount;
         user.blockRewardDebt = (user.shares * (pool.accRewardPerShare)) / (1e18);
         user.productsRewardDebt = (user.shares * (pool.rewardsPerShare)) / (1e18);
@@ -391,9 +438,9 @@ contract JavStakeX is BaseUpgradable, ReentrancyGuardUpgradeable, RewardRateConf
         }
 
         uint256 blockRewards = ((user.shares * _accRewardPerShare) / 1e18) - user.blockRewardDebt;
-        uint256 productsRewards = ((user.shares * pool.rewardsPerShare) / 1e18) >
-            user.productsRewardDebt
-            ? ((user.shares * pool.rewardsPerShare) / 1e18) - user.productsRewardDebt
+        uint256 poolRewards = user.shares * pool.rewardsPerShare;
+        uint256 productsRewards = (poolRewards / 1e18) > user.productsRewardDebt
+            ? (poolRewards / 1e18) - user.productsRewardDebt
             : 0;
 
         uint256 nftRewards = IERC721(infinityPass).balanceOf(_user) > 0

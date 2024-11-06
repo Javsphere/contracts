@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
-const { ADMIN_ERROR } = require("../common/constanst");
+const { ADMIN_ERROR, MANAGER_ERROR } = require("../common/constanst");
 
 describe("JavPriceAggregator contract", () => {
     let hhJavPriceAggregator;
@@ -45,7 +45,9 @@ describe("JavPriceAggregator contract", () => {
 
     describe("Transactions", () => {
         it("Should revert when set pause", async () => {
-            await expect(hhJavPriceAggregator.connect(bot).pause()).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhJavPriceAggregator.connect(bot).pause()).to.be.revertedWith(
+                MANAGER_ERROR,
+            );
         });
 
         it("Should set pause", async () => {
@@ -56,7 +58,7 @@ describe("JavPriceAggregator contract", () => {
 
         it("Should revert when set unpause", async () => {
             await expect(hhJavPriceAggregator.connect(bot).unpause()).to.be.revertedWith(
-                ADMIN_ERROR,
+                MANAGER_ERROR,
             );
         });
 

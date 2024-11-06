@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -32,24 +32,6 @@ contract JavFreezer is
         uint256 totalClaim;
     }
 
-    /**
-     * @notice Info for each staking by ID
-     * One Address can have many Deposits with different periods. Unlimited Amount.
-     * depositTokens = amount of tokens for exact deposit.
-     * stakePeriod = Locking Period - from 3 months to 30 months. value is integer
-     * depositTimestamp = timestamp of deposit
-     * withdrawalTimestamp = Timestamp when user can withdraw his locked tokens
-     * is_finished = checks if user has already withdrawn tokens
-     */
-    struct UserDeposit {
-        uint256 depositTokens;
-        uint256 stakePeriod;
-        uint256 depositTimestamp;
-        uint256 withdrawalTimestamp;
-        uint256 rewardsClaimed;
-        uint256 rewardDebt;
-        bool is_finished;
-    }
     /**
      * @notice Info of Pool
      * @param lastRewardBlock: Last block number that reward distribution occurs
@@ -91,62 +73,33 @@ contract JavFreezer is
     PoolFee[] public poolFee;
     uint256 public infinityPassPercent;
     address public infinityPass;
+    address public migratorAddress;
 
     /* ========== EVENTS ========== */
-    event SetPoolInfo(uint256 _pid, uint256 _lastRewardBlock, uint256 _accRewardPerShare);
-    event AddPool(
-        address indexed _baseToken,
-        address indexed _rewardToken,
-        uint256 _lastRewardBlock,
-        uint256 _accRewardPerShare
-    );
-    event SetLockPeriod(uint256 indexed _lockId, uint256 _duration);
-    event SetLockPeriodMultiplier(uint256 indexed _lockId, uint256 _multiplier);
-    event SetVestingAddress(address indexed _address);
-    event SetRewardsDistributorAddress(address indexed _address);
-    event ClaimUserReward(
-        address indexed user,
-        uint256 amount,
-        uint256 indexed pid,
-        uint256 indexed period
-    );
-    event Deposit(
-        address indexed user,
-        uint256 amount,
-        uint256 indexed pid,
-        uint256 indexed period,
-        uint256 depositTimestamp,
-        uint256 withdrawalTimestamp
-    );
-    event Withdraw(
-        address indexed user,
-        uint256 amount,
-        uint256 indexed pid,
-        uint256 indexed period
-    );
-    event AddRewards(uint256 indexed pid, uint256 amount);
     event SetPoolFee(uint256 _pid, PoolFee _poolFee);
-    event Burn(address _token, uint256 _amount);
-    event SetInfinityPassPercent(uint256 indexed _percent);
-    event SetInfinityPass(address indexed _address);
 
     modifier validLockId(uint256 _lockId) {
-        require(lockPeriod[_lockId] != 0 && _lockId < 5, "JavFreezer: invalid lock period");
+        require(lockPeriod[_lockId] != 0 && _lockId < 5, WrongLockPeriod());
         _;
     }
 
     modifier poolExists(uint256 _pid) {
-        require(_pid < poolInfo.length, "JavFreezer: Unknown pool");
+        require(_pid < poolInfo.length, WrongPool());
         _;
     }
 
     modifier onlyVesting() {
-        require(msg.sender == vestingAddress, "JavFreezer: only vesting");
+        require(_msgSender() == vestingAddress, NotAllowed());
         _;
     }
 
     modifier onlyRewardsDistributor() {
-        require(msg.sender == rewardsDistributorAddress, "JavFreezer: only rewardsDistributor");
+        require(_msgSender() == rewardsDistributorAddress, NotAllowed());
+        _;
+    }
+
+    modifier onlyMigrator() {
+        require(_msgSender() == migratorAddress, NotAllowed());
         _;
     }
 
@@ -158,20 +111,21 @@ contract JavFreezer is
     function initialize(
         uint256 _rewardPerBlock,
         uint256 _rewardUpdateBlocksInterval,
-        address _vestingAddress
+        address _vestingAddress,
+        uint256 _infinityPassPercent,
+        address _infinityPass,
+        address _migratorAddress
     ) external initializer {
         vestingAddress = _vestingAddress;
+        infinityPassPercent = _infinityPassPercent;
+        infinityPass = _infinityPass;
+        migratorAddress = _migratorAddress;
 
         __Base_init();
         __ReentrancyGuard_init();
         __RewardRateConfigurable_init(_rewardPerBlock, _rewardUpdateBlocksInterval);
 
-        emit Initialized(msg.sender, block.number);
-    }
-
-    function setTvl(uint256 _pid, uint256 _lockId, uint256 _tvl) external onlyAdmin {
-        require(_lockId == 5 || _lockId == 6, "JavFreezer: invalid lock period");
-        tvl[_pid][_lockId] = _tvl;
+        emit Initialized(_msgSender(), block.number);
     }
 
     /**
@@ -185,7 +139,8 @@ contract JavFreezer is
         address _baseToken,
         address _rewardToken,
         uint256 _lastRewardBlock,
-        uint256 _accRewardPerShare
+        uint256 _accRewardPerShare,
+        PoolFee memory _poolFee
     ) external onlyAdmin {
         poolInfo.push(
             PoolInfo({
@@ -197,16 +152,10 @@ contract JavFreezer is
             })
         );
         productsRewardsInfo.push(ProductsRewardsInfo({rewardsAmount: 0, rewardsPerShare: 0}));
+        poolFee.push(_poolFee);
 
+        emit SetPoolFee(poolFee.length - 1, _poolFee);
         emit AddPool(_baseToken, _rewardToken, _lastRewardBlock, _accRewardPerShare);
-    }
-
-    function addPoolRewardsInfo() external onlyAdmin {
-        require(
-            poolInfo.length > productsRewardsInfo.length,
-            "JavFreezer: rewards pool already exists"
-        );
-        productsRewardsInfo.push(ProductsRewardsInfo({rewardsAmount: 0, rewardsPerShare: 0}));
     }
 
     function setRewardConfiguration(
@@ -242,11 +191,6 @@ contract JavFreezer is
         emit SetPoolInfo(pid, lastRewardBlock, accRewardPerShare);
     }
 
-    function addPoolFee(PoolFee memory _poolFee) external onlyAdmin {
-        poolFee.push(_poolFee);
-        emit SetPoolFee(poolFee.length - 1, _poolFee);
-    }
-
     function setPoolFee(uint256 pid, PoolFee memory _poolFee) external onlyAdmin poolExists(pid) {
         poolFee[pid] = _poolFee;
         emit SetPoolFee(pid, _poolFee);
@@ -276,6 +220,81 @@ contract JavFreezer is
         emit SetInfinityPass(_address);
     }
 
+    function setMigratorAddress(address _address) external onlyAdmin {
+        migratorAddress = _address;
+
+        emit SetMigratorAddress(_address);
+    }
+
+    function burnTokens(uint256 _pid, address _holder) external onlyMigrator poolExists(_pid) {
+        for (uint256 _depositId = 0; _depositId < userInfo[_holder][_pid].depositId; ++_depositId) {
+            UserDeposit storage depositDetails = userDeposits[_holder][_pid][_depositId];
+            if (!depositDetails.is_finished) {
+                _updatePool(_pid, 0);
+                _claim(_holder, _pid, _depositId);
+
+                UserInfo storage user = userInfo[_holder][_pid];
+                PoolInfo storage pool = poolInfo[_pid];
+                user.totalDepositTokens -= depositDetails.depositTokens;
+                pool.totalShares -= depositDetails.depositTokens;
+                tvl[_pid][depositDetails.stakePeriod] -= depositDetails.depositTokens;
+
+                _burnToken(address(pool.baseToken), depositDetails.depositTokens);
+
+                depositDetails.is_finished = true;
+
+                emit BurnTokens(
+                    _pid,
+                    _holder,
+                    depositDetails.stakePeriod,
+                    depositDetails.depositTokens
+                );
+            }
+        }
+    }
+
+    function makeMigration(
+        uint256 _pid,
+        address _holder,
+        UserDeposit[] memory _userDeposits
+    ) external onlyMigrator poolExists(_pid) {
+        for (uint256 i = 0; i < _userDeposits.length; ++i) {
+            UserInfo storage user = userInfo[_holder][_pid];
+            PoolInfo storage pool = poolInfo[_pid];
+            ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
+            _updatePool(_pid, 0);
+
+            pool.baseToken.safeTransferFrom(
+                _msgSender(),
+                address(this),
+                _userDeposits[i].depositTokens
+            );
+
+            user.totalDepositTokens += _userDeposits[i].depositTokens;
+            pool.totalShares += _userDeposits[i].depositTokens;
+            tvl[_pid][_userDeposits[i].stakePeriod] += _userDeposits[i].depositTokens;
+
+            uint256 blockRewardDebt = (_userDeposits[i].depositTokens * (pool.accRewardPerShare)) /
+                (1e18);
+            uint256 productRewardDebt = (_userDeposits[i].depositTokens *
+                (productsRewInfo.rewardsPerShare)) / (1e18);
+
+            _userDeposits[i].rewardDebt = blockRewardDebt;
+            userDeposits[_holder][_pid].push(_userDeposits[i]);
+            user.depositId = userDeposits[_holder][_pid].length;
+            productsRewardsDebt[_holder][_pid][user.depositId - 1] = productRewardDebt;
+
+            emit Deposit(
+                _holder,
+                _userDeposits[i].depositTokens,
+                _pid,
+                _userDeposits[i].stakePeriod,
+                _userDeposits[i].depositTimestamp,
+                _userDeposits[i].withdrawalTimestamp
+            );
+        }
+    }
+
     /**
      * @notice Deposit in given pool
      * @param _periodId: stake period
@@ -287,10 +306,7 @@ contract JavFreezer is
         uint256 _amount
     ) external nonReentrant whenNotPaused poolExists(_pid) validLockId(_periodId) {
         PoolInfo memory pool = poolInfo[_pid];
-        require(
-            pool.baseToken.balanceOf(msg.sender) >= _amount,
-            "JavFreezer: invalid balance for deposit"
-        );
+        require(pool.baseToken.balanceOf(_msgSender()) >= _amount, InvalidAmount());
         _deposit(_pid, _amount, _periodId);
     }
 
@@ -350,8 +366,8 @@ contract JavFreezer is
         PoolInfo storage pool = poolInfo[_pid];
         UserDeposit storage depositDetails = userDeposits[_holder][_pid][_depositId];
         ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
-        require(depositDetails.depositTokens >= _amount, "JavFreezer: invalid withdraw amount");
-        require(!depositDetails.is_finished, "JavFreezer: already withdrawn");
+        require(depositDetails.depositTokens >= _amount, InvalidAmount());
+        require(!depositDetails.is_finished, AlreadyFinished());
 
         _claim(_holder, _pid, _depositId);
         depositDetails.depositTokens -= _amount;
@@ -391,7 +407,7 @@ contract JavFreezer is
      */
     function claim(uint256 _pid, uint256 _depositId) external nonReentrant poolExists(_pid) {
         _updatePool(_pid, 0);
-        _claim(msg.sender, _pid, _depositId);
+        _claim(_msgSender(), _pid, _depositId);
     }
 
     /**
@@ -403,13 +419,13 @@ contract JavFreezer is
     ) external nonReentrant poolExists(_pid) validLockId(_lockId) {
         for (
             uint256 _depositId = 0;
-            _depositId < userInfo[msg.sender][_pid].depositId;
+            _depositId < userInfo[_msgSender()][_pid].depositId;
             ++_depositId
         ) {
-            UserDeposit memory depositDetails = userDeposits[msg.sender][_pid][_depositId];
+            UserDeposit memory depositDetails = userDeposits[_msgSender()][_pid][_depositId];
             if (depositDetails.stakePeriod == _lockId) {
                 _updatePool(_pid, 0);
-                _claim(msg.sender, _pid, _depositId);
+                _claim(_msgSender(), _pid, _depositId);
             }
         }
     }
@@ -420,11 +436,11 @@ contract JavFreezer is
     function claimAll(uint256 _pid) external nonReentrant poolExists(_pid) {
         for (
             uint256 _depositId = 0;
-            _depositId < userInfo[msg.sender][_pid].depositId;
+            _depositId < userInfo[_msgSender()][_pid].depositId;
             ++_depositId
         ) {
             _updatePool(_pid, 0);
-            _claim(msg.sender, _pid, _depositId);
+            _claim(_msgSender(), _pid, _depositId);
         }
     }
 
@@ -449,6 +465,14 @@ contract JavFreezer is
         return
             (((getRewardPerBlock() * lockPeriodMultiplier[_lockId] * 1051200) / 1e5) * 1e18) /
             totalShares;
+    }
+
+    function userDeposit(
+        address _user,
+        uint256 _pid,
+        uint256 _id
+    ) external view returns (UserDeposit memory) {
+        return userDeposits[_user][_pid][_id];
     }
 
     /**
@@ -504,6 +528,13 @@ contract JavFreezer is
         return poolInfo.length;
     }
 
+    function userDepositTokens(
+        uint256 _pid,
+        address _user
+    ) external view poolExists(_pid) returns (uint256) {
+        return userInfo[_user][_pid].totalDepositTokens;
+    }
+
     /**
      * @notice Update reward variables of the given pool to be up-to-date.
      * @param _pid: Pool id where user has assets
@@ -535,13 +566,13 @@ contract JavFreezer is
     periodID - id of months array accordingly
     */
     function _deposit(uint256 _pid, uint256 _depositAmount, uint256 _periodId) private {
-        UserInfo storage user = userInfo[msg.sender][_pid];
+        UserInfo storage user = userInfo[_msgSender()][_pid];
         PoolInfo storage pool = poolInfo[_pid];
         ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
         PoolFee memory fee = poolFee[_pid];
         _updatePool(_pid, 0);
 
-        pool.baseToken.safeTransferFrom(msg.sender, address(this), _depositAmount);
+        pool.baseToken.safeTransferFrom(_msgSender(), address(this), _depositAmount);
 
         uint256 burnAmount = (_depositAmount * fee.depositFee) / 1e4;
         _burnToken(address(pool.baseToken), burnAmount);
@@ -562,12 +593,12 @@ contract JavFreezer is
             rewardsClaimed: 0,
             rewardDebt: blockRewardDebt
         });
-        userDeposits[msg.sender][_pid].push(depositDetails);
-        user.depositId = userDeposits[msg.sender][_pid].length;
-        productsRewardsDebt[msg.sender][_pid][user.depositId - 1] = productRewardDebt;
+        userDeposits[_msgSender()][_pid].push(depositDetails);
+        user.depositId = userDeposits[_msgSender()][_pid].length;
+        productsRewardsDebt[_msgSender()][_pid][user.depositId - 1] = productRewardDebt;
 
         emit Deposit(
-            msg.sender,
+            _msgSender(),
             _userAmount,
             _pid,
             _periodId,
@@ -581,22 +612,19 @@ contract JavFreezer is
     accepts _depositId - is the id of user element.
     */
     function _withdraw(uint256 _pid, uint256 _depositId) private {
-        UserInfo storage user = userInfo[msg.sender][_pid];
+        UserInfo storage user = userInfo[_msgSender()][_pid];
         PoolInfo storage pool = poolInfo[_pid];
-        UserDeposit storage depositDetails = userDeposits[msg.sender][_pid][_depositId];
+        UserDeposit storage depositDetails = userDeposits[_msgSender()][_pid][_depositId];
         ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
         PoolFee memory fee = poolFee[_pid];
-        require(
-            depositDetails.withdrawalTimestamp < block.timestamp,
-            "JavFreezer: lock period hasn't ended."
-        );
-        require(!depositDetails.is_finished, "JavFreezer: already withdrawn");
+        require(depositDetails.withdrawalTimestamp < block.timestamp, PeriodNotEnded());
+        require(!depositDetails.is_finished, AlreadyFinished());
 
-        _claim(msg.sender, _pid, _depositId);
+        _claim(_msgSender(), _pid, _depositId);
         depositDetails.rewardDebt =
             (depositDetails.depositTokens * (pool.accRewardPerShare)) /
             (1e18);
-        productsRewardsDebt[msg.sender][_pid][_depositId] =
+        productsRewardsDebt[_msgSender()][_pid][_depositId] =
             (depositDetails.depositTokens * productsRewInfo.rewardsPerShare) /
             (1e18);
         user.totalDepositTokens -= depositDetails.depositTokens;
@@ -605,12 +633,12 @@ contract JavFreezer is
 
         uint256 burnAmount = (depositDetails.depositTokens * fee.withdrawFee) / 1e4;
 
-        pool.baseToken.safeTransfer(msg.sender, depositDetails.depositTokens - burnAmount);
+        pool.baseToken.safeTransfer(_msgSender(), depositDetails.depositTokens - burnAmount);
         _burnToken(address(pool.baseToken), burnAmount);
 
         depositDetails.is_finished = true;
         emit Withdraw(
-            msg.sender,
+            _msgSender(),
             depositDetails.depositTokens - burnAmount,
             _pid,
             depositDetails.stakePeriod
@@ -666,7 +694,11 @@ contract JavFreezer is
 
         uint256 _accRewardPerShare = pool.accRewardPerShare;
 
-        if (block.number > pool.lastRewardBlock && pool.totalShares != 0) {
+        if (
+            block.number > pool.lastRewardBlock &&
+            pool.totalShares != 0 &&
+            block.timestamp <= depositDetails.withdrawalTimestamp
+        ) {
             uint256 _multiplier = block.number - pool.lastRewardBlock;
             uint256 _reward = (_multiplier * getRewardPerBlock());
             _accRewardPerShare = _accRewardPerShare + ((_reward * 1e18) / pool.totalShares);
@@ -674,11 +706,11 @@ contract JavFreezer is
 
         uint256 rewards = ((depositDetails.depositTokens * _accRewardPerShare) / 1e18) -
             depositDetails.rewardDebt;
-        uint256 productsRewards = (depositDetails.depositTokens * productsRewInfo.rewardsPerShare) /
-            1e18 >
+        uint256 depositProductRewards = depositDetails.depositTokens *
+            productsRewInfo.rewardsPerShare;
+        uint256 productsRewards = depositProductRewards / 1e18 >
             productsRewardsDebt[_user][_pid][_depositId]
-            ? ((depositDetails.depositTokens * productsRewInfo.rewardsPerShare) / 1e18) -
-                productsRewardsDebt[_user][_pid][_depositId]
+            ? (depositProductRewards / 1e18) - productsRewardsDebt[_user][_pid][_depositId]
             : 0;
         uint256 blockRewards = ((rewards * lockPeriodMultiplier[depositDetails.stakePeriod]) / 1e5);
 

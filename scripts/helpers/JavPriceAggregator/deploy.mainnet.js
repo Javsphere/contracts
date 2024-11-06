@@ -1,27 +1,28 @@
 const { ethers, upgrades } = require("hardhat");
+const { logDeploy } = require("../../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory("JavPriceAggregator");
+    const Contract = await ethers.getContractFactory(
+        "contracts/helpers/JavPriceAggregator.sol:JavPriceAggregator",
+    );
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            ["0x8d64C3cbc9b8a261A906c304C4f19B8E6352Bd87"], //_allowedAddresses_
+            1, //_priceUpdateFee
+            ["0xed778ED7aC2AA1C4AD4Ba9F2c0818B44316E8f6a"], //_allowedSigners_
         ],
         {
             initializer: "initialize",
             kind: "uups",
-            txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei"),
-            },
         },
     );
+
     await contract.waitForDeployment();
 
-    const contractAddress = await contract.getAddress();
-    console.log(`JavPriceAggregator contract deployed to: ${contractAddress}`);
+    logDeploy("JavPriceAggregator", await contract.getAddress());
 }
 
 main()

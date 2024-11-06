@@ -1,4 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
+const { logDeploy } = require("../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -8,22 +9,21 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            ethers.parseEther("0.0000005"), //_rewardPerBlock
-            30, //_rewardUpdateBlocksInterval
-            "0xF977A2D3EA547731f04B19cfDCE00fe9d23dB485", //_vestingAddress
+            ethers.parseEther("140"), //_rewardPerBlock
+            0, //_rewardUpdateBlocksInterval
+            "0x05Ab310524968Fda05431F7FA8858351FD190eba", //_vestingAddress
+            10, //_infinityPassPercent
+            "0xdcD2ECce51a80Ccf23e8a767A0BFe3546CDAE7a6", //_infinityPass
+            "0x0000000000000000000000000000000000000000", //_migratorAddress
         ],
         {
             initializer: "initialize",
             kind: "uups",
-            txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei"),
-            },
         },
     );
     await contract.waitForDeployment();
 
-    const contractAddress = await contract.getAddress();
-    console.log(`JavFreezer contract deployed to: ${contractAddress}`);
+    logDeploy("JavFreezer", await contract.getAddress());
 }
 
 main()
