@@ -68,6 +68,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     event BuyLLP(
         address indexed user,
         address tokenIn,
+        uint256 tokenInID,
         address tokenOut,
         uint256 amountIn,
         uint256 amountOut
@@ -76,6 +77,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         address indexed user,
         address tokenIn,
         address tokenOut,
+        uint256 tokenOutID,
         uint256 amountIn,
         uint256 amountOut
     );
@@ -193,7 +195,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         IERC20(_token.asset).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
 
-        emit BuyLLP(msg.sender, _token.asset, llpToken, _amount, _llpAmount);
+        emit BuyLLP(msg.sender, _token.asset, _inputToken, llpToken, _amount, _llpAmount);
     }
 
     /**
@@ -253,7 +255,9 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         address sender = _msgSender();
         IERC20(_token.asset).safeTransferFrom(sender, address(this), assets);
 
-        uint256 usdAmount = (assets * _getUsdPrice(_token.priceFeed)) / 1e18;
+        uint256 usdAmount = (assets *
+            _getUsdPrice(_token.priceFeed) *
+            tokensPrecision[_token.asset].precisionDelta) / PRECISION_18;
         rewardsAmountUsd += usdAmount;
 
         accRewardsPerToken[_collateralIndex] +=
@@ -353,7 +357,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         IERC20(_inputToken.asset).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
 
-        emit BuyLLP(msg.sender, _inputToken.asset, llpToken, _amount, _llpAmount);
+        emit BuyLLP(msg.sender, _inputToken.asset, _tokenId, llpToken, _amount, _llpAmount);
     }
 
     function _sellLLP(uint256 _tokenId, TokenInfo memory _outputToken, uint256 _amount) private {
@@ -369,7 +373,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         IERC20Extended(llpToken).burnFrom(msg.sender, _amount);
         IERC20(_outputToken.asset).safeTransfer(msg.sender, _tokensAmount);
 
-        emit SellLLP(msg.sender, llpToken, _outputToken.asset, _amount, _tokensAmount);
+        emit SellLLP(msg.sender, llpToken, _outputToken.asset, _tokenId, _amount, _tokensAmount);
     }
 
     function _getUsdPrice(bytes32 _priceFeed) private view returns (uint256) {
