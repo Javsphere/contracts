@@ -269,5 +269,13 @@ describe("Vote contract", () => {
             await expect(proposal.isExecuted).to.be.equal(true);
             await expect(proposal.isApproved).to.be.equal(true);
         });
+
+        it("Should revert when execute proposal - WrongIndex", async () => {
+            const id = await hhVote.proposalIndex()
+            await expect(hhVote.executeProposal(id)).to.be.revertedWithCustomError(
+                hhVote,
+                "WrongIndex",
+            );
+        });
     });
 });

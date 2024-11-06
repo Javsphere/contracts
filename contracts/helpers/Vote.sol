@@ -107,12 +107,13 @@ contract Vote is IVote, BaseUpgradable {
 
     function executeProposal(uint256 _proposalId) external onlyActiveProposal(_proposalId) {
         require(proposals[_proposalId].endTimestamp <= block.timestamp, NotEnded());
+        require(_proposalId < proposalIndex, WrongIndex());
         _executeProposal(_proposalId);
     }
 
     function _executeProposal(uint256 _proposalId) private {
         Proposal storage proposal = proposals[_proposalId];
-        bool isApproved = proposalWeight[_proposalId][true] >= proposalWeight[_proposalId][false];
+        bool isApproved = proposalWeight[_proposalId][true] > proposalWeight[_proposalId][false];
         proposal.isApproved = isApproved;
         proposal.isExecuted = true;
 

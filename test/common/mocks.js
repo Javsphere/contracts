@@ -10,14 +10,14 @@ const WETH9Artifact = require("@uniswap/v2-periphery/build/WETH9.json");
 
 async function deployTokenFixture() {
     const erc20ContractFactory = await ethers.getContractFactory("ERC20Mock");
-    const erc20Token = await erc20ContractFactory.deploy("MockERC20", "MOCK");
+    const erc20Token = await erc20ContractFactory.deploy("MockERC20", "MOCK", 18);
     await erc20Token.waitForDeployment();
     return erc20Token;
 }
 
 async function deployToken2Fixture() {
     const erc20ContractFactory = await ethers.getContractFactory("ERC20Mock");
-    const erc20Token = await erc20ContractFactory.deploy("Mock2ERC20", "MOCK2");
+    const erc20Token = await erc20ContractFactory.deploy("Mock2ERC20", "MOCK2", 18);
     await erc20Token.waitForDeployment();
     return erc20Token;
 }

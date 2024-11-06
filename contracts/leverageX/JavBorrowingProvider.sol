@@ -5,6 +5,7 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../libraries/leverageX/PriceAggregatorUtils.sol";
+import "../libraries/leverageX/CollateralUtils.sol";
 import "../base/BaseUpgradable.sol";
 
 import "../interfaces/leverageX/IJavBorrowingProvider.sol";
@@ -35,6 +36,11 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         uint256 amount;
     }
 
+    struct TokenPrecisionInfo {
+        uint128 precision;
+        uint128 precisionDelta;
+    }
+
     // Parameters (constant)
     uint256 constant PRECISION_18 = 1e18;
 
@@ -46,6 +52,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     uint256 public sellFee; // * 1e4
 
     TokenInfo[] public tokens;
+    mapping(address => TokenPrecisionInfo) public tokensPrecision;
 
     // Price state
     uint256 public rewardsAmountUsd; // PRECISION_18
@@ -61,6 +68,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     event BuyLLP(
         address indexed user,
         address tokenIn,
+        uint256 tokenInID,
         address tokenOut,
         uint256 amountIn,
         uint256 amountOut
@@ -69,6 +77,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         address indexed user,
         address tokenIn,
         address tokenOut,
+        uint256 tokenOutID,
         uint256 amountIn,
         uint256 amountOut
     );
@@ -108,6 +117,13 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         buyFee = _buyFee;
         sellFee = _sellFee;
 
+        CollateralUtils.CollateralConfig memory collateralConfig = CollateralUtils
+            .getCollateralConfig(_llpToken);
+        tokensPrecision[_llpToken] = TokenPrecisionInfo({
+            precision: collateralConfig.precision,
+            precisionDelta: collateralConfig.precisionDelta
+        });
+
         __Base_init();
         __ReentrancyGuard_init();
 
@@ -117,6 +133,12 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     }
 
     function addToken(TokenInfo memory tokenInfo) public onlyAdmin {
+        CollateralUtils.CollateralConfig memory collateralConfig = CollateralUtils
+            .getCollateralConfig(tokenInfo.asset);
+        tokensPrecision[tokenInfo.asset] = TokenPrecisionInfo({
+            precision: collateralConfig.precision,
+            precisionDelta: collateralConfig.precisionDelta
+        });
         tokens.push(tokenInfo);
 
         emit AddToken(tokenInfo);
@@ -127,10 +149,18 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         TokenInfo memory _tokenInfo
     ) external onlyAdmin validToken(_tokenId) {
         TokenInfo storage _token = tokens[_tokenId];
+        CollateralUtils.CollateralConfig memory collateralConfig = CollateralUtils
+            .getCollateralConfig(_tokenInfo.asset);
+
         _token.asset = _tokenInfo.asset;
         _token.priceFeed = _tokenInfo.priceFeed;
         _token.targetWeightage = _tokenInfo.targetWeightage;
         _token.isActive = _tokenInfo.isActive;
+
+        tokensPrecision[_tokenInfo.asset] = TokenPrecisionInfo({
+            precision: collateralConfig.precision,
+            precisionDelta: collateralConfig.precisionDelta
+        });
 
         emit UpdateToken(
             _tokenId,
@@ -165,7 +195,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         IERC20(_token.asset).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
 
-        emit BuyLLP(msg.sender, _token.asset, llpToken, _amount, _llpAmount);
+        emit BuyLLP(msg.sender, _token.asset, _inputToken, llpToken, _amount, _llpAmount);
     }
 
     /**
@@ -207,7 +237,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     }
 
     function rebalanceTokens() external {
-        _rebalance();
+        //        _rebalance();
     }
 
     function updatePnlHandler(address newValue) external onlyOwner {
@@ -225,7 +255,9 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         address sender = _msgSender();
         IERC20(_token.asset).safeTransferFrom(sender, address(this), assets);
 
-        uint256 usdAmount = (assets * _getUsdPrice(_token.priceFeed)) / 1e18;
+        uint256 usdAmount = (assets *
+            _getUsdPrice(_token.priceFeed) *
+            tokensPrecision[_token.asset].precisionDelta) / PRECISION_18;
         rewardsAmountUsd += usdAmount;
 
         accRewardsPerToken[_collateralIndex] +=
@@ -314,30 +346,34 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     }
 
     function _buyLLP(uint256 _tokenId, TokenInfo memory _inputToken, uint256 _amount) private {
-        uint256 _inputAmountUsd = (_amount * _getUsdPrice(_inputToken.priceFeed)) / 1e18;
+        uint256 _inputAmountUsd = (_amount *
+            _getUsdPrice(_inputToken.priceFeed) *
+            tokensPrecision[_inputToken.asset].precisionDelta) / PRECISION_18;
         // calculate llp amount
         uint256 _fee = (_inputAmountUsd * buyFee) / 1e4;
-        uint256 _llpAmount = ((_inputAmountUsd - _fee) * 1e18) / _llpPrice();
+        uint256 _llpAmount = ((_inputAmountUsd - _fee) * PRECISION_18) / _llpPrice();
         tokenAmount[_tokenId] += _amount;
 
         IERC20(_inputToken.asset).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
 
-        emit BuyLLP(msg.sender, _inputToken.asset, llpToken, _amount, _llpAmount);
+        emit BuyLLP(msg.sender, _inputToken.asset, _tokenId, llpToken, _amount, _llpAmount);
     }
 
     function _sellLLP(uint256 _tokenId, TokenInfo memory _outputToken, uint256 _amount) private {
-        uint256 _inputAmountUsd = (_amount * _llpPrice()) / 1e18;
+        uint256 _inputAmountUsd = (_amount *
+            _llpPrice() *
+            tokensPrecision[llpToken].precisionDelta) / PRECISION_18;
         // calculate tokens amount
         uint256 _fee = (_inputAmountUsd * sellFee) / 1e4;
         uint256 _tokenUsdPrice = _getUsdPrice(_outputToken.priceFeed);
-        uint256 _tokensAmount = ((_inputAmountUsd - _fee) * 1e18) / _tokenUsdPrice;
+        uint256 _tokensAmount = ((_inputAmountUsd - _fee) * PRECISION_18) / _tokenUsdPrice;
         tokenAmount[_tokenId] -= _tokensAmount;
 
         IERC20Extended(llpToken).burnFrom(msg.sender, _amount);
         IERC20(_outputToken.asset).safeTransfer(msg.sender, _tokensAmount);
 
-        emit SellLLP(msg.sender, llpToken, _outputToken.asset, _amount, _tokensAmount);
+        emit SellLLP(msg.sender, llpToken, _outputToken.asset, _tokenId, _amount, _tokensAmount);
     }
 
     function _getUsdPrice(bytes32 _priceFeed) private view returns (uint256) {
@@ -360,169 +396,173 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         uint256 _tokenId,
         TokenInfo memory _token
     ) private view returns (uint256) {
-        return (tokenAmount[_tokenId] * _getUsdPrice(_token.priceFeed)) / 1e18;
+        return
+            (tokenAmount[_tokenId] *
+                _getUsdPrice(_token.priceFeed) *
+                tokensPrecision[_token.asset].precisionDelta) / PRECISION_18;
     }
 
     function _llpPrice() private view returns (uint256) {
         return
-            ((_calculateTotalTvlUsd() + rewardsAmountUsd) * 1e18) / IERC20(llpToken).totalSupply();
+            ((_calculateTotalTvlUsd() + rewardsAmountUsd) * PRECISION_18) /
+            (IERC20(llpToken).totalSupply() * tokensPrecision[llpToken].precisionDelta);
     }
 
-    function _rebalance() private {
-        uint256 _totalTvl = _calculateTotalTvlUsd();
-        RebalanceInfo[] memory rebalanceValues = new RebalanceInfo[](tokens.length);
-        SwapTokenInfo[] memory swapValues = new SwapTokenInfo[](tokens.length);
-
-        // Calculate target and current values for each token
-        for (uint8 i = 0; i < tokens.length; ++i) {
-            if (tokens[i].isActive) {
-                uint256 targetValue = (_totalTvl * tokens[i].targetWeightage) / 100;
-                uint256 currentValue = _calculateTvlUsd(i, tokens[i]);
-                bool isSell = currentValue >= targetValue ? true : false;
-                uint256 excessValue = isSell
-                    ? currentValue - targetValue
-                    : targetValue - currentValue;
-                rebalanceValues[i] = RebalanceInfo({
-                    tokenId: i,
-                    targetValue: targetValue,
-                    currentValue: currentValue,
-                    excessValue: excessValue > (_totalTvl * 1) / 100 ? excessValue : 0,
-                    isSell: isSell
-                });
-            }
-        }
-
-        // Rebalance tokens by swapping excess tokens for deficit tokens
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (
-                tokens[i].isActive &&
-                rebalanceValues[i].excessValue > 0 &&
-                rebalanceValues[i].isSell
-            ) {
-                (swapValues, rebalanceValues) = _calculateSwapAmount(
-                    i,
-                    swapValues,
-                    rebalanceValues
-                );
-            }
-        }
-        // Swap tokens
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokens[i].isActive && swapValues[i].amount > 0) {
-                _swapToken(
-                    swapValues[i].tokenIn,
-                    swapValues[i].tokenOut,
-                    swapValues[i].amount,
-                    3000
-                );
-            }
-        }
-    }
-
-    function _calculateSwapAmount(
-        uint256 _tokenId,
-        SwapTokenInfo[] memory swapValues,
-        RebalanceInfo[] memory rebalanceValues
-    ) private view returns (SwapTokenInfo[] memory, RebalanceInfo[] memory) {
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (
-                tokens[i].isActive &&
-                rebalanceValues[i].excessValue > 0 &&
-                i != _tokenId &&
-                rebalanceValues[_tokenId].isSell != rebalanceValues[i].isSell
-            ) {
-                RebalanceInfo memory rebalanceValue = rebalanceValues[i];
-                uint256 excessValue;
-                if (rebalanceValue.excessValue >= rebalanceValues[_tokenId].excessValue) {
-                    excessValue = rebalanceValues[_tokenId].excessValue;
-
-                    rebalanceValues[_tokenId].excessValue = 0;
-                    rebalanceValues[i].excessValue -= excessValue;
-                } else {
-                    excessValue = rebalanceValue.excessValue;
-
-                    rebalanceValues[i].excessValue = 0;
-                    rebalanceValues[_tokenId].excessValue -= excessValue;
-                }
-
-                swapValues = _updateSwapValues(
-                    swapValues,
-                    tokens[_tokenId].asset,
-                    tokens[i].asset,
-                    (excessValue * 1e18) / _getUsdPrice(tokens[_tokenId].priceFeed)
-                );
-
-                if (rebalanceValues[_tokenId].excessValue == 0) {
-                    break;
-                }
-            }
-        }
-        return (swapValues, rebalanceValues);
-    }
-
-    function _updateSwapValues(
-        SwapTokenInfo[] memory swapValues,
-        address _tokenIn,
-        address _tokenOut,
-        uint256 _amount
-    ) private pure returns (SwapTokenInfo[] memory) {
-        bool isPairFound = false;
-
-        for (uint256 i = 0; i < swapValues.length; i++) {
-            if (swapValues[i].tokenIn == _tokenIn && swapValues[i].tokenOut == _tokenOut) {
-                swapValues[i].amount += _amount;
-                isPairFound = true;
-                break;
-            }
-        }
-
-        if (!isPairFound) {
-            for (uint256 i = 0; i < swapValues.length; i++) {
-                if (swapValues[i].tokenIn == address(0)) {
-                    swapValues[i].tokenIn = _tokenIn;
-                    swapValues[i].tokenOut = _tokenOut;
-                    swapValues[i].amount = _amount;
-                    break;
-                }
-            }
-        }
-
-        return swapValues;
-    }
-
-    function _swapToken(
-        address _tokenIn,
-        address _tokenOut,
-        uint256 _amount,
-        uint256 _poolFee
-    ) private {
-        IERC20(_tokenIn).safeDecreaseAllowance(address(swapRouter), 0);
-        IERC20(_tokenIn).safeIncreaseAllowance(address(swapRouter), _amount);
-
-        uint256 _tokenIdIn = _getTokenIdByAddress(_tokenIn);
-        uint256 _tokenIdOut = _getTokenIdByAddress(_tokenOut);
-
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
-            tokenIn: _tokenIn,
-            tokenOut: _tokenOut,
-            fee: uint24(_poolFee),
-            recipient: address(this),
-            amountIn: _amount,
-            amountOutMinimum: 0,
-            sqrtPriceLimitX96: 0
-        });
-        uint256 _amountOut = swapRouter.exactInputSingle(params);
-
-        tokenAmount[_tokenIdIn] -= _amount;
-        tokenAmount[_tokenIdOut] -= _amountOut;
-    }
-
-    function _getTokenIdByAddress(address _tokenAddress) private view returns (uint256) {
-        for (uint8 i = 0; i < tokens.length; ++i) {
-            TokenInfo memory _token = tokens[i];
-            if (_token.isActive && _token.asset == _tokenAddress) {
-                return i;
-            }
-        }
-    }
+    //    function _rebalance() private {
+    //        uint256 _totalTvl = _calculateTotalTvlUsd();
+    //        RebalanceInfo[] memory rebalanceValues = new RebalanceInfo[](tokens.length);
+    //        SwapTokenInfo[] memory swapValues = new SwapTokenInfo[](tokens.length);
+    //
+    //        // Calculate target and current values for each token
+    //        for (uint8 i = 0; i < tokens.length; ++i) {
+    //            if (tokens[i].isActive) {
+    //                uint256 targetValue = (_totalTvl * tokens[i].targetWeightage) / 100;
+    //                uint256 currentValue = _calculateTvlUsd(i, tokens[i]);
+    //                bool isSell = currentValue >= targetValue ? true : false;
+    //                uint256 excessValue = isSell
+    //                    ? currentValue - targetValue
+    //                    : targetValue - currentValue;
+    //                rebalanceValues[i] = RebalanceInfo({
+    //                    tokenId: i,
+    //                    targetValue: targetValue,
+    //                    currentValue: currentValue,
+    //                    excessValue: excessValue > (_totalTvl * 1) / 100 ? excessValue : 0,
+    //                    isSell: isSell
+    //                });
+    //            }
+    //        }
+    //
+    //        // Rebalance tokens by swapping excess tokens for deficit tokens
+    //        for (uint256 i = 0; i < tokens.length; i++) {
+    //            if (
+    //                tokens[i].isActive &&
+    //                rebalanceValues[i].excessValue > 0 &&
+    //                rebalanceValues[i].isSell
+    //            ) {
+    //                (swapValues, rebalanceValues) = _calculateSwapAmount(
+    //                    i,
+    //                    swapValues,
+    //                    rebalanceValues
+    //                );
+    //            }
+    //        }
+    //        // Swap tokens
+    //        for (uint256 i = 0; i < tokens.length; i++) {
+    //            if (tokens[i].isActive && swapValues[i].amount > 0) {
+    //                _swapToken(
+    //                    swapValues[i].tokenIn,
+    //                    swapValues[i].tokenOut,
+    //                    swapValues[i].amount,
+    //                    3000
+    //                );
+    //            }
+    //        }
+    //    }
+    //
+    //    function _calculateSwapAmount(
+    //        uint256 _tokenId,
+    //        SwapTokenInfo[] memory swapValues,
+    //        RebalanceInfo[] memory rebalanceValues
+    //    ) private view returns (SwapTokenInfo[] memory, RebalanceInfo[] memory) {
+    //        for (uint256 i = 0; i < tokens.length; i++) {
+    //            if (
+    //                tokens[i].isActive &&
+    //                rebalanceValues[i].excessValue > 0 &&
+    //                i != _tokenId &&
+    //                rebalanceValues[_tokenId].isSell != rebalanceValues[i].isSell
+    //            ) {
+    //                RebalanceInfo memory rebalanceValue = rebalanceValues[i];
+    //                uint256 excessValue;
+    //                if (rebalanceValue.excessValue >= rebalanceValues[_tokenId].excessValue) {
+    //                    excessValue = rebalanceValues[_tokenId].excessValue;
+    //
+    //                    rebalanceValues[_tokenId].excessValue = 0;
+    //                    rebalanceValues[i].excessValue -= excessValue;
+    //                } else {
+    //                    excessValue = rebalanceValue.excessValue;
+    //
+    //                    rebalanceValues[i].excessValue = 0;
+    //                    rebalanceValues[_tokenId].excessValue -= excessValue;
+    //                }
+    //
+    //                swapValues = _updateSwapValues(
+    //                    swapValues,
+    //                    tokens[_tokenId].asset,
+    //                    tokens[i].asset,
+    //                    (excessValue * 1e18) / _getUsdPrice(tokens[_tokenId].priceFeed)
+    //                );
+    //
+    //                if (rebalanceValues[_tokenId].excessValue == 0) {
+    //                    break;
+    //                }
+    //            }
+    //        }
+    //        return (swapValues, rebalanceValues);
+    //    }
+    //
+    //    function _updateSwapValues(
+    //        SwapTokenInfo[] memory swapValues,
+    //        address _tokenIn,
+    //        address _tokenOut,
+    //        uint256 _amount
+    //    ) private pure returns (SwapTokenInfo[] memory) {
+    //        bool isPairFound = false;
+    //
+    //        for (uint256 i = 0; i < swapValues.length; i++) {
+    //            if (swapValues[i].tokenIn == _tokenIn && swapValues[i].tokenOut == _tokenOut) {
+    //                swapValues[i].amount += _amount;
+    //                isPairFound = true;
+    //                break;
+    //            }
+    //        }
+    //
+    //        if (!isPairFound) {
+    //            for (uint256 i = 0; i < swapValues.length; i++) {
+    //                if (swapValues[i].tokenIn == address(0)) {
+    //                    swapValues[i].tokenIn = _tokenIn;
+    //                    swapValues[i].tokenOut = _tokenOut;
+    //                    swapValues[i].amount = _amount;
+    //                    break;
+    //                }
+    //            }
+    //        }
+    //
+    //        return swapValues;
+    //    }
+    //
+    //    function _swapToken(
+    //        address _tokenIn,
+    //        address _tokenOut,
+    //        uint256 _amount,
+    //        uint256 _poolFee
+    //    ) private {
+    //        IERC20(_tokenIn).safeDecreaseAllowance(address(swapRouter), 0);
+    //        IERC20(_tokenIn).safeIncreaseAllowance(address(swapRouter), _amount);
+    //
+    //        uint256 _tokenIdIn = _getTokenIdByAddress(_tokenIn);
+    //        uint256 _tokenIdOut = _getTokenIdByAddress(_tokenOut);
+    //
+    //        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+    //            tokenIn: _tokenIn,
+    //            tokenOut: _tokenOut,
+    //            fee: uint24(_poolFee),
+    //            recipient: address(this),
+    //            amountIn: _amount,
+    //            amountOutMinimum: 0,
+    //            sqrtPriceLimitX96: 0
+    //        });
+    //        uint256 _amountOut = swapRouter.exactInputSingle(params);
+    //
+    //        tokenAmount[_tokenIdIn] -= _amount;
+    //        tokenAmount[_tokenIdOut] -= _amountOut;
+    //    }
+    //
+    //    function _getTokenIdByAddress(address _tokenAddress) private view returns (uint256) {
+    //        for (uint8 i = 0; i < tokens.length; ++i) {
+    //            TokenInfo memory _token = tokens[i];
+    //            if (_token.isActive && _token.asset == _tokenAddress) {
+    //                return i;
+    //            }
+    //        }
+    //    }
 }
