@@ -12,6 +12,16 @@ module.exports = {
     solidity: {
         compilers: [
             {
+                version: "0.8.26",
+                settings: {
+                    optimizer: {
+                        enabled: true,
+                        runs: 200,
+                    },
+                    viaIR: true,
+                },
+            },
+            {
                 version: "0.8.24",
                 settings: {
                     optimizer: {
@@ -19,15 +29,7 @@ module.exports = {
                         runs: 200,
                     },
                 },
-            },
-            {
-                version: "0.8.20",
-                settings: {
-                    optimizer: {
-                        enabled: true,
-                        runs: 200,
-                    },
-                },
+                viaIR: true,
             },
         ],
     },
@@ -52,12 +54,18 @@ module.exports = {
             url: "https://sepolia.base.org",
             accounts: [process.env.OWNER_KEY],
         },
+        base: {
+            chainId: 8453,
+            url: "https://base-mainnet.public.blastapi.io",
+            accounts: [process.env.OWNER_KEY],
+        },
     },
     etherscan: {
         apiKey: {
             testnet: "abc",
             mainnet: "abc",
             sepolia_base: "abc",
+            base: "abc",
         },
         customChains: [
             {
@@ -88,6 +96,14 @@ module.exports = {
                     apiURL: "https://api-sepolia.basescan.org/api",
                     // browserURL: "https://base-sepolia.blockscout.com/",
                     browserURL: "https://sepolia.basescan.org/",
+                },
+            },
+            {
+                network: "base",
+                chainId: 8453,
+                urls: {
+                    apiURL: "https://api.basescan.org/api",
+                    browserURL: "https://basescan.org/",
                 },
             },
         ],
