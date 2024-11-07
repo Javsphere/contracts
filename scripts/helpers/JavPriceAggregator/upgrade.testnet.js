@@ -1,5 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0x69732876393acD817fA8F7330837cB7C4D5D9f7E";
+const PROXY = "0x909Bd08A97fe097000C76C0cbd08568fbA311443";
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -12,9 +12,6 @@ async function main() {
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",
         redeployImplementation: "always",
-        txOverrides: {
-            gasLimit: ethers.parseUnits("0.03", "gwei"),
-        },
     });
     await impl.waitForDeployment();
 

@@ -367,7 +367,9 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         // calculate tokens amount
         uint256 _fee = (_inputAmountUsd * sellFee) / 1e4;
         uint256 _tokenUsdPrice = _getUsdPrice(_outputToken.priceFeed);
-        uint256 _tokensAmount = ((_inputAmountUsd - _fee) * PRECISION_18) / _tokenUsdPrice;
+        uint256 _tokensAmount = ((_inputAmountUsd - _fee) * PRECISION_18) /
+            _tokenUsdPrice /
+            tokensPrecision[_outputToken.asset].precisionDelta;
         tokenAmount[_tokenId] -= _tokensAmount;
 
         IERC20Extended(llpToken).burnFrom(msg.sender, _amount);

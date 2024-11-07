@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.24;
 
 interface IJavPriceAggregator {
     struct Price {
@@ -31,4 +31,6 @@ interface IJavPriceAggregator {
     /// @dev Reverts if the transferred fee is not sufficient or the updateData is invalid.
     /// @param updateData Array of price update data.
     function updatePriceFeeds(bytes[] calldata updateData) external payable;
+
+    error StalePrice();
 }
