@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -28,6 +28,7 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
     mapping(bytes32 => IJavPriceAggregator.Price) private _latestPriceInfo;
 
     uint256 public priceUpdateFee;
+    uint256 public updatePriceLifetime;
 
     /* ========== EVENTS ========== */
     event AddAllowedSigner(address indexed _address);
@@ -35,6 +36,7 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
     event SetPriceUpdateFee(uint256 indexed _priceUpdateFee);
     event UpdatePriceFeed(bytes32 indexed id, int64 price, uint64 publishTime);
     event ClaimFee(address indexed to, uint256 amount);
+    event SetUpdatePriceLifetime(uint256 indexed lifetime);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -70,6 +72,12 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
         priceUpdateFee = _priceUpdateFee;
 
         emit SetPriceUpdateFee(_priceUpdateFee);
+    }
+
+    function setUpdatePriceLifetime(uint256 _lifetime) external onlyAdmin {
+        updatePriceLifetime = _lifetime;
+
+        emit SetUpdatePriceLifetime(_lifetime);
     }
 
     /**
@@ -109,6 +117,7 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
             require(_allowedSigners.contains(signer), "JavPriceAggregator: Invalid signature");
 
             UpdatePriceInfo memory _priceInfo = abi.decode(encodedData, (UpdatePriceInfo));
+            require(_priceInfo.publishTime >= block.timestamp - updatePriceLifetime, StalePrice());
             _latestPriceInfo[_priceInfo.id] = IJavPriceAggregator.Price({
                 price: _priceInfo.price,
                 conf: _priceInfo.conf,
