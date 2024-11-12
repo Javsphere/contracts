@@ -3,7 +3,7 @@ const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 const { ADMIN_ERROR, MANAGER_ERROR } = require("../common/constanst");
-const {time} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const { time } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 describe("JavPriceAggregator contract", () => {
     let hhJavPriceAggregator;
@@ -119,9 +119,9 @@ describe("JavPriceAggregator contract", () => {
         });
 
         it("Should revert when setUpdatePriceLifetime", async () => {
-            await expect(hhJavPriceAggregator.connect(bot).setUpdatePriceLifetime(1)).to.be.revertedWith(
-                ADMIN_ERROR,
-            );
+            await expect(
+                hhJavPriceAggregator.connect(bot).setUpdatePriceLifetime(1),
+            ).to.be.revertedWith(ADMIN_ERROR);
         });
 
         it("Should setUpdatePriceLifetime", async () => {
@@ -130,7 +130,6 @@ describe("JavPriceAggregator contract", () => {
 
             await expect(await hhJavPriceAggregator.updatePriceLifetime()).to.equal(lifetime);
         });
-
 
         it("Should revert when updatePriceFeeds - invalid data length", async () => {
             const data = ethers.hexlify(ethers.toUtf8Bytes("Example data"));
@@ -164,7 +163,7 @@ describe("JavPriceAggregator contract", () => {
         });
 
         it("Should updatePriceFeeds", async () => {
-            const currentTime =  await time.latest();
+            const currentTime = await time.latest();
             const id = "0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688";
             const price = 1000;
             const conf = 500;
@@ -190,7 +189,7 @@ describe("JavPriceAggregator contract", () => {
         });
 
         it("Should revert when updatePriceFeeds - StalePrice", async () => {
-            const currentTime =  await time.latest();
+            const currentTime = await time.latest();
             const id = "0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688";
             const price = 1000;
             const conf = 500;

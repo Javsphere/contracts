@@ -74,6 +74,8 @@ contract JavFreezer is
     uint256 public infinityPassPercent;
     address public infinityPass;
     address public migratorAddress;
+    uint256 public averageBlockTime;
+    mapping(uint256 => mapping(address => mapping(uint256 => bool))) public depositEnded;
 
     /* ========== EVENTS ========== */
     event SetPoolFee(uint256 _pid, PoolFee _poolFee);
@@ -175,6 +177,12 @@ contract JavFreezer is
         rewardsDistributorAddress = _address;
 
         emit SetRewardsDistributorAddress(_address);
+    }
+
+    function setAverageBlockTime(uint256 _blockTime) external onlyAdmin {
+        averageBlockTime = _blockTime;
+
+        emit SetAverageBlockTime(_blockTime);
     }
 
     function setPoolInfo(
@@ -485,7 +493,8 @@ contract JavFreezer is
         uint256 _depositId,
         address _user
     ) external view returns (uint256) {
-        return _getPendingRewards(_pid, _depositId, _user);
+        (uint256 rewards, ) = _getPendingRewards(_pid, _depositId, _user);
+        return rewards;
     }
 
     /**
@@ -500,10 +509,12 @@ contract JavFreezer is
         address _user
     ) external view returns (uint256) {
         uint256 rewards;
+        uint256 _pendingRewards;
         for (uint256 _depositId = 0; _depositId < userInfo[_user][_pid].depositId; ++_depositId) {
             UserDeposit memory depositDetails = userDeposits[_user][_pid][_depositId];
             if (depositDetails.stakePeriod == _lockId) {
-                rewards += _getPendingRewards(_pid, _depositId, _user);
+                (_pendingRewards, ) = _getPendingRewards(_pid, _depositId, _user);
+                rewards += _pendingRewards;
             }
         }
         return rewards;
@@ -515,8 +526,10 @@ contract JavFreezer is
      */
     function pendingRewardTotal(uint256 _pid, address _user) external view returns (uint256) {
         uint256 rewards;
+        uint256 _pendingRewards;
         for (uint256 _depositId = 0; _depositId < userInfo[_user][_pid].depositId; ++_depositId) {
-            rewards += _getPendingRewards(_pid, _depositId, _user);
+            (_pendingRewards, ) = _getPendingRewards(_pid, _depositId, _user);
+            rewards += _pendingRewards;
         }
         return rewards;
     }
@@ -656,7 +669,11 @@ contract JavFreezer is
         ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
         PoolFee memory fee = poolFee[_pid];
 
-        uint256 pending = _getPendingRewards(_pid, _depositId, _user);
+        (uint256 pending, bool isEnded) = _getPendingRewards(_pid, _depositId, _user);
+
+        if (isEnded) {
+            depositEnded[_pid][_user][_depositId] = isEnded;
+        }
 
         if (pending > 0) {
             uint256 burnAmount = (pending * fee.claimFee) / 1e4;
@@ -680,26 +697,31 @@ contract JavFreezer is
         uint256 _pid,
         uint256 _depositId,
         address _user
-    ) private view returns (uint256) {
+    ) private view returns (uint256, bool) {
         UserDeposit memory depositDetails = userDeposits[_user][_pid][_depositId];
         PoolInfo memory pool = poolInfo[_pid];
         ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
+        bool isEnded = false;
         if (
             depositDetails.is_finished ||
             block.timestamp <= depositDetails.depositTimestamp ||
-            block.number < pool.lastRewardBlock
+            block.number < pool.lastRewardBlock ||
+            depositEnded[_pid][_user][_depositId]
         ) {
-            return 0;
+            return (0, isEnded);
+        }
+
+        uint256 effectiveBlock = block.number;
+        if (block.timestamp > depositDetails.withdrawalTimestamp) {
+            // Stop accumulating rewards after withdrawal timestamp
+            effectiveBlock = _getBlockNumberAtTimestamp(depositDetails.withdrawalTimestamp);
+            isEnded = true;
         }
 
         uint256 _accRewardPerShare = pool.accRewardPerShare;
 
-        if (
-            block.number > pool.lastRewardBlock &&
-            pool.totalShares != 0 &&
-            block.timestamp <= depositDetails.withdrawalTimestamp
-        ) {
-            uint256 _multiplier = block.number - pool.lastRewardBlock;
+        if (effectiveBlock > pool.lastRewardBlock && pool.totalShares != 0) {
+            uint256 _multiplier = effectiveBlock - pool.lastRewardBlock;
             uint256 _reward = (_multiplier * getRewardPerBlock());
             _accRewardPerShare = _accRewardPerShare + ((_reward * 1e18) / pool.totalShares);
         }
@@ -718,12 +740,16 @@ contract JavFreezer is
             ? ((blockRewards + productsRewards) * infinityPassPercent) / 100
             : 0;
 
-        return blockRewards + productsRewards + nftRewards;
+        return (blockRewards + productsRewards + nftRewards, isEnded);
     }
 
     function _burnToken(address _token, uint256 _amount) private {
         IERC20Extended(_token).burn(_amount);
 
         emit Burn(_token, _amount);
+    }
+
+    function _getBlockNumberAtTimestamp(uint256 timestamp) private view returns (uint256) {
+        return block.number - ((block.timestamp - timestamp) / averageBlockTime);
     }
 }
