@@ -1,10 +1,8 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const {
-    deployTokenFixture,
-} = require("../common/mocks");
-const { ADMIN_ERROR, MANAGER_ERROR, MAX_UINT256} = require("../common/constanst");
+const { deployTokenFixture } = require("../common/mocks");
+const { ADMIN_ERROR, MANAGER_ERROR, MAX_UINT256 } = require("../common/constanst");
 describe("JavBorrowingProvider contract", () => {
     let hhJavBorrowingProvider;
     let owner;
@@ -36,17 +34,11 @@ describe("JavBorrowingProvider contract", () => {
     }
 
     async function deployLLPToken() {
-        const llpTokenFactory = await ethers.getContractFactory(
-            "LLPToken",
-        );
+        const llpTokenFactory = await ethers.getContractFactory("LLPToken");
         [owner, ...addrs] = await ethers.getSigners();
-        const llpToken = await upgrades.deployProxy(
-            llpTokenFactory,
-            [],
-            {
-                initializer: "initialize",
-            },
-        );
+        const llpToken = await upgrades.deployProxy(llpTokenFactory, [], {
+            initializer: "initialize",
+        });
         await llpToken.waitForDeployment();
         return llpToken;
     }
@@ -88,14 +80,13 @@ describe("JavBorrowingProvider contract", () => {
                         priceFeed: token2PriceId,
                         targetWeightage: 20,
                         isActive: true,
-                    }
+                    },
                 ], // _tokens
             ],
             {
                 initializer: "initialize",
             },
         );
-
     });
 
     describe("Deployment", () => {
@@ -200,7 +191,7 @@ describe("JavBorrowingProvider contract", () => {
             const amount1 = ethers.parseEther("1");
             await erc20Token.mint(owner.address, amount1);
 
-            await hhJavBorrowingProvider.initialBuy(0, amount1,amount1);
+            await hhJavBorrowingProvider.initialBuy(0, amount1, amount1);
 
             await expect(await erc20Token.balanceOf(owner.address)).to.be.equal(0);
             await expect(await llpToken.balanceOf(owner.address)).to.be.equal(amount1);
@@ -208,7 +199,6 @@ describe("JavBorrowingProvider contract", () => {
 
             await expect(await hhJavBorrowingProvider.llpPrice()).to.equal(ethers.parseEther("1"));
         });
-
 
         it("Should buyLLP", async () => {
             const amount = ethers.parseUnits("1", 6);
@@ -219,7 +209,6 @@ describe("JavBorrowingProvider contract", () => {
             await expect(await erc20Token2.balanceOf(addr2.address)).to.be.equal(0);
             await expect(await llpToken.balanceOf(addr2.address)).to.be.equal(amount * BigInt(2));
             await expect(await hhJavBorrowingProvider.tokenAmount(1)).to.be.equal(amount);
-
         });
 
         // it("Should rebalance", async () => {

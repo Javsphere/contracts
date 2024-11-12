@@ -1,13 +1,12 @@
 const { ethers, upgrades } = require("hardhat");
-const PROXY = "0x909Bd08A97fe097000C76C0cbd08568fbA311443";
+const ContractName = "JavBorrowingProvider";
+const PROXY = "0xFd916d70eB2d0E0E1C17A6a68a7FBEdE3106b852";
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory(
-        "contracts/helpers/JavPriceAggregator.sol:JavPriceAggregator",
-    );
+    const Contract = await ethers.getContractFactory(ContractName);
 
     const impl = await upgrades.upgradeProxy(PROXY, Contract, {
         kind: "uups",
@@ -32,7 +31,7 @@ async function main() {
     }
 
     console.log(`New implementation Address: ${newImplementationAddress}`);
-    console.log(`JavPriceAggregator contract upgraded`);
+    console.log(`${ContractName} contract upgraded`);
 }
 
 main()

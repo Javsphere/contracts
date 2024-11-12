@@ -56,7 +56,7 @@ module.exports = {
         },
         base: {
             chainId: 8453,
-            url: "https://base-mainnet.public.blastapi.io",
+            url: "https://mainnet.base.org",
             accounts: [process.env.OWNER_KEY],
         },
     },
@@ -92,10 +92,10 @@ module.exports = {
                 network: "sepolia_base",
                 chainId: 84532,
                 urls: {
-                    // apiURL: "https://base-sepolia.blockscout.com/api",
-                    apiURL: "https://api-sepolia.basescan.org/api",
-                    // browserURL: "https://base-sepolia.blockscout.com/",
-                    browserURL: "https://sepolia.basescan.org/",
+                    apiURL: "https://base-sepolia.blockscout.com/api",
+                    // apiURL: "https://api-sepolia.basescan.org/api",
+                    browserURL: "https://base-sepolia.blockscout.com/",
+                    // browserURL: "https://sepolia.basescan.org/",
                 },
             },
             {
@@ -110,10 +110,10 @@ module.exports = {
     },
     contractSizer: {
         alphaSort: true,
-        runOnCompile: true,
+        runOnCompile: false,
         disambiguatePaths: false,
     },
     gasReporter: {
-        enabled: true,
+        enabled: false,
     },
 };

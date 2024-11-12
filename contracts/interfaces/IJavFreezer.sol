@@ -103,6 +103,7 @@ interface IJavFreezer is IGeneralErrors {
     event SetInfinityPass(address indexed _address);
     event SetMigratorAddress(address indexed _address);
     event BurnTokens(uint256 indexed pid, address indexed holder, uint256 lockId, uint256 amount);
+    event SetAverageBlockTime(uint256 indexed blockTime);
 
     error WrongPool();
     error WrongLockPeriod();
