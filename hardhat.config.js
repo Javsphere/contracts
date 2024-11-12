@@ -54,12 +54,18 @@ module.exports = {
             url: "https://sepolia.base.org",
             accounts: [process.env.OWNER_KEY],
         },
+        base: {
+            chainId: 8453,
+            url: "https://mainnet.base.org",
+            accounts: [process.env.OWNER_KEY],
+        },
     },
     etherscan: {
         apiKey: {
             testnet: "abc",
             mainnet: "abc",
-            sepolia_base: "A458CBUKBI4APAMMSCDR5DHYU2ZE5CGYD8",
+            sepolia_base: "abc",
+            base: "abc",
         },
         customChains: [
             {
@@ -86,10 +92,18 @@ module.exports = {
                 network: "sepolia_base",
                 chainId: 84532,
                 urls: {
-                    // apiURL: "https://base-sepolia.blockscout.com/api",
-                    apiURL: "https://api-sepolia.basescan.org/api",
-                    // browserURL: "https://base-sepolia.blockscout.com/",
-                    browserURL: "https://sepolia.basescan.org/",
+                    apiURL: "https://base-sepolia.blockscout.com/api",
+                    // apiURL: "https://api-sepolia.basescan.org/api",
+                    browserURL: "https://base-sepolia.blockscout.com/",
+                    // browserURL: "https://sepolia.basescan.org/",
+                },
+            },
+            {
+                network: "base",
+                chainId: 8453,
+                urls: {
+                    apiURL: "https://api.basescan.org/api",
+                    browserURL: "https://basescan.org/",
                 },
             },
         ],

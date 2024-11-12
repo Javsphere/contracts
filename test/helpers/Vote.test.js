@@ -271,7 +271,7 @@ describe("Vote contract", () => {
         });
 
         it("Should revert when execute proposal - WrongIndex", async () => {
-            const id = await hhVote.proposalIndex()
+            const id = await hhVote.proposalIndex();
             await expect(hhVote.executeProposal(id)).to.be.revertedWithCustomError(
                 hhVote,
                 "WrongIndex",
