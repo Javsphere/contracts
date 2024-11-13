@@ -5,7 +5,6 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../interfaces/leverageX/IJavMultiCollatDiamond.sol";
 import "../../interfaces/leverageX/IJavBorrowingProvider.sol";
-import "../../interfaces/IRewardsDistributor.sol";
 
 import "./StorageUtils.sol";
 import "./AddressStoreUtils.sol";
