@@ -64,8 +64,8 @@ module.exports = {
         apiKey: {
             testnet: "abc",
             mainnet: "abc",
-            sepolia_base: "abc",
-            base: "abc",
+            sepolia_base: process.env.BASE_API_KEY,
+            base: process.env.BASE_API_KEY,
         },
         customChains: [
             {
@@ -92,10 +92,10 @@ module.exports = {
                 network: "sepolia_base",
                 chainId: 84532,
                 urls: {
-                    apiURL: "https://base-sepolia.blockscout.com/api",
-                    // apiURL: "https://api-sepolia.basescan.org/api",
-                    browserURL: "https://base-sepolia.blockscout.com/",
-                    // browserURL: "https://sepolia.basescan.org/",
+                    // apiURL: "https://base-sepolia.blockscout.com/api",
+                    apiURL: "https://api-sepolia.basescan.org/api",
+                    // browserURL: "https://base-sepolia.blockscout.com/",
+                    browserURL: "https://sepolia.basescan.org/",
                 },
             },
             {
@@ -103,7 +103,9 @@ module.exports = {
                 chainId: 8453,
                 urls: {
                     apiURL: "https://api.basescan.org/api",
+                    // apiURL: "https://base.blockscout.com/api",
                     browserURL: "https://basescan.org/",
+                    // browserURL: "https://base.blockscout.com/",
                 },
             },
         ],
