@@ -45,7 +45,17 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
         PriceAggregatorUtils.updateCollateralUsdPriceFeed(_collateralIndex, _value);
     }
 
-    // Interactions
+    /// @inheritdoc IPriceAggregatorUtils
+    function setPriceLifetime(uint48 _lifetime) external onlyRole(Role.GOV) {
+        PriceAggregatorUtils.setPriceLifetime(_lifetime);
+    }
+
+    // Getters
+
+    /// @inheritdoc IPriceAggregatorUtils
+    function getPriceLifetime() external view virtual returns (uint256) {
+        return PriceAggregatorUtils.getPriceLifetime();
+    }
 
     /// @inheritdoc IPriceAggregatorUtils
     function getPrice(uint16 _pairIndex) external view virtual returns (uint256) {
@@ -59,8 +69,6 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
     ) external payable onlySelf {
         PriceAggregatorUtils.updatePrices(_priceUpdate, _user);
     }
-
-    // Getters
 
     /// @inheritdoc IPriceAggregatorUtils
     function getCollateralPriceUsd(uint8 _collateralIndex) external view returns (uint256) {
