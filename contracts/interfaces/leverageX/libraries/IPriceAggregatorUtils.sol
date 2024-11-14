@@ -32,6 +32,17 @@ interface IPriceAggregatorUtils is IPriceAggregator {
     function updateCollateralUsdPriceFeed(uint8 _collateralIndex, bytes32 _value) external;
 
     /**
+     * @dev set price lifetime
+     * @param _lifetime lifetime value in seconds
+     */
+    function setPriceLifetime(uint48 _lifetime) external;
+
+    /**
+     * @dev Return valid price lifetime in seconds
+     */
+    function getPriceLifetime() external view returns (uint256);
+
+    /**
      * @dev Requests price from oracles
      * @param _pairIndex pair index
      */
@@ -92,6 +103,7 @@ interface IPriceAggregatorUtils is IPriceAggregator {
      * @param value new value
      */
     event CollateralUsdPriceFeedUpdated(uint8 collateralIndex, bytes32 value);
+    event LifeTimeUpdated(uint48 lifetime);
 
     error WrongCollateralUsdDecimals();
 }
