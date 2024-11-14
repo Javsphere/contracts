@@ -1,9 +1,9 @@
-const {expect} = require("chai");
-const {ethers, upgrades} = require("hardhat");
+const { expect } = require("chai");
+const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const {ADMIN_ERROR, MANAGER_ERROR} = require("./common/constanst");
-const {deployTokenFixture, deployInfinityPassFixture} = require("./common/mocks");
-const {time, mine} = require("@nomicfoundation/hardhat-network-helpers");
+const { ADMIN_ERROR, MANAGER_ERROR } = require("./common/constanst");
+const { deployTokenFixture, deployInfinityPassFixture } = require("./common/mocks");
+const { time, mine } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("JavFreezer contract", () => {
     let hhJavFreezer;
@@ -129,17 +129,15 @@ describe("JavFreezer contract", () => {
         });
 
         it("Should revert when setAverageBlockTime", async () => {
-            await expect(
-                hhJavFreezer.connect(addr1).setAverageBlockTime(8),
-            ).to.be.revertedWith(ADMIN_ERROR);
+            await expect(hhJavFreezer.connect(addr1).setAverageBlockTime(8)).to.be.revertedWith(
+                ADMIN_ERROR,
+            );
         });
 
         it("Should setAverageBlockTime", async () => {
             await hhJavFreezer.setAverageBlockTime(8);
 
-            await expect(await hhJavFreezer.averageBlockTime()).to.equal(
-                8,
-            );
+            await expect(await hhJavFreezer.averageBlockTime()).to.equal(8);
         });
 
         it("Should revert when addPool", async () => {
@@ -1086,13 +1084,10 @@ describe("JavFreezer contract", () => {
             const lockId = 0;
             const amount = ethers.parseEther("1");
 
-
             await erc20Token.mint(addr1.address, amount);
             await erc20Token.connect(addr1).approve(hhJavFreezer.target, amount);
 
-
             await hhJavFreezer.connect(addr1).deposit(pid, lockId, amount);
-
 
             const userInfo = await hhJavFreezer.userInfo(addr1.address, pid);
             const depositId = userInfo.depositId - BigInt(1);
@@ -1109,7 +1104,6 @@ describe("JavFreezer contract", () => {
             await hhJavFreezer.connect(addr1).claim(pid, depositId);
             userBalance = await erc20Token.balanceOf(addr1.address);
             await expect(userBalance - userBalanceBefore).to.be.equal(0);
-
         });
     });
 });

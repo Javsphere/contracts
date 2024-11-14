@@ -15,7 +15,7 @@ async function main() {
         5, // _sellFee,
         [
             {
-                asset: "0x4200000000000000000000000000000000000006",  //weth
+                asset: "0x4200000000000000000000000000000000000006", //weth
                 priceFeed: "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
                 targetWeightage: 33,
                 isActive: true,

@@ -12,6 +12,4 @@ import "./types/ITypes.sol";
  * @dev the non-expanded interface for multi-collat diamond, only contains types/structs/enums
  */
 
-interface IJavDiamond is IJavAddressStore, IJavDiamondCut, IJavDiamondLoupe, ITypes {
-
-}
+interface IJavDiamond is IJavAddressStore, IJavDiamondCut, IJavDiamondLoupe, ITypes {}
