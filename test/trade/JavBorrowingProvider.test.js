@@ -204,10 +204,17 @@ describe("JavBorrowingProvider contract", () => {
             const amount = ethers.parseUnits("1", 6);
             await erc20Token2.mint(addr2.address, amount);
 
+            const usdAmount = amount * BigInt(2) * ethers.parseUnits("1", 12);
+            const fee =
+                ((await hhJavBorrowingProvider.buyFee()) * usdAmount) / ethers.parseUnits("1", 4);
+            const tokenAmounts =
+                ((usdAmount - fee) * ethers.parseUnits("1", 18)) /
+                (await hhJavBorrowingProvider.llpPrice());
+
             await hhJavBorrowingProvider.connect(addr2).buyLLP(1, amount);
 
             await expect(await erc20Token2.balanceOf(addr2.address)).to.be.equal(0);
-            await expect(await llpToken.balanceOf(addr2.address)).to.be.equal(amount * BigInt(2));
+            await expect(await llpToken.balanceOf(addr2.address)).to.be.equal(tokenAmounts);
             await expect(await hhJavBorrowingProvider.tokenAmount(1)).to.be.equal(amount);
         });
 

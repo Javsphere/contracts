@@ -89,6 +89,8 @@ describe("TokenVestingFreezer contract", () => {
                 accRewardPerShare,
                 fee,
             );
+
+            await freezerMock.setAverageBlockTime(10);
         });
 
         it("Should set vesting address", async () => {

@@ -32,6 +32,4 @@ interface IJavMultiCollatDiamond is
     IBorrowingFeesUtils,
     IPriceAggregatorUtils,
     IPriceUtils
-{
-
-}
+{}

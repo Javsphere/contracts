@@ -49,7 +49,11 @@ library TradingCommonUtils {
                 1e3
             : int256(0);
 
-        p = p > maxPnlP ? maxPnlP : p < minPnlP ? minPnlP : p;
+        p = p > maxPnlP
+            ? maxPnlP
+            : p < minPnlP
+                ? minPnlP
+                : p;
     }
 
     /**

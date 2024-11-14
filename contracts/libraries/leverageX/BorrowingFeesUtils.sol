@@ -835,10 +835,18 @@ library BorrowingFeesUtils {
         IBorrowingFees.OpenInterest memory oi = _oiStorage;
 
         if (_long) {
-            oi.long = _increase ? oi.long + delta : delta > oi.long ? 0 : oi.long - delta;
+            oi.long = _increase
+                ? oi.long + delta
+                : delta > oi.long
+                    ? 0
+                    : oi.long - delta;
             _oiStorage.long = oi.long;
         } else {
-            oi.short = _increase ? oi.short + delta : delta > oi.short ? 0 : oi.short - delta;
+            oi.short = _increase
+                ? oi.short + delta
+                : delta > oi.short
+                    ? 0
+                    : oi.short - delta;
             _oiStorage.short = oi.short;
         }
 
