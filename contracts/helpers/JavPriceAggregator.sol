@@ -101,6 +101,17 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
         return _latestPriceInfo[id];
     }
 
+    function getPriceNoOlderThan(
+        bytes32 id,
+        uint age
+    ) external view returns (IJavPriceAggregator.Price memory price) {
+        price = _latestPriceInfo[id];
+
+        require(_diff(block.timestamp, price.publishTime) > age, StalePrice());
+
+        return price;
+    }
+
     function updatePriceFeeds(bytes[] calldata updateData) external payable {
         for (uint256 i = 0; i < updateData.length; i++) {
             bytes memory data = updateData[i];
@@ -133,6 +144,14 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
         _to.transfer(_amount);
 
         emit ClaimFee(_to, _amount);
+    }
+
+    function _diff(uint x, uint y) private pure returns (uint) {
+        if (x > y) {
+            return x - y;
+        } else {
+            return y - x;
+        }
     }
 
     function _slice(

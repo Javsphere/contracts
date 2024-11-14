@@ -49,7 +49,7 @@ describe("CommunityLaunch contract", () => {
 
     async function deployTokenFixture() {
         const erc20ContractFactory = await ethers.getContractFactory("ERC20Mock");
-        const erc20Token = await erc20ContractFactory.deploy("Mock3ERC20", "MOCK3");
+        const erc20Token = await erc20ContractFactory.deploy("Mock3ERC20", "MOCK3", 18);
         await erc20Token.waitForDeployment();
         return erc20Token;
     }

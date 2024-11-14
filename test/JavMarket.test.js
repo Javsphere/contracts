@@ -154,14 +154,14 @@ describe("JavMarket contract", () => {
             await hhJavMarket.pause();
 
             await expect(
-                hhJavMarket.connect(addr1).tradeToken(0, 15, 1, 1, true, 1),
+                hhJavMarket.connect(addr1).tradeToken(0, 15, "1", 1, true, 1),
             ).to.be.revertedWithCustomError(hhJavMarket, "EnforcedPause");
             await hhJavMarket.unpause();
         });
 
         it("Should revert when buy balanceOf < _amount", async () => {
             await expect(
-                hhJavMarket.connect(addr1).tradeToken(0, 15, 1, 1, true, 1),
+                hhJavMarket.connect(addr1).tradeToken(0, 15, "1", 1, true, 1),
             ).to.be.revertedWith("JavMarket: invalid amount");
         });
 
@@ -190,7 +190,7 @@ describe("JavMarket contract", () => {
                     userAddress: addr1.address,
                     id: 1,
                     tradeTokenId: 0,
-                    tokenId: 1,
+                    tokenId: "1",
                     buyingType: 1,
                     amount: 2,
                     price: 3,
@@ -211,7 +211,7 @@ describe("JavMarket contract", () => {
                     userAddress: addr1.address,
                     id: 500,
                     tradeTokenId: 0,
-                    tokenId: 1,
+                    tokenId: "1",
                     buyingType: 1,
                     amount: 2,
                     price: 3,

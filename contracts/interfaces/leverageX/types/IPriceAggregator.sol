@@ -22,7 +22,8 @@ interface IPriceAggregator {
         mapping(uint8 => bytes32) collateralUsdPriceFeed;
         bytes32 rewardsTokenUsdFeed;
         uint96 __placeholder; // 96 bits
-        uint256[41] __gap;
+        uint48 priceLifetime;
+        uint256[40] __gap;
     }
 
 

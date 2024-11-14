@@ -68,11 +68,30 @@ library PriceAggregatorUtils {
     /**
      * @dev Check IPriceAggregatorUtils interface for documentation
      */
+    function setPriceLifetime(uint48 _lifetime) internal {
+        _getStorage().priceLifetime = _lifetime;
+
+        emit IPriceAggregatorUtils.LifeTimeUpdated(_lifetime);
+    }
+
+    /**
+     * @dev Check IPriceAggregatorUtils interface for documentation
+     */
+    function getPriceLifetime() internal view returns (uint256) {
+        return _getStorage().priceLifetime;
+    }
+
+    /**
+     * @dev Check IPriceAggregatorUtils interface for documentation
+     */
     function getPrice(uint16 _pairIndex) internal view returns (uint256) {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
         IPairsStorage.Pair memory pair = _getMultiCollatDiamond().pairs(_pairIndex);
         IJavPriceAggregator oracle = pair.altPriceOracle ? s.alternativeOracle : s.oracle;
-        IJavPriceAggregator.Price memory price = oracle.getPrice(pair.feedId);
+        IJavPriceAggregator.Price memory price = oracle.getPriceNoOlderThan(
+            pair.feedId,
+            _getStorage().priceLifetime
+        );
         return PriceUtils.convertToUint(price.price, price.expo, 10);
     }
 
@@ -162,7 +181,10 @@ library PriceAggregatorUtils {
      */
     function getRewardsTokenPriceUsd() internal view returns (uint256) {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
-        IJavPriceAggregator.Price memory price = s.oracle.getPrice(s.rewardsTokenUsdFeed);
+        IJavPriceAggregator.Price memory price = s.oracle.getPriceNoOlderThan(
+            s.rewardsTokenUsdFeed,
+            _getStorage().priceLifetime
+        );
         return PriceUtils.convertToUint(price.price, price.expo, 8);
     }
 

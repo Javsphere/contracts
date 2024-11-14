@@ -7,6 +7,7 @@ import "../../interfaces/leverageX/types/ITradingStorage.sol";
 import "../../interfaces/leverageX/libraries/ITradingCommonUtils.sol";
 import "../../interfaces/leverageX/IJavMultiCollatDiamond.sol";
 import "../../interfaces/leverageX/IJavBorrowingProvider.sol";
+import "../../interfaces/IRewardsDistributor.sol";
 import "./ConstantsUtils.sol";
 import "./AddressStoreUtils.sol";
 import "./TradingProcessingUtils.sol";
@@ -48,7 +49,11 @@ library TradingCommonUtils {
                 1e3
             : int256(0);
 
-        p = p > maxPnlP ? maxPnlP : p < minPnlP ? minPnlP : p;
+        p = p > maxPnlP
+            ? maxPnlP
+            : p < minPnlP
+                ? minPnlP
+                : p;
     }
 
     /**

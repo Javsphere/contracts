@@ -5,7 +5,6 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../interfaces/leverageX/IJavMultiCollatDiamond.sol";
 import "../../interfaces/leverageX/IJavBorrowingProvider.sol";
-import "../../interfaces/IRewardsDistributor.sol";
 
 import "./StorageUtils.sol";
 import "./AddressStoreUtils.sol";
@@ -364,8 +363,8 @@ library TradingProcessingUtils {
             cancelReason = !t.isOpen
                 ? ITradingProcessing.CancelReason.NO_TRADE
                 : _pendingOrder.price == 0
-                ? ITradingProcessing.CancelReason.MARKET_CLOSED
-                : ITradingProcessing.CancelReason.NONE;
+                    ? ITradingProcessing.CancelReason.MARKET_CLOSED
+                    : ITradingProcessing.CancelReason.NONE;
         }
 
         if (cancelReason != ITradingProcessing.CancelReason.NO_TRADE) {
@@ -585,24 +584,29 @@ library TradingProcessingUtils {
                                 ? priceAfterImpact >= _trade.tp
                                 : priceAfterImpact <= _trade.tp
                         ))
-                    ? ITradingProcessing.CancelReason.TP_REACHED
-                    : (_trade.sl > 0 &&
-                        (_trade.long ? _executionPrice <= _trade.sl : _executionPrice >= _trade.sl))
-                    ? ITradingProcessing.CancelReason.SL_REACHED
-                    : !TradingCommonUtils.isWithinExposureLimits(
-                        _trade.collateralIndex,
-                        _trade.pairIndex,
-                        _trade.long,
-                        positionSizeCollateral
-                    )
-                    ? ITradingProcessing.CancelReason.EXPOSURE_LIMITS
-                    : (priceImpactP * _trade.leverage) / 1e3 >
-                        ConstantsUtils.MAX_OPEN_NEGATIVE_PNL_P
-                    ? ITradingProcessing.CancelReason.PRICE_IMPACT
-                    : _trade.leverage >
-                        _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) * 1e3
-                    ? ITradingProcessing.CancelReason.MAX_LEVERAGE
-                    : ITradingProcessing.CancelReason.NONE
+                        ? ITradingProcessing.CancelReason.TP_REACHED
+                        : (_trade.sl > 0 &&
+                            (
+                                _trade.long
+                                    ? _executionPrice <= _trade.sl
+                                    : _executionPrice >= _trade.sl
+                            ))
+                            ? ITradingProcessing.CancelReason.SL_REACHED
+                            : !TradingCommonUtils.isWithinExposureLimits(
+                                _trade.collateralIndex,
+                                _trade.pairIndex,
+                                _trade.long,
+                                positionSizeCollateral
+                            )
+                                ? ITradingProcessing.CancelReason.EXPOSURE_LIMITS
+                                : (priceImpactP * _trade.leverage) / 1e3 >
+                                    ConstantsUtils.MAX_OPEN_NEGATIVE_PNL_P
+                                    ? ITradingProcessing.CancelReason.PRICE_IMPACT
+                                    : _trade.leverage >
+                                        _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) *
+                                            1e3
+                                        ? ITradingProcessing.CancelReason.MAX_LEVERAGE
+                                        : ITradingProcessing.CancelReason.NONE
             );
     }
 
