@@ -172,6 +172,24 @@ describe("JavBorrowingProvider contract", () => {
             await expect(await hhJavBorrowingProvider.adminAddress()).to.equal(owner.address);
         });
 
+        it("Should revert when toggleBuyActiveState", async () => {
+            await expect(
+                hhJavBorrowingProvider.connect(bot).toggleBuyActiveState(),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should revert when toggleSellActiveState", async () => {
+            await expect(
+                hhJavBorrowingProvider.connect(bot).toggleSellActiveState(),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
+        it("Should revert when addWhiteListBatch", async () => {
+            await expect(
+                hhJavBorrowingProvider.connect(bot).addWhiteListBatch([addr2.address]),
+            ).to.be.revertedWith(ADMIN_ERROR);
+        });
+
         it("Should get tvl = 0", async () => {
             await expect(await hhJavBorrowingProvider.tvl()).to.equal(0);
         });
@@ -200,6 +218,27 @@ describe("JavBorrowingProvider contract", () => {
             await expect(await hhJavBorrowingProvider.llpPrice()).to.equal(ethers.parseEther("1"));
         });
 
+        it("Should revert when buyLLP - InactiveBuy", async () => {
+            await expect(
+                hhJavBorrowingProvider.connect(bot).buyLLP(1, 1),
+            ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "InactiveBuy");
+        });
+
+        it("Should toggleBuyActiveState", async () => {
+            await hhJavBorrowingProvider.toggleBuyActiveState();
+            await expect(await hhJavBorrowingProvider.isBuyActive()).to.be.equal(true);
+        });
+
+        it("Should revert when buyLLP - OnlyWhiteList", async () => {
+            await expect(
+                hhJavBorrowingProvider.connect(bot).buyLLP(1, 1),
+            ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "OnlyWhiteList");
+        });
+
+        it("Should addWhiteListBatch", async () => {
+            await hhJavBorrowingProvider.addWhiteListBatch([addr2.address]);
+        });
+
         it("Should buyLLP", async () => {
             const amount = ethers.parseUnits("1", 6);
             await erc20Token2.mint(addr2.address, amount);
@@ -216,6 +255,23 @@ describe("JavBorrowingProvider contract", () => {
             await expect(await erc20Token2.balanceOf(addr2.address)).to.be.equal(0);
             await expect(await llpToken.balanceOf(addr2.address)).to.be.equal(tokenAmounts);
             await expect(await hhJavBorrowingProvider.tokenAmount(1)).to.be.equal(amount);
+        });
+
+        it("Should revert when sellLLP - InactiveSell", async () => {
+            await expect(
+                hhJavBorrowingProvider.connect(bot).sellLLP(1, 1),
+            ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "InactiveSell");
+        });
+
+        it("Should toggleBuyActiveState", async () => {
+            await hhJavBorrowingProvider.toggleSellActiveState();
+            await expect(await hhJavBorrowingProvider.isSellActive()).to.be.equal(true);
+        });
+
+        it("Should revert when sellLLP - OnlyWhiteList", async () => {
+            await expect(
+                hhJavBorrowingProvider.connect(bot).sellLLP(1, 1),
+            ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "OnlyWhiteList");
         });
 
         // it("Should rebalance", async () => {
