@@ -254,6 +254,7 @@ contract JavFreezer is
                 emit BurnTokens(
                     _pid,
                     _holder,
+                    _depositId,
                     depositDetails.stakePeriod,
                     depositDetails.depositTokens
                 );
