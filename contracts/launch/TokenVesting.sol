@@ -40,7 +40,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
     event AddAllowedAddress(address indexed _address);
     event RemoveAllowedAddress(address indexed _address);
     event SetMigratorAddress(address indexed _address);
-    event BurnTokens(address indexed holder, uint256 amount);
+    event BurnTokens(address indexed holder, bytes32 vestingScheduleId, uint256 amount);
 
     modifier onlyIfVestingScheduleNotRevoked(bytes32 _vestingScheduleId) {
         require(!vestingSchedules[_vestingScheduleId].revoked);
@@ -166,6 +166,7 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
 
     function burnTokens(address _holder) external onlyMigrator {
         uint256 _burnAmount;
+        uint256 _burnAmountTotal;
         bytes32 _vestingScheduleId;
         for (uint256 i = 0; i < holdersVestingCount[_holder]; ++i) {
             _vestingScheduleId = _computeVestingScheduleIdForAddressAndIndex(_holder, i);
@@ -174,14 +175,15 @@ contract TokenVesting is ITokenVesting, BaseUpgradable, ReentrancyGuardUpgradeab
             }
             VestingSchedule storage vestingSchedule = vestingSchedules[_vestingScheduleId];
             if (!vestingSchedule.revoked) {
-                _burnAmount += (vestingSchedule.amountTotal - vestingSchedule.released);
+                _burnAmount = (vestingSchedule.amountTotal - vestingSchedule.released);
+                _burnAmountTotal += _burnAmount;
                 vestingSchedule.revoked = true;
+                emit BurnTokens(_holder, _vestingScheduleId, _burnAmount);
             }
         }
-        if (_burnAmount > 0) {
-            vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - _burnAmount;
-            IERC20Extended(address(token)).burn(_burnAmount);
-            emit BurnTokens(_holder, _burnAmount);
+        if (_burnAmountTotal > 0) {
+            vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - _burnAmountTotal;
+            IERC20Extended(address(token)).burn(_burnAmountTotal);
         }
     }
 
