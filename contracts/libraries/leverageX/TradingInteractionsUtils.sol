@@ -12,6 +12,7 @@ import "./PackingUtils.sol";
 import "./TradingCommonUtils.sol";
 import "./updateLeverage/UpdateLeverageUtils.sol";
 import "./updatePositionSize/UpdatePositionSizeUtils.sol";
+import "../../interfaces/helpers/ITermsAndConditionsAgreement.sol";
 
 /**
  * @custom:version 8
@@ -56,6 +57,26 @@ library TradingInteractionsUtils {
         _;
     }
 
+    modifier onlyAgreeToTerms() {
+        require(
+            ITermsAndConditionsAgreement(_getStorage().termsAndConditionsAddress).hasAgreed(
+                msg.sender
+            ),
+            "JavTradingInteractions: OnlyAgreedToTerms"
+        );
+        _;
+    }
+
+    /**
+     * @dev Check ITradingInteractionsUtils interface for documentation
+     */
+    function updateTermsAndConditionsAddress(address _termsAndConditionsAddress) internal {
+        ITradingInteractions.TradingInteractionsStorage storage s = _getStorage();
+        s.termsAndConditionsAddress = _termsAndConditionsAddress;
+
+        emit ITradingInteractionsUtils.TermsAndConditionsAddressUpdated(_termsAndConditionsAddress);
+    }
+
     /**
      * @dev Check ITradingInteractionsUtils interface for documentation
      */
@@ -64,7 +85,7 @@ library TradingInteractionsUtils {
         uint16 _maxSlippageP,
         address _referrer,
         bytes[][] calldata _priceUpdate
-    ) internal tradingActivated onlyWithPriceUpdate(_priceUpdate) {
+    ) internal tradingActivated onlyAgreeToTerms onlyWithPriceUpdate(_priceUpdate) {
         _openTrade(_trade, _maxSlippageP, _referrer, false);
     }
 

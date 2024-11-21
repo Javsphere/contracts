@@ -12,7 +12,8 @@ interface ITradingInteractions {
 
     struct TradingInteractionsStorage {
         uint80 __placeholder;
-        uint256[47] __gap;
+        address termsAndConditionsAddress;
+        uint256[46] __gap;
     }
 
 }
