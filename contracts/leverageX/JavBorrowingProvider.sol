@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "../libraries/leverageX/PriceAggregatorUtils.sol";
 import "../libraries/leverageX/CollateralUtils.sol";
+import "../abstract/TearmsAndCondUtils.sol";
 import "../base/BaseUpgradable.sol";
 
 import "../interfaces/leverageX/IJavBorrowingProvider.sol";
@@ -14,7 +15,12 @@ import "../interfaces/IJavPriceAggregator.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../interfaces/ISwapRouter.sol";
 
-contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeable, BaseUpgradable {
+contract JavBorrowingProvider is
+    IJavBorrowingProvider,
+    TermsAndCondUtils,
+    ReentrancyGuardUpgradeable,
+    BaseUpgradable
+{
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
     struct TokenInfo {
@@ -67,6 +73,7 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     EnumerableSet.AddressSet private _whiteListAddresses;
     bool public isBuyActive;
     bool public isSellActive;
+    address public termsAndConditionsAddress;
 
     /* ========== EVENTS ========== */
     event AddToken(TokenInfo tokenInfo);
@@ -228,6 +235,14 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         }
     }
 
+    function setTermsAndConditionsAddress(
+        address _termsAndConditionsAddress
+    ) external onlyAdmin nonZeroAddress(_termsAndConditionsAddress) {
+        termsAndConditionsAddress = _termsAndConditionsAddress;
+
+        emit SetTermsAndConditionsAddress(_termsAndConditionsAddress);
+    }
+
     function initialBuy(
         uint256 _inputToken,
         uint256 _amount,
@@ -254,7 +269,15 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     function buyLLP(
         uint256 _inputToken,
         uint256 _amount
-    ) external nonReentrant onlyActiveBuy whenNotPaused validToken(_inputToken) onlyWhiteList {
+    )
+        external
+        nonReentrant
+        onlyActiveBuy
+        whenNotPaused
+        validToken(_inputToken)
+        onlyWhiteList
+        onlyAgreeToTerms(termsAndConditionsAddress)
+    {
         require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Purchase not available");
         TokenInfo memory _token = tokens[_inputToken];
         require(

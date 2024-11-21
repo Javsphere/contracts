@@ -19,6 +19,15 @@ contract JavTradingInteractions is JavAddressStore, ITradingInteractionsUtils {
         _disableInitializers();
     }
 
+    // Management Setters
+
+    /// @inheritdoc ITradingInteractionsUtils
+    function updateTermsAndConditionsAddress(
+        address _termsAndConditionsAddress
+    ) external onlyRole(Role.GOV) {
+        TradingInteractionsUtils.updateTermsAndConditionsAddress(_termsAndConditionsAddress);
+    }
+
     // Interactions
 
     /// @inheritdoc ITradingInteractionsUtils
