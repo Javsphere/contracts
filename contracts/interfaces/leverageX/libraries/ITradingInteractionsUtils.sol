@@ -25,6 +25,12 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     ) external payable;
 
     /**
+     * @dev Update termsAndConditionsAddress address
+     * @param _termsAndConditionsAddress termsAndConditionsAddress address
+     */
+    function updateTermsAndConditionsAddress(address _termsAndConditionsAddress) external;
+
+    /**
      * @dev Updates existing trade's max closing slippage % for caller
      * @param _index index of trade
      * @param _maxSlippageP new max closing slippage % (1e3 precision)
@@ -176,6 +182,12 @@ interface ITradingInteractionsUtils is ITradingInteractions {
      * @param index index of the open trade for caller
      */
     event CouldNotCloseTrade(address indexed trader, uint16 indexed pairIndex, uint32 index);
+
+    /**
+     * @dev Emitted when an existing termsAndConditionsAddress is updated
+     * @param termsAndConditionsAddress termsAndConditionsAddress address
+     */
+    event TermsAndConditionsAddressUpdated(address indexed termsAndConditionsAddress);
 
     error NotWrappedNativeToken();
     error DelegateNotApproved();

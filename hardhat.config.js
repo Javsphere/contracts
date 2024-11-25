@@ -7,6 +7,16 @@ require("@nomiclabs/hardhat-solhint");
 require("hardhat-contract-sizer");
 require("solidity-docgen");
 
+// Remove deprecated folder from compile task
+const { subtask } = require("hardhat/config");
+const { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } = require("hardhat/builtin-tasks/task-names");
+
+subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, __, runSuper) => {
+    const paths = await runSuper();
+
+    return paths.filter((p) => !p.includes("deprecated"));
+});
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
     solidity: {

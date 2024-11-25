@@ -103,8 +103,7 @@ async function main() {
 
     const tradingInteractionsFactory = await ethers.getContractFactory("JavTradingInteractions", {
         libraries: {
-            "contracts/libraries/leverageX/PackingUtils.sol:PackingUtils":
-                "0xE438848bb41658a2203a245CA0c7d466e75AEB31",
+            "contracts/libraries/leverageX/PackingUtils.sol:PackingUtils": packlingUtils.target,
             "contracts/libraries/leverageX/TradingCommonUtils.sol:TradingCommonUtils":
                 tradingCommonUtils.target,
             "contracts/libraries/leverageX/updateLeverage/UpdateLeverageUtils.sol:UpdateLeverageUtils":

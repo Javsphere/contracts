@@ -4,8 +4,10 @@ pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "../libraries/leverageX/PriceAggregatorUtils.sol";
 import "../libraries/leverageX/CollateralUtils.sol";
+import "../abstract/TearmsAndCondUtils.sol";
 import "../base/BaseUpgradable.sol";
 
 import "../interfaces/leverageX/IJavBorrowingProvider.sol";
@@ -13,8 +15,14 @@ import "../interfaces/IJavPriceAggregator.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../interfaces/ISwapRouter.sol";
 
-contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeable, BaseUpgradable {
+contract JavBorrowingProvider is
+    IJavBorrowingProvider,
+    TermsAndCondUtils,
+    ReentrancyGuardUpgradeable,
+    BaseUpgradable
+{
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
     struct TokenInfo {
         address asset;
         bytes32 priceFeed;
@@ -62,6 +70,10 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     // Parameters (adjustable)
     uint256 public lossesBurnP; // PRECISION_18 (% of all losses)
     mapping(uint256 => uint256) public tokenAmount; // PRECISION_18
+    EnumerableSet.AddressSet private _whiteListAddresses;
+    bool public isBuyActive;
+    bool public isSellActive;
+    address public termsAndConditionsAddress;
 
     /* ========== EVENTS ========== */
     event AddToken(TokenInfo tokenInfo);
@@ -93,6 +105,21 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     modifier validToken(uint256 _tokenId) {
         require(_tokenId < tokens.length, "JavBorrowingProvider: Invalid token");
         require(tokens[_tokenId].isActive, "JavBorrowingProvider: Token is inactive");
+        _;
+    }
+
+    modifier onlyWhiteList() {
+        require(_whiteListAddresses.contains(_msgSender()), OnlyWhiteList());
+        _;
+    }
+
+    modifier onlyActiveBuy() {
+        require(isBuyActive, InactiveBuy());
+        _;
+    }
+
+    modifier onlyActiveSell() {
+        require(isSellActive, InactiveSell());
         _;
     }
 
@@ -180,6 +207,42 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         emit SetTokenAmount(_inputToken, _amount);
     }
 
+    function toggleBuyActiveState() external onlyAdmin {
+        bool toggled = !isBuyActive;
+        isBuyActive = toggled;
+
+        emit BuyActiveStateUpdated(toggled);
+    }
+
+    function toggleSellActiveState() external onlyAdmin {
+        bool toggled = !isSellActive;
+        isSellActive = toggled;
+
+        emit SellActiveStateUpdated(toggled);
+    }
+
+    function addWhiteListBatch(address[] calldata _addresses) external onlyAdmin {
+        for (uint8 i = 0; i < _addresses.length; ++i) {
+            _whiteListAddresses.add(_addresses[i]);
+            emit WhiteListAdded(_addresses[i]);
+        }
+    }
+
+    function removeWhiteListBatch(address[] calldata _addresses) external onlyAdmin {
+        for (uint8 i = 0; i < _addresses.length; ++i) {
+            _whiteListAddresses.remove(_addresses[i]);
+            emit WhiteListRemoved(_addresses[i]);
+        }
+    }
+
+    function setTermsAndConditionsAddress(
+        address _termsAndConditionsAddress
+    ) external onlyAdmin nonZeroAddress(_termsAndConditionsAddress) {
+        termsAndConditionsAddress = _termsAndConditionsAddress;
+
+        emit SetTermsAndConditionsAddress(_termsAndConditionsAddress);
+    }
+
     function initialBuy(
         uint256 _inputToken,
         uint256 _amount,
@@ -192,10 +255,10 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         TokenInfo memory _token = tokens[_inputToken];
         tokenAmount[_inputToken] += _amount;
 
-        IERC20(_token.asset).safeTransferFrom(msg.sender, address(this), _amount);
-        IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
+        IERC20(_token.asset).safeTransferFrom(_msgSender(), address(this), _amount);
+        IERC20Extended(llpToken).mint(_msgSender(), _llpAmount);
 
-        emit BuyLLP(msg.sender, _token.asset, _inputToken, llpToken, _amount, _llpAmount);
+        emit BuyLLP(_msgSender(), _token.asset, _inputToken, llpToken, _amount, _llpAmount);
     }
 
     /**
@@ -206,11 +269,19 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     function buyLLP(
         uint256 _inputToken,
         uint256 _amount
-    ) external nonReentrant whenNotPaused validToken(_inputToken) {
+    )
+        external
+        nonReentrant
+        onlyActiveBuy
+        whenNotPaused
+        validToken(_inputToken)
+        onlyWhiteList
+        onlyAgreeToTerms(termsAndConditionsAddress)
+    {
         require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Purchase not available");
         TokenInfo memory _token = tokens[_inputToken];
         require(
-            IERC20(_token.asset).balanceOf(msg.sender) >= _amount,
+            IERC20(_token.asset).balanceOf(_msgSender()) >= _amount,
             "JavBorrowingProvider: invalid balance for buy"
         );
 
@@ -225,11 +296,11 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
     function sellLLP(
         uint256 _outputToken,
         uint256 _amount
-    ) external nonReentrant whenNotPaused validToken(_outputToken) {
+    ) external nonReentrant onlyActiveSell whenNotPaused validToken(_outputToken) onlyWhiteList {
         require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Sell not available");
         TokenInfo memory _token = tokens[_outputToken];
         require(
-            IERC20(llpToken).balanceOf(msg.sender) >= _amount,
+            IERC20(llpToken).balanceOf(_msgSender()) >= _amount,
             "JavBorrowingProvider: invalid balance for sell"
         );
 
@@ -345,6 +416,10 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         return tokens.length;
     }
 
+    function getWhiteListAddresses() external view returns (address[] memory) {
+        return _whiteListAddresses.values();
+    }
+
     function _buyLLP(uint256 _tokenId, TokenInfo memory _inputToken, uint256 _amount) private {
         uint256 _inputAmountUsd = (_amount *
             _getUsdPrice(_inputToken.priceFeed) *
@@ -354,10 +429,10 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
         uint256 _llpAmount = ((_inputAmountUsd - _fee) * PRECISION_18) / _llpPrice();
         tokenAmount[_tokenId] += _amount;
 
-        IERC20(_inputToken.asset).safeTransferFrom(msg.sender, address(this), _amount);
-        IERC20Extended(llpToken).mint(msg.sender, _llpAmount);
+        IERC20(_inputToken.asset).safeTransferFrom(_msgSender(), address(this), _amount);
+        IERC20Extended(llpToken).mint(_msgSender(), _llpAmount);
 
-        emit BuyLLP(msg.sender, _inputToken.asset, _tokenId, llpToken, _amount, _llpAmount);
+        emit BuyLLP(_msgSender(), _inputToken.asset, _tokenId, llpToken, _amount, _llpAmount);
     }
 
     function _sellLLP(uint256 _tokenId, TokenInfo memory _outputToken, uint256 _amount) private {
@@ -372,10 +447,10 @@ contract JavBorrowingProvider is IJavBorrowingProvider, ReentrancyGuardUpgradeab
             tokensPrecision[_outputToken.asset].precisionDelta;
         tokenAmount[_tokenId] -= _tokensAmount;
 
-        IERC20Extended(llpToken).burnFrom(msg.sender, _amount);
-        IERC20(_outputToken.asset).safeTransfer(msg.sender, _tokensAmount);
+        IERC20Extended(llpToken).burnFrom(_msgSender(), _amount);
+        IERC20(_outputToken.asset).safeTransfer(_msgSender(), _tokensAmount);
 
-        emit SellLLP(msg.sender, llpToken, _outputToken.asset, _tokenId, _amount, _tokensAmount);
+        emit SellLLP(_msgSender(), llpToken, _outputToken.asset, _tokenId, _amount, _tokensAmount);
     }
 
     function _getUsdPrice(bytes32 _priceFeed) private view returns (uint256) {

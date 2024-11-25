@@ -39,6 +39,12 @@ contract TokenVestingFreezer is ITokenVesting, BaseUpgradable, ReentrancyGuardUp
     event AddAllowedAddress(address indexed _address);
     event RemoveAllowedAddress(address indexed _address);
     event SetMigratorAddress(address indexed _address);
+    event BurnTokens(
+        address indexed holder,
+        bytes32 vestingScheduleId,
+        uint256 freezerdepositID,
+        uint256 amount
+    );
 
     modifier onlyIfVestingScheduleNotRevoked(bytes32 _vestingScheduleId) {
         require(vestingSchedules[_vestingScheduleId].initialized);
@@ -242,6 +248,13 @@ contract TokenVestingFreezer is ITokenVesting, BaseUpgradable, ReentrancyGuardUp
                 uint256 unreleased = vestingSchedule.amountTotal - vestingSchedule.released;
                 vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - unreleased;
                 vestingSchedule.revoked = true;
+
+                emit BurnTokens(
+                    _holder,
+                    _vestingScheduleId,
+                    vestingFreezeId[_vestingScheduleId],
+                    unreleased
+                );
             }
         }
     }

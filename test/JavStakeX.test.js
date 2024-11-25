@@ -3,7 +3,11 @@ const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { min } = require("hardhat/internal/util/bigint");
 const { ADMIN_ERROR, MANAGER_ERROR } = require("./common/constanst");
-const { deployTokenFixture, deployInfinityPassFixture } = require("./common/mocks");
+const {
+    deployTokenFixture,
+    deployInfinityPassFixture,
+    deployTermsAndConditionsFixture,
+} = require("./common/mocks");
 const { mine } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("JavStakeX contract", () => {
@@ -16,13 +20,15 @@ describe("JavStakeX contract", () => {
     let erc20Token;
     let infinityPass;
     let rewardsDistributor;
+    let termsAndConditions;
 
     before(async () => {
-        const javStakeX = await ethers.getContractFactory("JavStakeX");
+        const javStakeX = await ethers.getContractFactory("contracts/JavStakeX.sol:JavStakeX");
         [owner, addr1, addr2, addr3, bot, rewardsDistributor, ...addrs] = await ethers.getSigners();
         const nonZeroAddress = ethers.Wallet.createRandom().address;
         erc20Token = await helpers.loadFixture(deployTokenFixture);
         infinityPass = await helpers.loadFixture(deployInfinityPassFixture);
+        termsAndConditions = await helpers.loadFixture(deployTermsAndConditionsFixture);
         const rewardPerBlock = ethers.parseEther("0.05");
         const rewardUpdateBlocksInterval = 864000;
         const infinityPassPercent = 5;
@@ -30,12 +36,11 @@ describe("JavStakeX contract", () => {
         hhJavStakeX = await upgrades.deployProxy(
             javStakeX,
             [
-                rewardPerBlock,
-                rewardUpdateBlocksInterval,
                 rewardsDistributor.address,
                 infinityPassPercent,
                 infinityPass.target,
                 nonZeroAddress,
+                termsAndConditions.target,
             ],
 
             {
@@ -164,7 +169,7 @@ describe("JavStakeX contract", () => {
 
         it("Should revert when setRewardConfiguration", async () => {
             await expect(
-                hhJavStakeX.connect(addr1).setRewardConfiguration(1, 1),
+                hhJavStakeX.connect(addr1).setRewardConfiguration(0, 1, 1),
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
@@ -172,10 +177,10 @@ describe("JavStakeX contract", () => {
             const rewardPerBlock = ethers.parseEther("0.05");
             const updateBlocksInterval = 12345;
 
-            await hhJavStakeX.setRewardConfiguration(rewardPerBlock, updateBlocksInterval);
+            await hhJavStakeX.setRewardConfiguration(0, rewardPerBlock, updateBlocksInterval);
 
-            const lastBlock = await ethers.provider.getBlockNumber();
-            const rewardsConfiguration = await hhJavStakeX.getRewardsConfiguration();
+            const lastBlock = await ethers.provider.getBlockNumber(0);
+            const rewardsConfiguration = await hhJavStakeX.getRewardsConfiguration(0);
 
             await expect(rewardsConfiguration.rewardPerBlock).to.be.equal(rewardPerBlock);
             await expect(rewardsConfiguration.lastUpdateBlockNum).to.be.equal(lastBlock);
@@ -248,6 +253,15 @@ describe("JavStakeX contract", () => {
             await expect(poolFeeInfo[0]).to.be.equal(5);
             await expect(poolFeeInfo[1]).to.be.equal(5);
             await expect(poolFeeInfo[2]).to.be.equal(5);
+        });
+
+        it("Should reverted when stake - OnlyAgreedToTerms", async () => {
+            await expect(hhJavStakeX.connect(addr1).stake(0, 2)).to.be.revertedWithCustomError(
+                hhJavStakeX,
+                "OnlyAgreedToTerms",
+            );
+
+            await termsAndConditions.connect(addr1).agreeToTerms();
         });
 
         it("Should reverted when stake - amount < minAmount", async () => {
@@ -346,6 +360,7 @@ describe("JavStakeX contract", () => {
         });
 
         it("Should stake - from another address", async () => {
+            await termsAndConditions.connect(addr2).agreeToTerms();
             await erc20Token.mint(addr2.address, ethers.parseEther("10"));
             const stakeAmount = ethers.parseEther("5");
             const balanceBeforeAddr2 = await erc20Token.balanceOf(addr2.address);
@@ -485,7 +500,7 @@ describe("JavStakeX contract", () => {
         it("Should get apr", async () => {
             const pid = 0;
             const poolInfo = await hhJavStakeX.poolInfo(pid);
-            const rewardsPerBlock = await hhJavStakeX.getRewardPerBlock();
+            const rewardsPerBlock = await hhJavStakeX.getRewardPerBlock(0);
             const apr =
                 ((rewardsPerBlock * BigInt(1051200) + poolInfo.rewardsAmount) *
                     ethers.parseEther("1")) /

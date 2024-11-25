@@ -139,6 +139,18 @@ async function deployInfinityPassFixture() {
     return infinityPass;
 }
 
+async function deployTermsAndConditionsFixture() {
+    const termsAndConditionsFactory = await ethers.getContractFactory(
+        "TermsAndConditionsAgreement",
+    );
+    [owner, ...addrs] = await ethers.getSigners();
+    const termsAndConditions = await upgrades.deployProxy(termsAndConditionsFactory, ["test"], {
+        initializer: "initialize",
+    });
+    await termsAndConditions.waitForDeployment();
+    return termsAndConditions;
+}
+
 module.exports = {
     deployTokenFixture,
     deployToken2Fixture,
@@ -146,4 +158,5 @@ module.exports = {
     deployUniswapV3Fixture,
     deployStateRelayerFixture,
     deployInfinityPassFixture,
+    deployTermsAndConditionsFixture,
 };
