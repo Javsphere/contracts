@@ -6,36 +6,64 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "./libraries/leverageX/CollateralUtils.sol";
-import "./helpers/RewardRateConfigurable.sol";
-import "./abstract/TearmsAndCondUtils.sol";
-
-import "./interfaces/IERC20Extended.sol";
-import "./base/BaseUpgradable.sol";
-import "./interfaces/IJavStakeX.sol";
+import "../interfaces/IERC20Extended.sol";
+import "../base/BaseUpgradable.sol";
+import "./IJavStakeX.sol";
+import "./RewardRateConfigurable.sol";
 
 contract JavStakeX is
     IJavStakeX,
-    TermsAndCondUtils,
     BaseUpgradable,
     ReentrancyGuardUpgradeable,
     RewardRateConfigurable
 {
     using SafeERC20 for IERC20;
 
+    /**
+     * @notice Info for update user investment/withdraw info
+     * @param user: user address
+     * @param amount: investment amount
+     */
+    struct PoolInfo {
+        IERC20 baseToken;
+        IERC20 rewardToken;
+        uint256 totalShares;
+        uint256 lastRewardBlock;
+        uint256 accRewardPerShare;
+        uint256 rewardsAmount;
+        uint256 rewardsPerShare;
+        uint256 minStakeAmount;
+    }
+
+    struct UserInfo {
+        uint256 shares;
+        uint256 blockRewardDebt;
+        uint256 productsRewardDebt;
+        uint256 totalClaims;
+    }
+
     /// Info of each pool.
     PoolInfo[] public poolInfo;
-    PoolFee[] public poolFee;
     /// Info of each user that stakes want tokens.
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
-    mapping(address => TokenPrecisionInfo) public tokensPrecision;
 
     address public rewardsDistributorAddress;
+
+    struct PoolFee {
+        uint64 depositFee; //* 1e4
+        uint64 withdrawFee; //* 1e4
+        uint64 claimFee; //* 1e4
+    }
+
     /// Info of each pool fee.
+    PoolFee[] public poolFee;
     uint256 public infinityPassPercent;
     address public infinityPass;
     address public migratorAddress;
-    address public termsAndConditionsAddress;
+
+    /* ========== EVENTS ========== */
+
+    event SetPoolFee(uint256 _pid, PoolFee _poolFee);
 
     modifier poolExists(uint256 _pid) {
         require(_pid < poolInfo.length, WrongPool());
@@ -58,20 +86,21 @@ contract JavStakeX is
     }
 
     function initialize(
+        uint256 _rewardPerBlock,
+        uint256 _rewardUpdateBlocksInterval,
         address _rewardsDistributorAddress,
         uint256 _infinityPassPercent,
         address _infinityPass,
-        address _migratorAddress,
-        address _termsAndConditionsAddress
+        address _migratorAddress
     ) external initializer {
         rewardsDistributorAddress = _rewardsDistributorAddress;
         infinityPassPercent = _infinityPassPercent;
         infinityPass = _infinityPass;
         migratorAddress = _migratorAddress;
-        termsAndConditionsAddress = _termsAndConditionsAddress;
 
         __Base_init();
         __ReentrancyGuard_init();
+        __RewardRateConfigurable_init(_rewardPerBlock, _rewardUpdateBlocksInterval);
 
         emit Initialized(_msgSender(), block.number);
     }
@@ -101,11 +130,10 @@ contract JavStakeX is
     }
 
     function setRewardConfiguration(
-        uint256 _pid,
         uint256 rewardPerBlock,
         uint256 updateBlocksInterval
-    ) external poolExists(_pid) onlyAdmin {
-        _setRewardConfiguration(_pid, rewardPerBlock, updateBlocksInterval);
+    ) external onlyAdmin {
+        _setRewardConfiguration(rewardPerBlock, updateBlocksInterval);
     }
 
     /**
@@ -122,7 +150,6 @@ contract JavStakeX is
         uint128 _minStakeAmount,
         PoolFee memory _poolFee
     ) external onlyAdmin {
-        CollateralUtils.CollateralConfig memory collateralConfig;
         poolInfo.push(
             PoolInfo({
                 baseToken: IERC20(_baseToken),
@@ -136,19 +163,6 @@ contract JavStakeX is
             })
         );
         poolFee.push(_poolFee);
-
-        collateralConfig = CollateralUtils.getCollateralConfig(_baseToken);
-        tokensPrecision[_baseToken] = TokenPrecisionInfo({
-            precision: collateralConfig.precision,
-            precisionDelta: collateralConfig.precisionDelta
-        });
-
-        collateralConfig = CollateralUtils.getCollateralConfig(_rewardToken);
-        tokensPrecision[_rewardToken] = TokenPrecisionInfo({
-            precision: collateralConfig.precision,
-            precisionDelta: collateralConfig.precisionDelta
-        });
-
         emit SetPoolFee(poolFee.length - 1, _poolFee);
         emit AddPool(_baseToken, _rewardToken, _minStakeAmount);
     }
@@ -172,14 +186,6 @@ contract JavStakeX is
         emit SetPoolFee(pid, _poolFee);
     }
 
-    function setTermsAndConditionsAddress(
-        address _termsAndConditionsAddress
-    ) external onlyAdmin nonZeroAddress(_termsAndConditionsAddress) {
-        termsAndConditionsAddress = _termsAndConditionsAddress;
-
-        emit SetTermsAndConditionsAddress(_termsAndConditionsAddress);
-    }
-
     function burnTokens(uint256 _pid, address _holder) external onlyMigrator poolExists(_pid) {
         _updatePool(_pid, 0);
         _claim(_pid, _holder);
@@ -199,41 +205,14 @@ contract JavStakeX is
         emit BurnTokens(_pid, _holder, _burnAmount);
     }
 
-    function makeMigration(
-        uint256 _pid,
-        uint256 _amount,
-        address _holder
-    ) external onlyMigrator poolExists(_pid) {
-        UserInfo storage user = userInfo[_pid][_holder];
-        PoolInfo storage pool = poolInfo[_pid];
-        _updatePool(_pid, 0);
-
-        require(pool.baseToken.balanceOf(_msgSender()) >= _amount, InvalidAmount());
-
-        pool.baseToken.safeTransferFrom(_msgSender(), address(this), _amount);
-
-        pool.totalShares += _amount;
-
-        user.shares += _amount;
-        user.blockRewardDebt =
-            (user.shares * (pool.accRewardPerShare)) /
-            tokensPrecision[address(pool.rewardToken)].precision;
-        user.productsRewardDebt =
-            (user.shares * (pool.rewardsPerShare)) /
-            tokensPrecision[address(pool.rewardToken)].precision;
-
-        emit Stake(_holder, _pid, _amount);
-    }
+    function makeMigration(uint256 _pid, uint256 _amount, address _holder) external {}
 
     /**
      * @notice Function to stake token for selected pool
      * @param _pid: pool id
      * @param _amount: token amount
      */
-    function stake(
-        uint256 _pid,
-        uint256 _amount
-    ) external nonReentrant whenNotPaused onlyAgreeToTerms(termsAndConditionsAddress) {
+    function stake(uint256 _pid, uint256 _amount) external nonReentrant whenNotPaused {
         PoolInfo memory pool = poolInfo[_pid];
         require(pool.minStakeAmount <= _amount, InvalidAmount());
         require(pool.baseToken.balanceOf(_msgSender()) >= _amount, InvalidAmount());
@@ -301,13 +280,8 @@ contract JavStakeX is
 
     function apr(uint256 _pid) external view returns (uint256) {
         PoolInfo memory pool = poolInfo[_pid];
-        uint256 totalShares = pool.totalShares > 0
-            ? pool.totalShares
-            : tokensPrecision[address(pool.rewardToken)].precision;
-        return
-            (getRewardPerBlock(_pid) *
-                1051200 *
-                tokensPrecision[address(pool.rewardToken)].precision) / totalShares;
+        uint256 totalShares = pool.totalShares > 0 ? pool.totalShares : 1e18;
+        return (getRewardPerBlock() * 1051200 * 1e18) / totalShares;
     }
 
     function userShares(
@@ -339,12 +313,8 @@ contract JavStakeX is
         pool.totalShares += _amount - burnAmount;
 
         user.shares += _amount - burnAmount;
-        user.blockRewardDebt =
-            (user.shares * (pool.accRewardPerShare)) /
-            tokensPrecision[address(pool.rewardToken)].precision;
-        user.productsRewardDebt =
-            (user.shares * (pool.rewardsPerShare)) /
-            tokensPrecision[address(pool.rewardToken)].precision;
+        user.blockRewardDebt = (user.shares * (pool.accRewardPerShare)) / (1e18);
+        user.productsRewardDebt = (user.shares * (pool.rewardsPerShare)) / (1e18);
 
         emit Stake(_user, _pid, _amount - burnAmount);
     }
@@ -362,12 +332,8 @@ contract JavStakeX is
 
         _claim(_pid, _msgSender());
         user.shares -= _amount;
-        user.blockRewardDebt =
-            (user.shares * (pool.accRewardPerShare)) /
-            tokensPrecision[address(pool.rewardToken)].precision;
-        user.productsRewardDebt =
-            (user.shares * (pool.rewardsPerShare)) /
-            tokensPrecision[address(pool.rewardToken)].precision;
+        user.blockRewardDebt = (user.shares * (pool.accRewardPerShare)) / (1e18);
+        user.productsRewardDebt = (user.shares * (pool.rewardsPerShare)) / (1e18);
 
         pool.totalShares -= _amount;
 
@@ -397,12 +363,8 @@ contract JavStakeX is
             _burnToken(address(pool.rewardToken), burnAmount);
             pool.rewardToken.safeTransfer(_user, pending - burnAmount);
 
-            user.blockRewardDebt =
-                (user.shares * (pool.accRewardPerShare)) /
-                tokensPrecision[address(pool.rewardToken)].precision;
-            user.productsRewardDebt =
-                (user.shares * (pool.rewardsPerShare)) /
-                tokensPrecision[address(pool.rewardToken)].precision;
+            user.blockRewardDebt = (user.shares * (pool.accRewardPerShare)) / (1e18);
+            user.productsRewardDebt = (user.shares * (pool.rewardsPerShare)) / (1e18);
 
             emit Claim(address(pool.rewardToken), _user, pending - burnAmount);
         }
@@ -425,15 +387,11 @@ contract JavStakeX is
             return;
         }
 
-        uint256 _reward = (block.number - pool.lastRewardBlock) * getRewardPerBlock(_pid);
-        pool.accRewardPerShare =
-            pool.accRewardPerShare +
-            ((_reward * tokensPrecision[address(pool.rewardToken)].precision) / pool.totalShares);
+        uint256 _reward = (block.number - pool.lastRewardBlock) * getRewardPerBlock();
+        pool.accRewardPerShare = pool.accRewardPerShare + ((_reward * 1e18) / pool.totalShares);
         pool.lastRewardBlock = block.number;
         pool.rewardsAmount += _rewardsAmount;
-        pool.rewardsPerShare =
-            (pool.rewardsAmount * tokensPrecision[address(pool.rewardToken)].precision) /
-            pool.totalShares;
+        pool.rewardsPerShare = (pool.rewardsAmount * 1e18) / pool.totalShares;
 
         emit UpdatePool(_pid, pool.totalShares, pool.rewardsAmount, pool.rewardsPerShare);
     }
@@ -455,20 +413,14 @@ contract JavStakeX is
 
         if (block.number > pool.lastRewardBlock && pool.totalShares != 0) {
             uint256 _multiplier = block.number - pool.lastRewardBlock;
-            uint256 _reward = (_multiplier * getRewardPerBlock(_pid));
-            _accRewardPerShare =
-                _accRewardPerShare +
-                ((_reward * tokensPrecision[address(pool.rewardToken)].precision) /
-                    pool.totalShares);
+            uint256 _reward = (_multiplier * getRewardPerBlock());
+            _accRewardPerShare = _accRewardPerShare + ((_reward * 1e18) / pool.totalShares);
         }
 
-        uint256 blockRewards = ((user.shares * _accRewardPerShare) /
-            tokensPrecision[address(pool.rewardToken)].precision) - user.blockRewardDebt;
+        uint256 blockRewards = ((user.shares * _accRewardPerShare) / 1e18) - user.blockRewardDebt;
         uint256 poolRewards = user.shares * pool.rewardsPerShare;
-        uint256 productsRewards = (poolRewards /
-            tokensPrecision[address(pool.rewardToken)].precision) > user.productsRewardDebt
-            ? (poolRewards / tokensPrecision[address(pool.rewardToken)].precision) -
-                user.productsRewardDebt
+        uint256 productsRewards = (poolRewards / 1e18) > user.productsRewardDebt
+            ? (poolRewards / 1e18) - user.productsRewardDebt
             : 0;
 
         uint256 nftRewards = IERC721(infinityPass).balanceOf(_user) > 0

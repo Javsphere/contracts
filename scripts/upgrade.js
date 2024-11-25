@@ -1,6 +1,6 @@
 const { ethers, upgrades } = require("hardhat");
-const ContractName = "JavBorrowingProvider";
-const PROXY = "0xFd916d70eB2d0E0E1C17A6a68a7FBEdE3106b852";
+const ContractName = "BaseMigrator";
+const PROXY = "0x4fe3F2a6930B68fCD3355dDEF9168D486A35bd9d";
 
 async function main() {
     const [owner] = await ethers.getSigners();

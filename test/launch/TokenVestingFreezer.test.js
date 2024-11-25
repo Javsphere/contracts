@@ -16,16 +16,17 @@ describe("TokenVestingFreezer contract", () => {
     let freezerMock;
 
     async function deployFreezerFixture() {
-        const javFreezerFactory = await ethers.getContractFactory("JavFreezer");
+        const javFreezerFactory = await ethers.getContractFactory(
+            "contracts/JavFreezer.sol:JavFreezer",
+        );
         const infinityPass = await helpers.loadFixture(deployInfinityPassFixture);
         const javFreezer = await upgrades.deployProxy(
             javFreezerFactory,
             [
-                ethers.parseEther("0.05"),
-                864000,
                 "0x0000000000000000000000000000000000000000",
                 "5",
                 infinityPass.target,
+                "0x0000000000000000000000000000000000000000",
                 "0x0000000000000000000000000000000000000000",
             ],
 

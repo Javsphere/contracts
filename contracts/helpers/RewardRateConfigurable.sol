@@ -1,75 +1,69 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.16;
+
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract RewardRateConfigurable is Initializable {
+abstract contract RewardRateConfigurable is Initializable {
     struct RewardsConfiguration {
         uint256 rewardPerBlock;
         uint256 lastUpdateBlockNum;
         uint256 updateBlocksInterval;
+        uint128 block_multiplier;
+        uint128 block_divider;
     }
 
-    uint256 public constant REWARD_PER_BLOCK_MULTIPLIER = 1e6;
-    uint256 public constant DIVIDER = 1e6;
-
-    RewardsConfiguration private rewardsConfiguration;
+    mapping(uint256 => RewardsConfiguration) private rewardsConfiguration;
 
     event RewardPerBlockUpdated(uint256 oldValue, uint256 newValue);
 
-    function __RewardRateConfigurable_init(
-        uint256 _rewardPerBlock,
-        uint256 _rewardUpdateBlocksInterval
-    ) internal onlyInitializing {
-        __RewardRateConfigurable_init_unchained(_rewardPerBlock, _rewardUpdateBlocksInterval);
+    function getRewardsConfiguration(
+        uint256 _pid
+    ) public view returns (RewardsConfiguration memory) {
+        return rewardsConfiguration[_pid];
     }
 
-    function __RewardRateConfigurable_init_unchained(
-        uint256 _rewardPerBlock,
-        uint256 _rewardUpdateBlocksInterval
-    ) internal onlyInitializing {
-        rewardsConfiguration.rewardPerBlock = _rewardPerBlock;
-        rewardsConfiguration.lastUpdateBlockNum = block.number;
-        rewardsConfiguration.updateBlocksInterval = _rewardUpdateBlocksInterval;
-    }
-
-    function getRewardsConfiguration() public view returns (RewardsConfiguration memory) {
-        return rewardsConfiguration;
-    }
-
-    function getRewardPerBlock() public view returns (uint256) {
-        return rewardsConfiguration.rewardPerBlock;
+    function getRewardPerBlock(uint256 _pid) public view returns (uint256) {
+        return rewardsConfiguration[_pid].rewardPerBlock;
     }
 
     function _setRewardConfiguration(
+        uint256 _pid,
         uint256 rewardPerBlock,
         uint256 updateBlocksInterval
     ) internal {
-        uint256 oldRewardValue = rewardsConfiguration.rewardPerBlock;
+        uint256 oldRewardValue = rewardsConfiguration[_pid].rewardPerBlock;
 
-        rewardsConfiguration.rewardPerBlock = rewardPerBlock;
-        rewardsConfiguration.lastUpdateBlockNum = block.number;
-        rewardsConfiguration.updateBlocksInterval = updateBlocksInterval;
+        rewardsConfiguration[_pid] = RewardsConfiguration({
+            rewardPerBlock: rewardPerBlock,
+            lastUpdateBlockNum: block.number,
+            updateBlocksInterval: updateBlocksInterval,
+            block_multiplier: 1,
+            block_divider: 1
+        });
 
         emit RewardPerBlockUpdated(oldRewardValue, rewardPerBlock);
     }
 
-    function _updateRewardPerBlock() internal {
+    function _updateRewardPerBlock(uint256 _pid) internal {
         if (
-            (block.number - rewardsConfiguration.lastUpdateBlockNum) <
-            rewardsConfiguration.updateBlocksInterval
+            (block.number - rewardsConfiguration[_pid].lastUpdateBlockNum) <
+            rewardsConfiguration[_pid].updateBlocksInterval
         ) {
             return;
         }
 
-        uint256 rewardPerBlockOldValue = rewardsConfiguration.rewardPerBlock;
+        uint256 rewardPerBlockOldValue = rewardsConfiguration[_pid].rewardPerBlock;
 
-        rewardsConfiguration.rewardPerBlock =
-            (rewardPerBlockOldValue * REWARD_PER_BLOCK_MULTIPLIER) /
-            DIVIDER;
+        rewardsConfiguration[_pid].rewardPerBlock =
+            (rewardPerBlockOldValue * rewardsConfiguration[_pid].block_multiplier) /
+            rewardsConfiguration[_pid].block_divider;
 
-        rewardsConfiguration.lastUpdateBlockNum = block.number;
+        rewardsConfiguration[_pid].lastUpdateBlockNum = block.number;
 
-        emit RewardPerBlockUpdated(rewardPerBlockOldValue, rewardsConfiguration.rewardPerBlock);
+        emit RewardPerBlockUpdated(
+            rewardPerBlockOldValue,
+            rewardsConfiguration[_pid].rewardPerBlock
+        );
     }
 }
