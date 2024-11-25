@@ -45,16 +45,17 @@ describe("BaseMigrator contract", () => {
     }
 
     async function deployFreezer(vestingFreezerAddress, infinityPassAddress) {
-        const freezerFactory = await ethers.getContractFactory("JavFreezer");
+        const freezerFactory = await ethers.getContractFactory(
+            "contracts/JavFreezer.sol:JavFreezer",
+        );
         [owner, ...addrs] = await ethers.getSigners();
         const freezer = await upgrades.deployProxy(
             freezerFactory,
             [
-                ethers.parseEther("0.05"),
-                864000,
                 vestingFreezerAddress,
                 5,
                 infinityPassAddress,
+                "0x0000000000000000000000000000000000000000",
                 "0x0000000000000000000000000000000000000000",
             ],
             {
@@ -66,16 +67,15 @@ describe("BaseMigrator contract", () => {
     }
 
     async function deployStaking(infinityPassAddress) {
-        const stakingFactory = await ethers.getContractFactory("JavStakeX");
+        const stakingFactory = await ethers.getContractFactory("contracts/JavStakeX.sol:JavStakeX");
         [owner, ...addrs] = await ethers.getSigners();
         const staking = await upgrades.deployProxy(
             stakingFactory,
             [
-                ethers.parseEther("0.05"),
-                864000,
                 "0x0000000000000000000000000000000000000000",
                 5,
                 infinityPassAddress,
+                "0x0000000000000000000000000000000000000000",
                 "0x0000000000000000000000000000000000000000",
             ],
             {

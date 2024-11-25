@@ -1,37 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.24;
-
-import "./helpers/IGeneralErrors.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../interfaces/helpers/IGeneralErrors.sol";
 
 interface IJavFreezer is IGeneralErrors {
-    /**
-     * @notice Info of each user
-     * One Address can have many Deposits with different periods. Unlimited Amount.
-     * Total Deposit Tokens = Total amount of user active stake in all.
-     * depositId = incremental ID of deposits, eg. if user has 3 staking then this value will be 2;
-     * totalClaim = Total amount of tokens user claim.
-     */
-    struct UserInfo {
-        uint256 totalDepositTokens;
-        uint256 depositId;
-        uint256 totalClaim;
-    }
-
-    /**
-     * @notice Info of Pool
-     * @param lastRewardBlock: Last block number that reward distribution occurs
-     * @param accUTacoPerShare: Accumulated rewardPool per share, times 1e18
-     */
-    struct PoolInfo {
-        IERC20 baseToken;
-        IERC20 rewardToken;
-        uint256 totalShares;
-        uint256 lastRewardBlock;
-        uint256 accRewardPerShare;
-    }
-
     /**
      * @notice Info for each staking by ID
      * One Address can have many Deposits with different periods. Unlimited Amount.
@@ -49,22 +21,6 @@ interface IJavFreezer is IGeneralErrors {
         uint256 rewardsClaimed;
         uint256 rewardDebt;
         bool is_finished;
-    }
-
-    struct ProductsRewardsInfo {
-        uint256 rewardsAmount;
-        uint256 rewardsPerShare;
-    }
-
-    struct PoolFee {
-        uint64 depositFee; //* 1e4
-        uint64 withdrawFee; //* 1e4
-        uint64 claimFee; //* 1e4
-    }
-
-    struct TokenPrecisionInfo {
-        uint128 precision;
-        uint128 precisionDelta;
     }
 
     function pendingReward(
@@ -116,7 +72,6 @@ interface IJavFreezer is IGeneralErrors {
         uint256 _lastRewardBlock,
         uint256 _accRewardPerShare
     );
-    event SetPoolFee(uint256 _pid, PoolFee _poolFee);
     event SetLockPeriod(uint256 indexed _lockId, uint256 _duration);
     event SetLockPeriodMultiplier(uint256 indexed _lockId, uint256 _multiplier);
     event SetVestingAddress(address indexed _address);

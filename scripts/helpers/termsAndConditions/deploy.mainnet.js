@@ -1,17 +1,15 @@
-const {ethers, upgrades} = require("hardhat");
-const {logDeploy} = require("../../utils");
+const { ethers, upgrades } = require("hardhat");
+const { logDeploy } = require("../../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
     // We get the contract to deploy
     console.log(`Deploying from ${owner.address}`);
-    const Contract = await ethers.getContractFactory(
-        "TermsAndConditionsAgreement",
-    );
+    const Contract = await ethers.getContractFactory("TermsAndConditionsAgreement");
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "test" //_agreementsUrl
+            "test", //_agreementsUrl
         ],
         {
             initializer: "initialize",

@@ -51,6 +51,8 @@ contract BaseMigrator is IGeneralErrors, BaseUpgradable {
     error AlreadyMigrated();
     error InvalidSigner();
 
+    event SetSignerAddress(address indexed _address);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -74,6 +76,12 @@ contract BaseMigrator is IGeneralErrors, BaseUpgradable {
         signerAddress = _signerAddress;
 
         __Base_init();
+    }
+
+    function setSignerAddress(address _address) external nonZeroAddress(_address) onlyAdmin {
+        signerAddress = _address;
+
+        emit SetSignerAddress(_address);
     }
 
     function makeMigration(bytes calldata migrationData) external {

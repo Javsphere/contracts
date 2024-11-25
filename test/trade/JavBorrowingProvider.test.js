@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { deployTokenFixture } = require("../common/mocks");
+const { deployTokenFixture, deployTermsAndConditionsFixture } = require("../common/mocks");
 const { ADMIN_ERROR, MANAGER_ERROR, MAX_UINT256 } = require("../common/constanst");
 describe("JavBorrowingProvider contract", () => {
     let hhJavBorrowingProvider;
@@ -14,6 +14,7 @@ describe("JavBorrowingProvider contract", () => {
     let erc20Token;
     let erc20Token2;
     let llpToken;
+    let termsAndConditions;
     const token1PriceId = "0x12635656e5b860830354ee353bce5f76d17342f9dbb560e3180d878b5d53bae3";
     const token2PriceId = "0x2c14b4d35d0e7061b86be6dd7d168ca1f919c069f54493ed09a91adabea60ce6";
 
@@ -58,6 +59,7 @@ describe("JavBorrowingProvider contract", () => {
         erc20Token2 = await helpers.loadFixture(deployToken2Fixture);
         llpToken = await helpers.loadFixture(deployLLPToken);
         javPriceAggregator = await helpers.loadFixture(deployJavPriceAggregator);
+        termsAndConditions = await helpers.loadFixture(deployTermsAndConditionsFixture);
 
         hhJavBorrowingProvider = await upgrades.deployProxy(
             JavBorrowingProvider,
@@ -132,6 +134,7 @@ describe("JavBorrowingProvider contract", () => {
             await erc20Token.connect(owner).approve(hhJavBorrowingProvider.target, MAX_UINT256);
             await erc20Token2.connect(owner).approve(hhJavBorrowingProvider.target, MAX_UINT256);
             await erc20Token2.connect(addr2).approve(hhJavBorrowingProvider.target, MAX_UINT256);
+            await hhJavBorrowingProvider.setTermsAndConditionsAddress(termsAndConditions.target);
         });
     });
 
@@ -237,6 +240,14 @@ describe("JavBorrowingProvider contract", () => {
 
         it("Should addWhiteListBatch", async () => {
             await hhJavBorrowingProvider.addWhiteListBatch([addr2.address]);
+        });
+
+        it("Should revert when buyLLP - OnlyAgreedToTerms", async () => {
+            await expect(
+                hhJavBorrowingProvider.connect(addr2).buyLLP(1, 1),
+            ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "OnlyAgreedToTerms");
+
+            await termsAndConditions.connect(addr2).agreeToTerms();
         });
 
         it("Should buyLLP", async () => {
