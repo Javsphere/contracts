@@ -107,7 +107,7 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
     ) external view returns (IJavPriceAggregator.Price memory price) {
         price = _latestPriceInfo[id];
 
-        require(_diff(block.timestamp, price.publishTime) > age, StalePrice());
+        require(_diff(block.timestamp, price.publishTime) <= age, StalePrice());
 
         return price;
     }
