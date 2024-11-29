@@ -37,4 +37,6 @@ interface IJavBorrowingProvider {
     error OnlyWhiteList();
     error InactiveBuy();
     error InactiveSell();
+    error WrongBuyFee();
+    error WrongSellFee();
 }
