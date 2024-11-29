@@ -191,6 +191,14 @@ contract JavBorrowingFees is JavAddressStore, IBorrowingFeesUtils {
     }
 
     /// @inheritdoc IBorrowingFeesUtils
+    function getBorrowingGroupOi(
+        uint8 _collateralIndex,
+        uint16 _groupIndex
+    ) external view returns (OpenInterest memory) {
+        return BorrowingFeesUtils.getBorrowingGroupOi(_collateralIndex, _groupIndex);
+    }
+
+    /// @inheritdoc IBorrowingFeesUtils
     function getBorrowingPair(
         uint8 _collateralIndex,
         uint16 _pairIndex
