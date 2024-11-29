@@ -137,6 +137,8 @@ contract JavBorrowingProvider is
         uint256 _sellFee,
         TokenInfo[] memory _tokens
     ) external initializer {
+        require(_buyFee <= 10, WrongBuyFee());
+        require(_sellFee <= 10, WrongSellFee());
         priceAggregator = IJavPriceAggregator(_priceAggregator);
         swapRouter = ISwapRouter(_swapRouter);
         pnlHandler = _pnlHandler;
