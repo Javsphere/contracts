@@ -390,7 +390,7 @@ contract JavFreezer is
     function claimAllByByLockId(
         uint256 _pid,
         uint256 _lockId
-    ) external nonReentrant poolExists(_pid) validLockId(_lockId) {
+    ) external nonReentrant poolExists(_pid) {
         for (
             uint256 _depositId = 0;
             _depositId < userInfo[_msgSender()][_pid].depositId;
