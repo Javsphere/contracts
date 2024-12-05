@@ -218,34 +218,6 @@ contract JavFreezer is
         emit SetTermsAndConditionsAddress(_termsAndConditionsAddress);
     }
 
-    function burnTokens(uint256 _pid, address _holder) external onlyMigrator poolExists(_pid) {
-        for (uint256 _depositId = 0; _depositId < userInfo[_holder][_pid].depositId; ++_depositId) {
-            UserDeposit storage depositDetails = userDeposits[_holder][_pid][_depositId];
-            if (!depositDetails.is_finished) {
-                _updatePool(_pid, 0);
-                _claim(_holder, _pid, _depositId, false);
-
-                UserInfo storage user = userInfo[_holder][_pid];
-                PoolInfo storage pool = poolInfo[_pid];
-                user.totalDepositTokens -= depositDetails.depositTokens;
-                pool.totalShares -= depositDetails.depositTokens;
-                tvl[_pid][depositDetails.stakePeriod] -= depositDetails.depositTokens;
-
-                _burnToken(address(pool.baseToken), depositDetails.depositTokens);
-
-                depositDetails.is_finished = true;
-
-                emit BurnTokens(
-                    _pid,
-                    _holder,
-                    _depositId,
-                    depositDetails.stakePeriod,
-                    depositDetails.depositTokens
-                );
-            }
-        }
-    }
-
     function makeMigration(
         uint256 _pid,
         address _holder,

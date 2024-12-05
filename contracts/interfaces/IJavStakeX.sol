@@ -44,8 +44,6 @@ interface IJavStakeX is IGeneralErrors {
 
     function addRewards(uint256 _pid, uint256 _amount) external;
 
-    function burnTokens(uint256 _pid, address _holder) external;
-
     function makeMigration(uint256 _pid, uint256 _amount, address _holder) external;
 
     event AddPool(
@@ -70,7 +68,6 @@ interface IJavStakeX is IGeneralErrors {
     event SetInfinityPassPercent(uint256 indexed _percent);
     event SetInfinityPass(address indexed _address);
     event SetMigratorAddress(address indexed _address);
-    event BurnTokens(uint256 indexed pid, address indexed holder, uint256 amount);
 
     error WrongPool();
 }
