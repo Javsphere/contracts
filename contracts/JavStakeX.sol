@@ -100,6 +100,14 @@ contract JavStakeX is
         emit SetMigratorAddress(_address);
     }
 
+    function setTermsAndConditionsAddress(
+        address _termsAndConditionsAddress
+    ) external onlyAdmin nonZeroAddress(_termsAndConditionsAddress) {
+        termsAndConditionsAddress = _termsAndConditionsAddress;
+
+        emit SetTermsAndConditionsAddress(_termsAndConditionsAddress);
+    }
+
     function setRewardConfiguration(
         uint256 _pid,
         uint256 rewardPerBlock,
@@ -170,33 +178,6 @@ contract JavStakeX is
     function setPoolFee(uint256 pid, PoolFee memory _poolFee) external onlyAdmin poolExists(pid) {
         poolFee[pid] = _poolFee;
         emit SetPoolFee(pid, _poolFee);
-    }
-
-    function setTermsAndConditionsAddress(
-        address _termsAndConditionsAddress
-    ) external onlyAdmin nonZeroAddress(_termsAndConditionsAddress) {
-        termsAndConditionsAddress = _termsAndConditionsAddress;
-
-        emit SetTermsAndConditionsAddress(_termsAndConditionsAddress);
-    }
-
-    function burnTokens(uint256 _pid, address _holder) external onlyMigrator poolExists(_pid) {
-        _updatePool(_pid, 0);
-        _claim(_pid, _holder);
-
-        PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][_holder];
-        uint256 _burnAmount = user.shares;
-
-        user.shares = 0;
-        user.blockRewardDebt = 0;
-        user.productsRewardDebt = 0;
-
-        pool.totalShares -= _burnAmount;
-
-        _burnToken(address(pool.baseToken), _burnAmount);
-
-        emit BurnTokens(_pid, _holder, _burnAmount);
     }
 
     function makeMigration(

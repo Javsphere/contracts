@@ -101,8 +101,6 @@ interface IJavFreezer is IGeneralErrors {
 
     function addRewards(uint256 _pid, uint256 _amount) external;
 
-    function burnTokens(uint256 _pid, address _holder) external;
-
     function makeMigration(
         uint256 _pid,
         address _holder,
@@ -146,13 +144,6 @@ interface IJavFreezer is IGeneralErrors {
     event SetInfinityPassPercent(uint256 indexed _percent);
     event SetInfinityPass(address indexed _address);
     event SetMigratorAddress(address indexed _address);
-    event BurnTokens(
-        uint256 indexed pid,
-        address indexed holder,
-        uint256 depositId,
-        uint256 lockId,
-        uint256 amount
-    );
     event SetAverageBlockTime(uint256 indexed blockTime);
 
     error WrongPool();

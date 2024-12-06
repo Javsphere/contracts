@@ -84,7 +84,7 @@ contract BaseMigrator is IGeneralErrors, BaseUpgradable {
         emit SetSignerAddress(_address);
     }
 
-    function makeMigration(bytes calldata migrationData) external {
+    function makeMigration(bytes calldata migrationData) external whenNotPaused {
         require(migrationData.length >= 65, WrongLength()); // 65 bytes for the signature
         //        require(migrationInfo.signature.length == 65, WrongLength());
         bytes memory signature = _slice(migrationData, 0, 65);

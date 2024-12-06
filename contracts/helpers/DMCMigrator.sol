@@ -6,9 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../base/BaseUpgradable.sol";
 import "../interfaces/helpers/ITokenLock.sol";
 import "../interfaces/ITokenVesting.sol";
-import "../interfaces/IJavStakeX.sol";
-import "../interfaces/IJavFreezer.sol";
 import "../interfaces/IERC721Extended.sol";
+import "../dmc/IJavStakeX.sol";
+import "../dmc/IJavFreezer.sol";
 
 contract DMCMigrator is BaseUpgradable {
     using SafeERC20 for IERC20;
@@ -46,7 +46,7 @@ contract DMCMigrator is BaseUpgradable {
         __Base_init();
     }
 
-    function migrateFunds(uint256 _tokenID) external {
+    function migrateFunds(uint256 _tokenID) external whenNotPaused {
         // vesting
         if (ITokenVesting(vestingAddress).holdersVestingCount(_msgSender()) > 0) {
             ITokenVesting(vestingAddress).burnTokens(_msgSender());
