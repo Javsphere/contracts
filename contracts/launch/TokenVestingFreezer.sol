@@ -39,12 +39,6 @@ contract TokenVestingFreezer is ITokenVesting, BaseUpgradable, ReentrancyGuardUp
     event AddAllowedAddress(address indexed _address);
     event RemoveAllowedAddress(address indexed _address);
     event SetMigratorAddress(address indexed _address);
-    event BurnTokens(
-        address indexed holder,
-        bytes32 vestingScheduleId,
-        uint256 freezerdepositID,
-        uint256 amount
-    );
 
     modifier onlyIfVestingScheduleNotRevoked(bytes32 _vestingScheduleId) {
         require(vestingSchedules[_vestingScheduleId].initialized);
@@ -167,7 +161,7 @@ contract TokenVestingFreezer is ITokenVesting, BaseUpgradable, ReentrancyGuardUp
     ) external onlyAdmin onlyIfVestingScheduleNotRevoked(vestingScheduleId) {
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
         require(vestingSchedule.revocable, "TokenVesting: vesting is not revocable");
-        uint128 vestedAmount = _computeReleasableAmount(vestingSchedule);
+        uint128 vestedAmount = _computeReleasableAmount(vestingSchedule, vestingScheduleId);
         if (vestedAmount > 0) {
             _release(msg.sender, vestingScheduleId);
         }
@@ -215,7 +209,7 @@ contract TokenVestingFreezer is ITokenVesting, BaseUpgradable, ReentrancyGuardUp
         bytes32 vestingScheduleId
     ) external view onlyIfVestingScheduleNotRevoked(vestingScheduleId) returns (uint256) {
         VestingSchedule memory vestingSchedule = vestingSchedules[vestingScheduleId];
-        uint256 vestedAmount = _computeReleasableAmount(vestingSchedule);
+        uint256 vestedAmount = _computeReleasableAmount(vestingSchedule, vestingScheduleId);
         uint256 freezeProfit = IJavFreezer(freezer).pendingReward(
             0,
             vestingFreezeId[vestingScheduleId],
@@ -236,28 +230,7 @@ contract TokenVestingFreezer is ITokenVesting, BaseUpgradable, ReentrancyGuardUp
             ];
     }
 
-    function burnTokens(address _holder) external onlyMigrator {
-        bytes32 _vestingScheduleId;
-        for (uint256 i = 0; i < holdersVestingCount[_holder]; ++i) {
-            _vestingScheduleId = _computeVestingScheduleIdForAddressAndIndex(_holder, i);
-            if (_computeReleasableAmount(vestingSchedules[_vestingScheduleId]) > 0) {
-                _release(_holder, _vestingScheduleId);
-            }
-            VestingSchedule storage vestingSchedule = vestingSchedules[_vestingScheduleId];
-            if (!vestingSchedule.revoked) {
-                uint256 unreleased = vestingSchedule.amountTotal - vestingSchedule.released;
-                vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - unreleased;
-                vestingSchedule.revoked = true;
-
-                emit BurnTokens(
-                    _holder,
-                    _vestingScheduleId,
-                    vestingFreezeId[_vestingScheduleId],
-                    unreleased
-                );
-            }
-        }
-    }
+    function burnTokens(address _holder) external {}
 
     /**
      * @dev Computes the vesting schedule identifier for an address and an index.
@@ -344,7 +317,7 @@ contract TokenVestingFreezer is ITokenVesting, BaseUpgradable, ReentrancyGuardUp
             isBeneficiary || isReleasor,
             "TokenVesting: only beneficiary and owner can release vested tokens"
         );
-        uint128 releasableAmount = _computeReleasableAmount(vestingSchedule);
+        uint128 releasableAmount = _computeReleasableAmount(vestingSchedule, vestingScheduleId);
         require(releasableAmount > 0, "TokenVesting: invalid releasable amount");
 
         IJavFreezer(freezer).withdrawVesting(
@@ -375,12 +348,16 @@ contract TokenVestingFreezer is ITokenVesting, BaseUpgradable, ReentrancyGuardUp
      * @return the amount of releasable tokens
      */
     function _computeReleasableAmount(
-        VestingSchedule memory vestingSchedule
+        VestingSchedule memory vestingSchedule,
+        bytes32 vestingScheduleId
     ) private view returns (uint128) {
         // Retrieve the current time.
         uint256 currentTime = block.timestamp;
+        bool isDepositFinished = IJavFreezer(freezer)
+            .userDeposit(vestingSchedule.beneficiary, 0, vestingFreezeId[vestingScheduleId])
+            .is_finished;
         // If the current time is before the cliff, no tokens are releasable.
-        if ((currentTime < vestingSchedule.cliff) || vestingSchedule.revoked) {
+        if ((currentTime < vestingSchedule.cliff) || vestingSchedule.revoked || isDepositFinished) {
             return 0;
         }
         // If the current time is after the vesting period, all tokens are releasable,

@@ -9,7 +9,8 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x000", // _tokenAddress
+            "0x66F3Cf265D2D146A0348F6fC67E3Da0835e0968E", // _tokenAddress
+            "0x0000000000000000000000000000000000000000", // _migrator
         ],
         {
             initializer: "initialize",
