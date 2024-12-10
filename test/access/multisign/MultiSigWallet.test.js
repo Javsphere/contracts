@@ -1,7 +1,6 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { deployTokenFixture } = require("../../common/mocks");
 
 describe("MultiSigWallet contract", () => {
     let hhMultiSigWallet;
@@ -13,10 +12,22 @@ describe("MultiSigWallet contract", () => {
     let owners;
     let required;
 
+    async function deployJavTokenFixture() {
+        const javTokenFactory = await ethers.getContractFactory("JavToken");
+        [owner, ...addrs] = await ethers.getSigners();
+        const javToken = await upgrades.deployProxy(javTokenFactory, [
+            ethers.parseEther("2000000000"), //_cap
+        ], {
+            initializer: "initialize",
+        });
+        await javToken.waitForDeployment();
+        return javToken;
+    }
+
     before(async () => {
         const multiSigWallet = await ethers.getContractFactory("MultiSigWallet");
         [owner, addr1, addr2, addr3, ...addrs] = await ethers.getSigners();
-        erc20Token = await helpers.loadFixture(deployTokenFixture);
+        erc20Token = await helpers.loadFixture(deployJavTokenFixture);
 
         owners = [addr1.address, addr2.address];
         required = 2;
@@ -35,6 +46,10 @@ describe("MultiSigWallet contract", () => {
 
         it("Should set the right required", async () => {
             await expect(await hhMultiSigWallet.required()).to.equal(required);
+        });
+
+        it("Should transfer owner from token", async () => {
+            await erc20Token.transferOwnership(hhMultiSigWallet.target);
         });
     });
 
@@ -189,3 +204,7 @@ describe("MultiSigWallet contract", () => {
         });
     });
 });
+
+
+0x40c10f1900000000000000000000000051cdb3fe30e7fbed9df51ee7e0bf636f691372990000000000000000000000000000000000000000000000000de0b6b3a7640000
+0x40c10f1900000000000000000000000051cdb3fe30e7fbed9df51ee7e0bf636f691372990000000000000000000000000000000000000000000000000de0b6b3a7640000

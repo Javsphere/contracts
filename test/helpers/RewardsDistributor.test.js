@@ -200,10 +200,9 @@ describe("RewardsDistributor contract", () => {
         });
 
         it("Should setTokenPoolFee", async () => {
-            const fee = 3000;
-            await hhRewardsDistributor.setTokenPoolFee(wdfiTokenV3.target, fee);
+            await hhRewardsDistributor.setTokenPoolFee(wdfiTokenV3.target, true);
 
-            await expect(await hhRewardsDistributor.tokenPoolFee(wdfiTokenV3.target)).to.equal(fee);
+            await expect(await hhRewardsDistributor.tokenPoolFee(wdfiTokenV3.target)).to.equal(true);
         });
 
         it("Should revert when distributeRewards", async () => {

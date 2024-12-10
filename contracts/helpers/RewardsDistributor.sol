@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -9,7 +9,7 @@ import "../interfaces/IERC20Extended.sol";
 import "../interfaces/IJavFreezer.sol";
 import "../interfaces/IJavStakeX.sol";
 import "../base/BaseUpgradable.sol";
-import "../interfaces/ISwapRouter.sol";
+import "../interfaces/IRouter.sol";
 
 contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
     using SafeERC20 for IERC20;
@@ -17,7 +17,7 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
 
     EnumerableSet.AddressSet private _allowedAddresses;
 
-    ISwapRouter public swapRouter;
+    IRouter public swapRouter;
 
     address public javAddress;
     address public stakingAddress;
@@ -25,14 +25,13 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
 
     uint256 public burnPercent;
     uint256 public freezerPercent;
-
-    mapping(address => uint256) public tokenPoolFee;
+    mapping(address => bool) public tokenPoolFee;
 
     /* ========== EVENTS ========== */
     event AddAllowedAddress(address indexed _address);
     event RemoveAllowedAddress(address indexed _address);
     event SetPercents(uint256 burnPercent, uint256 freezerPercent);
-    event SetTokenPoolFee(address token, uint256 fee);
+    event SetTokenPoolFee(address token, bool isStable);
     event DistributeRewards(uint256 amount);
 
     modifier onlyAllowedAddresses() {
@@ -64,7 +63,7 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
         burnPercent = _burnPercent;
         freezerPercent = _freezerPercent;
 
-        swapRouter = ISwapRouter(_swapRouter);
+        swapRouter = IRouter(_swapRouter);
 
         for (uint256 i = 0; i < _allowedAddresses_.length; i++) {
             _allowedAddresses.add(_allowedAddresses_[i]);
@@ -99,46 +98,41 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
         emit SetPercents(burnPercent, freezerPercent);
     }
 
-    function setTokenPoolFee(address _token, uint256 _fee) external onlyAdmin {
-        tokenPoolFee[_token] = _fee;
+    function setTokenPoolFee(address _token, bool _isStable) external onlyAdmin {
+        tokenPoolFee[_token] = _isStable;
 
-        emit SetTokenPoolFee(_token, _fee);
+        emit SetTokenPoolFee(_token, _isStable);
     }
 
     function distributeRewards(address[] memory _tokens) external onlyAllowedAddresses {
         for (uint256 i = 0; i < _tokens.length; i++) {
             address _tokenIn = _tokens[i];
             if (_tokenIn != javAddress && _tokenIn != address(0)) {
-                _swapToken(
-                    _tokenIn,
-                    javAddress,
-                    IERC20(_tokenIn).balanceOf(address(this)),
-                    tokenPoolFee[_tokenIn]
-                );
+                _swapToken(_tokenIn, javAddress, IERC20(_tokenIn).balanceOf(address(this)));
             }
         }
         _distributeRewards();
     }
 
-    function _swapToken(
-        address _tokenIn,
-        address _tokenOut,
-        uint256 _amount,
-        uint256 _poolFee
-    ) private {
+    function _swapToken(address _tokenIn, address _tokenOut, uint256 _amount) private {
         IERC20(_tokenIn).safeDecreaseAllowance(address(swapRouter), 0);
         IERC20(_tokenIn).safeIncreaseAllowance(address(swapRouter), _amount);
 
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
-            tokenIn: _tokenIn,
-            tokenOut: _tokenOut,
-            fee: uint24(_poolFee),
-            recipient: address(this),
-            amountIn: _amount,
-            amountOutMinimum: 0,
-            sqrtPriceLimitX96: 0
+        IRouter.Route[] memory route;
+        route[0] = IRouter.Route({
+            from: _tokenIn,
+            to: _tokenOut,
+            stable: tokenPoolFee[_tokenIn],
+            factory: address(0)
         });
-        swapRouter.exactInputSingle(params);
+
+        swapRouter.swapExactTokensForTokens(
+            _amount,
+            0,
+            route,
+            address(this),
+            block.timestamp + 1000
+        );
     }
 
     function _distributeRewards() private {
