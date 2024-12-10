@@ -13,7 +13,7 @@ import "../base/BaseUpgradable.sol";
 import "../interfaces/leverageX/IJavBorrowingProvider.sol";
 import "../interfaces/IJavPriceAggregator.sol";
 import "../interfaces/IERC20Extended.sol";
-import "../interfaces/ISwapRouter.sol";
+import "../interfaces/IRouter.sol";
 
 contract JavBorrowingProvider is
     IJavBorrowingProvider,
@@ -53,7 +53,7 @@ contract JavBorrowingProvider is
     uint256 constant PRECISION_18 = 1e18;
 
     IJavPriceAggregator public priceAggregator;
-    ISwapRouter public swapRouter;
+    IRouter public swapRouter;
     address public pnlHandler;
     address public llpToken;
     uint256 public buyFee; // * 1e4
@@ -140,7 +140,7 @@ contract JavBorrowingProvider is
         require(_buyFee <= 10, WrongBuyFee());
         require(_sellFee <= 10, WrongSellFee());
         priceAggregator = IJavPriceAggregator(_priceAggregator);
-        swapRouter = ISwapRouter(_swapRouter);
+        swapRouter = IRouter(_swapRouter);
         pnlHandler = _pnlHandler;
         llpToken = _llpToken;
         buyFee = _buyFee;

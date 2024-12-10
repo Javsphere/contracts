@@ -1,4 +1,5 @@
 const { ethers, upgrades } = require("hardhat");
+const {logDeploy} = require("../../utils");
 
 async function main() {
     const [owner] = await ethers.getSigners();
@@ -8,29 +9,25 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "0x66F3Cf265D2D146A0348F6fC67E3Da0835e0968E", // _javAddress,
-            "0x2A9c4EdE9994911359af815367187947eD1dDf02", // _swapRouter,
-            "0xF923f0828c56b27C8f57bc698c99543f63091E9A", // _stakingAddress,
-            "0x4e15D4225623D07Adb43e9D546E57E1E6097e869", // _freezerAddress,
+            "0xEdC68c4c54228D273ed50Fc450E253F685a2c6b9", // _javAddress,
+            "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43", // _swapRouter,
+            "0xE420BBb4C2454f305a3335BBdCE069326985fb5b", // _stakingAddress,
+            "0x03e225D2bd32F5ecE539005B57F9B94A743ADBFB", // _freezerAddress,
             50, // _burnPercent,
             70, // _freezerPercent,
             [
-                "0x9065F4D6fB7B940D64941542c728f3883dE04FdC",
-                "0x51cdb3fe30E7fbEd9Df51EE7E0BF636f69137299",
+                "0xeDdF88551824918fdC98907732f92c62dBb827AA",
+                "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb",
             ], // _allowedAddresses_
         ],
         {
             initializer: "initialize",
             kind: "uups",
-            txOverrides: {
-                gasLimit: ethers.parseUnits("0.03", "gwei"),
-            },
         },
     );
     await contract.waitForDeployment();
 
-    const contractAddress = await contract.getAddress();
-    console.log(`RewardsDistributor contract deployed to: ${contractAddress}`);
+    logDeploy("RewardsDistributor", await contract.getAddress());
 }
 
 main()
