@@ -20,6 +20,7 @@ contract DMCMigrator is BaseUpgradable {
     address public stakingAddress;
     address public freezerAddress;
     address public infinityPass;
+    mapping(address => uint256) public migratedTime;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -72,5 +73,7 @@ contract DMCMigrator is BaseUpgradable {
         if (balance > 0) {
             ITokenLock(tokenLockAddress).lockTokens(_msgSender(), balance);
         }
+
+        migratedTime[_msgSender()] = block.timestamp;
     }
 }
