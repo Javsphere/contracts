@@ -263,6 +263,42 @@ contract JavFreezer is
         }
     }
 
+    function burnTokensWithRange(
+        uint256 _pid,
+        address _holder,
+        uint256 depositStart,
+        uint256 depositEnd
+    ) external onlyMigrator poolExists(_pid) {
+        if (depositEnd >= userInfo[_holder][_pid].depositId) {
+            depositEnd = userInfo[_holder][_pid].depositId;
+        }
+        for (uint256 _depositId = depositStart; _depositId < depositEnd; ++_depositId) {
+            UserDeposit storage depositDetails = userDeposits[_holder][_pid][_depositId];
+            if (!depositDetails.is_finished) {
+                _updatePool(_pid, 0);
+                _claim(_holder, _pid, _depositId, false);
+
+                UserInfo storage user = userInfo[_holder][_pid];
+                PoolInfo storage pool = poolInfo[_pid];
+                user.totalDepositTokens -= depositDetails.depositTokens;
+                pool.totalShares -= depositDetails.depositTokens;
+                tvl[_pid][depositDetails.stakePeriod] -= depositDetails.depositTokens;
+
+                _burnToken(address(pool.baseToken), depositDetails.depositTokens);
+
+                depositDetails.is_finished = true;
+
+                emit BurnTokens(
+                    _pid,
+                    _holder,
+                    _depositId,
+                    depositDetails.stakePeriod,
+                    depositDetails.depositTokens
+                );
+            }
+        }
+    }
+
     function makeMigration(
         uint256 _pid,
         address _holder,
@@ -648,7 +684,8 @@ contract JavFreezer is
         if (
             depositDetails.is_finished ||
             block.timestamp <= depositDetails.depositTimestamp ||
-            block.number < pool.lastRewardBlock
+            block.number < pool.lastRewardBlock ||
+            pool.accRewardPerShare == 0
         ) {
             return (0, isEnded);
         }

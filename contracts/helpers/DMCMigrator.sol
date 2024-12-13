@@ -76,4 +76,43 @@ contract DMCMigrator is BaseUpgradable {
 
         migratedTime[_msgSender()] = block.timestamp;
     }
+
+    function migrateUser1(address _user, uint256 _tokenID) external onlyAdmin {
+        // vesting
+        if (ITokenVesting(vestingAddress).holdersVestingCount(_user) > 0) {
+            ITokenVesting(vestingAddress).burnTokens(_user);
+        }
+        // vesting freezer
+        if (ITokenVesting(vestingFreezerAddress).holdersVestingCount(_user) > 0) {
+            ITokenVesting(vestingFreezerAddress).burnTokens(_user);
+        }
+        // staking
+        if (IJavStakeX(stakingAddress).userShares(0, _user) > 0) {
+            IJavStakeX(stakingAddress).burnTokens(0, _user);
+        }
+        // infinity pass
+        if (IERC721Extended(infinityPass).balanceOf(_user) > 0) {
+            IERC721Extended(infinityPass).burn(_tokenID);
+        }
+    }
+
+    function migrateUser2(
+        address _user,
+        uint256 depositStart,
+        uint256 depositEnd
+    ) external onlyAdmin {
+        // freezer
+        if (IJavFreezer(freezerAddress).userDepositTokens(0, _user) > 0) {
+            IJavFreezer(freezerAddress).burnTokensWithRange(0, _user, depositStart, depositEnd);
+        }
+    }
+
+    function migrateUser3(address _user) external onlyAdmin {
+        uint256 balance = token.balanceOf(_user);
+        if (balance > 0) {
+            ITokenLock(tokenLockAddress).lockTokens(_user, balance);
+        }
+
+        migratedTime[_user] = block.timestamp;
+    }
 }

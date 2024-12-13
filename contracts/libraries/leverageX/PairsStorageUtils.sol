@@ -54,9 +54,9 @@ library PairsStorageUtils {
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
-    function removePairs(uint256[] calldata _pairIndices) internal {
+    function togglePairsState(uint256[] calldata _pairIndices) internal {
         for (uint256 i = 0; i < _pairIndices.length; ++i) {
-            _removePair(_pairIndices[i]);
+            _togglePairsState(_pairIndices[i]);
         }
     }
 
@@ -456,15 +456,16 @@ library PairsStorageUtils {
      * @dev Remove an existing trading pair
      * @param _pairIndex index of pair to remove
      */
-    function _removePair(uint256 _pairIndex) internal {
+    function _togglePairsState(uint256 _pairIndex) internal {
         IPairsStorage.PairsStorage storage s = _getStorage();
 
         IPairsStorage.Pair memory p = s.pairs[_pairIndex];
         if (!s.isPairListed[p.from][p.to]) revert IPairsStorageUtils.PairNotListed();
 
-        s.isPairRemoved[_pairIndex] = true;
+        bool toggled = !s.isPairRemoved[_pairIndex];
+        s.isPairRemoved[_pairIndex] = toggled;
 
-        emit IPairsStorageUtils.PairRemoved(_pairIndex);
+        emit IPairsStorageUtils.PairStateUpdated(_pairIndex, toggled);
     }
 
     /**

@@ -428,7 +428,7 @@ contract JavStakeX is
         PoolInfo memory pool = poolInfo[_pid];
         UserInfo memory user = userInfo[_pid][_user];
 
-        if (block.number < pool.lastRewardBlock) {
+        if (block.number < pool.lastRewardBlock || pool.accRewardPerShare == 0) {
             return 0;
         }
 

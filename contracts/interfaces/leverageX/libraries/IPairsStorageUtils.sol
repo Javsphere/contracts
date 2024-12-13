@@ -34,7 +34,7 @@ interface IPairsStorageUtils is IPairsStorage {
      * @dev Remove trading pairs
      * @param _pairIndices indices of pairs
      */
-    function removePairs(uint256[] calldata _pairIndices) external;
+    function togglePairsState(uint256[] calldata _pairIndices) external;
 
     /**
      * @dev Adds new pair groups
@@ -232,8 +232,9 @@ interface IPairsStorageUtils is IPairsStorage {
     /**
      * @dev Emitted when a pair is removed
      * @param index index of pair
+     * @param isActive is pair active
      */
-    event PairRemoved(uint256 index);
+    event PairStateUpdated(uint256 index, bool isActive);
 
     /**
      * @dev Emitted when a pair's custom max leverage is updated
