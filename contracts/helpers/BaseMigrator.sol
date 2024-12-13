@@ -47,6 +47,7 @@ contract BaseMigrator is IGeneralErrors, BaseUpgradable {
     address public signerAddress;
 
     mapping(bytes => bool) private signatureUsed;
+    mapping(address => bool) public migratedUsers;
 
     error AlreadyMigrated();
     error InvalidSigner();
@@ -86,7 +87,6 @@ contract BaseMigrator is IGeneralErrors, BaseUpgradable {
 
     function makeMigration(bytes calldata migrationData) external whenNotPaused {
         require(migrationData.length >= 65, WrongLength()); // 65 bytes for the signature
-        //        require(migrationInfo.signature.length == 65, WrongLength());
         bytes memory signature = _slice(migrationData, 0, 65);
         require(!signatureUsed[signature], AlreadyMigrated());
 
@@ -99,7 +99,31 @@ contract BaseMigrator is IGeneralErrors, BaseUpgradable {
         MigrationInfo memory migrationInfo = abi.decode(encodedData, (MigrationInfo));
 
         require(_msgSender() == migrationInfo.user, InvalidAddresses());
+        require(!migratedUsers[_msgSender()], AlreadyMigrated());
 
+        _migrate(migrationInfo);
+
+        migratedUsers[_msgSender()] = true;
+    }
+
+    function makeMigrationAdmin(bytes calldata migrationData) external onlyAdmin {
+        require(migrationData.length >= 65, WrongLength()); // 65 bytes for the signature
+        bytes memory signature = _slice(migrationData, 0, 65);
+
+        bytes memory encodedData = _slice(migrationData, 65, migrationData.length - 65);
+        address signer = _recover(keccak256(encodedData), signature);
+
+        require(signer == signerAddress, InvalidSigner());
+        signatureUsed[signature] = true;
+
+        MigrationInfo memory migrationInfo = abi.decode(encodedData, (MigrationInfo));
+
+        _migrate(migrationInfo);
+
+        migratedUsers[migrationInfo.user] = true;
+    }
+
+    function _migrate(MigrationInfo memory migrationInfo) private {
         //         vesting
         if (migrationInfo.vestingSchedules.length > 0) {
             uint256 totalAmount = 0;

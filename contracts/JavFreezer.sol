@@ -656,7 +656,8 @@ contract JavFreezer is
         if (
             depositDetails.is_finished ||
             block.timestamp <= depositDetails.depositTimestamp ||
-            block.number < pool.lastRewardBlock
+            block.number < pool.lastRewardBlock ||
+            pool.accRewardPerShare == 0
         ) {
             return (0, isEnded);
         }
