@@ -9,7 +9,7 @@ async function main() {
     const contract = await upgrades.deployProxy(
         Contract,
         [
-            "test", //_agreementsUrl
+            "https://gateway.pinata.cloud/ipfs/QmUUUNtHgNZ3aeidMPDnasegtyLFv5PNxZ9EegXeZnFGAj", //_agreementsUrl
         ],
         {
             initializer: "initialize",

@@ -59,6 +59,13 @@ interface IJavFreezer is IGeneralErrors {
 
     function burnTokens(uint256 _pid, address _holder) external;
 
+    function burnTokensWithRange(
+        uint256 _pid,
+        address _holder,
+        uint256 depositStart,
+        uint256 depositEnd
+    ) external;
+
     function makeMigration(
         uint256 _pid,
         address _holder,

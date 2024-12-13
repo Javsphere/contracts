@@ -10,9 +10,9 @@ async function main() {
         Contract,
         [
             "0xE299E1e0b1697660AD3aD3b817f565D8Db0d36cb", // _adminAddress
-            "0x7246ad1ac72715c5fd6c1FD7460A63afB8289104", // _vestingAddress
-            "0xF923f0828c56b27C8f57bc698c99543f63091E9A", // _stakingAddress
-            "0x4e15D4225623D07Adb43e9D546E57E1E6097e869", // _freezerAddress
+            "0x42a40321843220e9811A1385D74d9798436f7002", // _vestingAddress
+            "0xE420BBb4C2454f305a3335BBdCE069326985fb5b", // _stakingAddress
+            "0x03e225D2bd32F5ecE539005B57F9B94A743ADBFB", // _freezerAddress
             25, // _stakingFactor
             2000, // _vestingFactor
             [0, 1, 2, 3, 4, 5, 6], // _freezerIdsFactor
