@@ -616,7 +616,7 @@ library TradingCommonUtils {
         uint8 _collateralIndex,
         address _trader,
         uint256 _valueCollateral
-    ) public {
+    ) internal {
         getBorrowingProvider().distributeReward(_collateralIndex, _valueCollateral);
         emit ITradingCommonUtils.BorrowingProviderFeeCharged(
             _trader,
