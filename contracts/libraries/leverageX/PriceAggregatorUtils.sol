@@ -119,7 +119,8 @@ library PriceAggregatorUtils {
         }
         //  send unused eth back to user
         if (msg.value > _totalFee) {
-            payable(_user).transfer(msg.value - _totalFee);
+            (bool success, ) = _user.call{value: msg.value - _totalFee}("");
+            require(success, "JavPriceAggregator: Refund failed");
         }
     }
 

@@ -93,7 +93,6 @@ contract JavBorrowingProvider is
         uint256 amountIn,
         uint256 amountOut
     );
-    event SetTokenAmount(uint256 tokenId, uint256 amount);
     event UpdateToken(
         uint256 indexed tokenId,
         address asset,
@@ -198,15 +197,6 @@ contract JavBorrowingProvider is
             _tokenInfo.targetWeightage,
             _tokenInfo.isActive
         );
-    }
-
-    function setTokenAmount(
-        uint256 _inputToken,
-        uint256 _amount
-    ) external onlyAdmin validToken(_inputToken) {
-        tokenAmount[_inputToken] = _amount;
-
-        emit SetTokenAmount(_inputToken, _amount);
     }
 
     function toggleBuyActiveState() external onlyAdmin {

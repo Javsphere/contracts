@@ -512,7 +512,7 @@ library TradingCommonUtils {
         uint8 _collateralIndex,
         address _to,
         uint256 _amountCollateral
-    ) public {
+    ) internal {
         if (_amountCollateral > 0) {
             IERC20(_getMultiCollatDiamond().getCollateral(_collateralIndex).collateral)
                 .safeTransfer(_to, _amountCollateral);
@@ -616,7 +616,7 @@ library TradingCommonUtils {
         uint8 _collateralIndex,
         address _trader,
         uint256 _valueCollateral
-    ) public {
+    ) internal {
         getBorrowingProvider().distributeReward(_collateralIndex, _valueCollateral);
         emit ITradingCommonUtils.BorrowingProviderFeeCharged(
             _trader,

@@ -40,4 +40,15 @@ contract LLPToken is ERC20BurnableUpgradeable, BaseUpgradable {
     function mint(address account, uint256 amount) external onlyBorrowingProvider {
         _mint(account, amount);
     }
+
+    function burn(uint256 amount) public virtual override {
+        revert("LLPToken: direct burning not allowed");
+    }
+
+    function burnFrom(
+        address account,
+        uint256 amount
+    ) public virtual override onlyBorrowingProvider {
+        super.burnFrom(account, amount);
+    }
 }
