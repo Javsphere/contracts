@@ -29,6 +29,7 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
 
     uint256 public priceUpdateFee;
     uint256 public updatePriceLifetime;
+    mapping(bytes => bool) private _usedSignatures;
 
     /* ========== EVENTS ========== */
     event AddAllowedSigner(address indexed _address);
@@ -119,6 +120,8 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
 
             // Extract the signature (first 65 bytes)
             bytes memory signature = _slice(data, 0, 65);
+            require(!_usedSignatures[signature], "JavPriceAggregator: Signature already used");
+            _usedSignatures[signature] = true;
 
             // Extract the UpdatePriceInfo struct (remaining bytes)
             bytes memory encodedData = _slice(data, 65, data.length - 65);
