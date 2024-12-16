@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
-contract BaseUpgradable is OwnableUpgradeable, PausableUpgradeable, UUPSUpgradeable {
+contract BaseUpgradable is Ownable2StepUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     address public adminAddress;
     address public managerAddress;
 
