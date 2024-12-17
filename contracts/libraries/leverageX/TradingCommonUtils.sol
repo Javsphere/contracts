@@ -31,9 +31,9 @@ library TradingCommonUtils {
         uint64 _currentPrice,
         bool _long,
         uint24 _leverage
-    ) public pure returns (int256 p) {
+    ) public view returns (int256 p) {
         int256 pricePrecision = int256(ConstantsUtils.P_10);
-        int256 maxPnlP = int256(ConstantsUtils.MAX_PNL_P) * pricePrecision;
+        int256 maxPnlP = int256(_getMultiCollatDiamond().getMaxPnlP()) * pricePrecision;
         int256 minPnlP = -100 * int256(ConstantsUtils.P_10);
 
         int256 openPrice = int256(uint256(_openPrice));
