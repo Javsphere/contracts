@@ -23,6 +23,7 @@ library TradingStorageUtils {
         address _rewardsToken,
         address _rewardsDistributor,
         address _borrowingProvider,
+        uint256 _max_pnl_p,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) internal {
@@ -35,7 +36,7 @@ library TradingStorageUtils {
 
         if (_collaterals.length < 2) revert ITradingStorageUtils.MissingCollaterals();
         if (_collaterals.length != _collateralsIndexes.length) revert IGeneralErrors.WrongLength();
-
+        s.max_pnl_p = _max_pnl_p;
         // Set addresses
         s.borrowingProvider = _borrowingProvider;
         IJavAddressStore.Addresses storage addresses = AddressStoreUtils.getAddresses();
@@ -115,6 +116,16 @@ library TradingStorageUtils {
         s.borrowingProvider = _borrowingProvider;
 
         emit ITradingStorageUtils.BorrowingProviderUpdated(_borrowingProvider);
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function updateMaxPnlP(uint256 _max_pnl_p) internal {
+        ITradingStorage.TradingStorage storage s = _getStorage();
+        s.max_pnl_p = _max_pnl_p;
+
+        emit ITradingStorageUtils.MaxPnlPUpdated(_max_pnl_p);
     }
 
     /**
@@ -462,6 +473,13 @@ library TradingStorageUtils {
     }
 
     /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getMaxPnlP() internal view returns (uint256) {
+        return _getStorage().max_pnl_p;
+    }
+
+    /**
      * @dev Returns storage slot to use when fetching storage relevant to library
      */
     function _getSlot() internal pure returns (uint256) {
@@ -497,14 +515,15 @@ library TradingStorageUtils {
         uint24 _leverage,
         uint64 _tp,
         bool _long
-    ) public pure returns (uint64) {
+    ) public view returns (uint64) {
+        ITradingStorage.TradingStorage storage s = _getStorage();
         if (
             _tp == 0 ||
             TradingCommonUtils.getPnlPercent(_openPrice, _tp, _long, _leverage) ==
-            int256(ConstantsUtils.MAX_PNL_P) * int256(ConstantsUtils.P_10)
+            int256(s.max_pnl_p) * int256(ConstantsUtils.P_10)
         ) {
             uint256 openPrice = uint256(_openPrice);
-            uint256 tpDiff = (openPrice * ConstantsUtils.MAX_PNL_P * 1e3) / _leverage / 100;
+            uint256 tpDiff = (openPrice * s.max_pnl_p * 1e3) / _leverage / 100;
             uint256 newTp = _long
                 ? openPrice + tpDiff
                 : (tpDiff <= openPrice ? openPrice - tpDiff : 0);
@@ -529,7 +548,7 @@ library TradingStorageUtils {
         uint64 _sl,
         bool _long,
         uint256 _liqPnlThresholdP
-    ) public pure returns (uint64) {
+    ) public view returns (uint64) {
         uint256 minSlPnlP = _liqPnlThresholdP - ConstantsUtils.SL_LIQ_BUFFER_P;
 
         if (
