@@ -23,7 +23,8 @@ interface ITradingStorage {
         address[] traders;
         mapping(address => bool) traderStored;
         mapping(address => mapping(uint32 => IPairsStorage.GroupLiquidationParams)) tradeLiquidationParams;
-        uint256[38] __gap;
+        uint256 max_pnl_p;
+        uint256[37] __gap;
     }
 
     enum PendingOrderType {

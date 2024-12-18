@@ -287,7 +287,7 @@ contract JavStakeX is
             : tokensPrecision[address(pool.rewardToken)].precision;
         return
             (getRewardPerBlock(_pid) *
-                1051200 *
+                15768000 *
                 tokensPrecision[address(pool.rewardToken)].precision) / totalShares;
     }
 

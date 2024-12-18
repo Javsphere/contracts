@@ -439,7 +439,7 @@ contract JavFreezer is
             ? pool.totalShares
             : tokensPrecision[address(pool.rewardToken)].precision;
         return
-            (((getRewardPerBlock(_pid) * lockPeriodMultiplier[_lockId] * 1051200) / 1e5) *
+            (((getRewardPerBlock(_pid) * lockPeriodMultiplier[_lockId] * 15768000) / 1e5) *
                 tokensPrecision[address(pool.rewardToken)].precision) / totalShares;
     }
 
