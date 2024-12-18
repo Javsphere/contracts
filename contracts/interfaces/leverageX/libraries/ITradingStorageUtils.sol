@@ -18,6 +18,7 @@ interface ITradingStorageUtils is ITradingStorage {
         address _rewardsToken,
         address _rewardsDistributor,
         address _borrowingProvider,
+        uint256 _max_pnl_p,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) external;
@@ -46,6 +47,12 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param _borrowingProvider borrowing provider address
      */
     function updateBorrowingProvider(address _borrowingProvider) external;
+
+    /**
+     * @dev Update max_pnl_p
+     * @param _max_pnl_p _max_pnl_p
+     */
+    function updateMaxPnlP(uint256 _max_pnl_p) external;
 
     /**
      * @dev Update collateral approve
@@ -270,6 +277,11 @@ interface ITradingStorageUtils is ITradingStorage {
     function getBorrowingProvider() external view returns (address);
 
     /**
+     * @dev Returns the number of the max pnl percent
+     */
+    function getMaxPnlP() external view returns (uint256);
+
+    /**
      * @dev Emitted when the trading activated state is updated
      * @param activated the new trading activated state
      */
@@ -295,6 +307,11 @@ interface ITradingStorageUtils is ITradingStorage {
      */
     event BorrowingProviderUpdated(address indexed borrowingProvider);
 
+    /**
+     * @dev Emitted when an existing max_pnl_p is updated
+     * @param max_pnl_p max_pnl_p
+     */
+    event MaxPnlPUpdated(uint256 indexed max_pnl_p);
     /**
      * @dev Emitted when an existing supported collateral is disabled (can still close trades but not open new ones)
      * @param index the index of the supported collateral

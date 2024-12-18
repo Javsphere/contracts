@@ -25,6 +25,7 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         address _rewardsToken,
         address _rewardsDistributor,
         address _borrowingProvider,
+        uint256 _max_pnl_p,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) external reinitializer(7) {
@@ -32,6 +33,7 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
             _rewardsToken,
             _rewardsDistributor,
             _borrowingProvider,
+            _max_pnl_p,
             _collaterals,
             _collateralsIndexes
         );
@@ -57,6 +59,11 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     /// @inheritdoc ITradingStorageUtils
     function updateBorrowingProvider(address _borrowingProvider) external onlyRole(Role.GOV) {
         TradingStorageUtils.updateBorrowingProvider(_borrowingProvider);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function updateMaxPnlP(uint256 max_pnl_p) external onlyRole(Role.GOV) {
+        TradingStorageUtils.updateMaxPnlP(max_pnl_p);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -221,6 +228,11 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     /// @inheritdoc ITradingStorageUtils
     function getBorrowingProvider() external view returns (address) {
         return TradingStorageUtils.getBorrowingProvider();
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function getMaxPnlP() external view returns (uint256) {
+        return TradingStorageUtils.getMaxPnlP();
     }
 
     /// @inheritdoc ITradingStorageUtils

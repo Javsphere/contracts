@@ -10,7 +10,7 @@ import "../../interfaces/leverageX/types/ITradingStorage.sol";
  */
 library ConstantsUtils {
     uint256 internal constant P_10 = 1e10; // 10 decimals (DO NOT UPDATE)
-    uint256 internal constant MAX_PNL_P = 900; // 900% PnL (10x)
+    uint256 internal constant MAX_PNL_P = 900; // 900% PnL (10x) // @custom:deprecated
     uint256 internal constant SL_LIQ_BUFFER_P = 10 * P_10; // SL has to be 10% closer than liq price
     uint256 internal constant LEGACY_LIQ_THRESHOLD_P = 90 * P_10; // -90% pnl
     uint256 internal constant MIN_LIQ_THRESHOLD_P = 50 * P_10; // -50% pnl
