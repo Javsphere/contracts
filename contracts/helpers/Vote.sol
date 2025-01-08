@@ -97,6 +97,7 @@ contract Vote is IVote, BaseUpgradable {
             InvalidVotePeriod()
         );
         uint256 votingWeight = _calculateVotingWeight(_msgSender());
+        require(votingWeight > 0, ZeroVotingPower());
         proposalWeight[_proposalId][_voteType] =
             proposalWeight[_proposalId][_voteType] +
             votingWeight;
