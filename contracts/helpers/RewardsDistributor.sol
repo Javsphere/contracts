@@ -118,7 +118,7 @@ contract RewardsDistributor is IRewardsDistributor, BaseUpgradable {
         IERC20(_tokenIn).safeDecreaseAllowance(address(swapRouter), 0);
         IERC20(_tokenIn).safeIncreaseAllowance(address(swapRouter), _amount);
 
-        IRouter.Route[] memory route;
+        IRouter.Route[] memory route = new IRouter.Route[](1);
         route[0] = IRouter.Route({
             from: _tokenIn,
             to: _tokenOut,
