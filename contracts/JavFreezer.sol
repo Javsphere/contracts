@@ -223,17 +223,19 @@ contract JavFreezer is
         address _holder,
         UserDeposit[] memory _userDeposits
     ) external onlyMigrator poolExists(_pid) {
-        for (uint256 i = 0; i < _userDeposits.length; ++i) {
-            UserInfo storage user = userInfo[_holder][_pid];
-            PoolInfo storage pool = poolInfo[_pid];
-            ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
-            _updatePool(_pid, 0);
+        UserInfo storage user = userInfo[_holder][_pid];
+        PoolInfo storage pool = poolInfo[_pid];
+        ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
 
-            pool.baseToken.safeTransferFrom(
-                _msgSender(),
-                address(this),
-                _userDeposits[i].depositTokens
-            );
+        uint256 totalDepositTokens = 0;
+        for (uint256 i = 0; i < _userDeposits.length; ++i) {
+            totalDepositTokens += _userDeposits[i].depositTokens;
+        }
+
+        pool.baseToken.safeTransferFrom(_msgSender(), address(this), totalDepositTokens);
+
+        for (uint256 i = 0; i < _userDeposits.length; ++i) {
+            _updatePool(_pid, 0);
 
             user.totalDepositTokens += _userDeposits[i].depositTokens;
             pool.totalShares += _userDeposits[i].depositTokens;
