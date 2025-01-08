@@ -50,7 +50,11 @@ library UpdateLeverageUtils {
 
         uint256 price = _getMultiCollatDiamond().getPrice(trade.pairIndex);
 
-        if ((trade.long && price <= values.liqPrice) || (!trade.long && price >= values.liqPrice)) {
+        if (
+            (trade.long && price <= values.liqPrice) ||
+            (!trade.long && price >= values.liqPrice) ||
+            values.liqPrice == 1
+        ) {
             revert IGeneralErrors.LiqReached();
         }
 
