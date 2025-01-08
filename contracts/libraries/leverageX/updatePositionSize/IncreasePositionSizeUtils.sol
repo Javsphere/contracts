@@ -135,7 +135,7 @@ library IncreasePositionSizeUtils {
             ITradingCommonUtils.TradePriceImpactInput(
                 _existingTrade,
                 _price,
-                10,
+                _getMultiCollatDiamond().pairSpreadP(_existingTrade.pairIndex),
                 values.positionSizeCollateralDelta
             )
         );
