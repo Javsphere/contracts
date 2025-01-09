@@ -80,11 +80,6 @@ library TradingCommonUtils {
         bool _long,
         bool _open
     ) public pure returns (uint256) {
-        // No closing spread for trades opened before v9.2
-        if (!_open) {
-            return _price;
-        }
-
         _spreadP = _spreadP / 2;
 
         uint256 priceDiff = (_price * _spreadP) / 100 / ConstantsUtils.P_10;

@@ -68,7 +68,7 @@ library TradingProcessingUtils {
      */
     function claimPendingGovFees() internal {
         uint8 collateralsCount = _getMultiCollatDiamond().getCollateralsCount();
-        for (uint8 i = 1; i <= collateralsCount; ++i) {
+        for (uint8 i = 0; i <= collateralsCount; ++i) {
             uint256 feesAmountCollateral = _getStorage().pendingGovFees[i];
 
             if (feesAmountCollateral > 0) {

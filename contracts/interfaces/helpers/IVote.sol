@@ -31,6 +31,7 @@ interface IVote is IGeneralErrors {
 
     error AlreadyExecuted();
     error AlreadyVoted();
+    error ZeroVotingPower();
     error InvalidVotePeriod();
     error NotEnded();
 }

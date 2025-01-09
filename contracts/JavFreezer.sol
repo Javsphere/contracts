@@ -186,7 +186,7 @@ contract JavFreezer is
         emit SetLockPeriod(_lockId, _duration);
     }
 
-    function setLockPeriodMultiplier(uint256 _lockId, uint256 _multiplier) external onlyAdmin {
+    function setLockPeriodMultiplier(uint256 _lockId, uint256 _multiplier) external onlyAdmin validLockId(_lockId){
         lockPeriodMultiplier[_lockId] = _multiplier;
 
         emit SetLockPeriodMultiplier(_lockId, _multiplier);
@@ -223,17 +223,19 @@ contract JavFreezer is
         address _holder,
         UserDeposit[] memory _userDeposits
     ) external onlyMigrator poolExists(_pid) {
-        for (uint256 i = 0; i < _userDeposits.length; ++i) {
-            UserInfo storage user = userInfo[_holder][_pid];
-            PoolInfo storage pool = poolInfo[_pid];
-            ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
-            _updatePool(_pid, 0);
+        UserInfo storage user = userInfo[_holder][_pid];
+        PoolInfo storage pool = poolInfo[_pid];
+        ProductsRewardsInfo memory productsRewInfo = productsRewardsInfo[_pid];
 
-            pool.baseToken.safeTransferFrom(
-                _msgSender(),
-                address(this),
-                _userDeposits[i].depositTokens
-            );
+        uint256 totalDepositTokens = 0;
+        for (uint256 i = 0; i < _userDeposits.length; ++i) {
+            totalDepositTokens += _userDeposits[i].depositTokens;
+        }
+
+        pool.baseToken.safeTransferFrom(_msgSender(), address(this), totalDepositTokens);
+
+        for (uint256 i = 0; i < _userDeposits.length; ++i) {
+            _updatePool(_pid, 0);
 
             user.totalDepositTokens += _userDeposits[i].depositTokens;
             pool.totalShares += _userDeposits[i].depositTokens;
@@ -281,45 +283,6 @@ contract JavFreezer is
         PoolInfo memory pool = poolInfo[_pid];
         require(pool.baseToken.balanceOf(_msgSender()) >= _amount, InvalidAmount());
         _deposit(_pid, _amount, _periodId);
-    }
-
-    /**
-     * @notice Deposit in given pool from vesting
-     * @param _holder: holder address
-     * @param _pid: pool id
-     * @param _amount: Amount of want token that user wants to deposit
-     */
-    function depositVesting(
-        address _holder,
-        uint256 _pid,
-        uint256 _amount,
-        uint256 _depositTimestamp,
-        uint256 _withdrawalTimestamp,
-        uint256 _lockId
-    ) external nonReentrant whenNotPaused poolExists(_pid) onlyVesting {
-        UserInfo storage user = userInfo[_holder][_pid];
-        PoolInfo storage pool = poolInfo[_pid];
-        _updatePool(_pid, 0);
-
-        user.totalDepositTokens += _amount;
-        pool.totalShares += _amount;
-        tvl[_pid][_lockId] += _amount;
-
-        uint256 rewardDebt = (_amount * (pool.accRewardPerShare)) /
-            tokensPrecision[address(pool.rewardToken)].precision;
-        UserDeposit memory depositDetails = UserDeposit({
-            depositTokens: _amount,
-            stakePeriod: _lockId,
-            depositTimestamp: _depositTimestamp,
-            withdrawalTimestamp: _withdrawalTimestamp,
-            is_finished: false,
-            rewardsClaimed: 0,
-            rewardDebt: rewardDebt
-        });
-        userDeposits[_holder][_pid].push(depositDetails);
-        user.depositId = userDeposits[_holder][_pid].length;
-
-        emit Deposit(_holder, _amount, _pid, _lockId, _depositTimestamp, _withdrawalTimestamp);
     }
 
     /**

@@ -103,6 +103,10 @@ library PriceAggregatorUtils {
         uint256 _totalFee;
         bytes[] memory _pythUpdateData = _priceUpdate[0];
         bytes[] memory _javUpdateData = _priceUpdate[1];
+        require(
+            _pythUpdateData.length > 0 || _javUpdateData.length > 0,
+            "JavPriceAggregator: Invalid price update data"
+        );
         if (_pythUpdateData.length > 0) {
             IJavPriceAggregator oracle = s.oracle;
             uint fee = oracle.getUpdateFee(_pythUpdateData);
