@@ -83,15 +83,6 @@ interface IJavFreezer is IGeneralErrors {
         uint256 _id
     ) external view returns (UserDeposit memory);
 
-    function depositVesting(
-        address _holder,
-        uint256 _pid,
-        uint256 _amount,
-        uint256 _depositTimestamp,
-        uint256 _withdrawalTimestamp,
-        uint256 _lockId
-    ) external;
-
     function withdrawVesting(
         address _holder,
         uint256 _pid,

@@ -115,6 +115,10 @@ library TradingStorageUtils {
         ITradingStorage.TradingStorage storage s = _getStorage();
         s.borrowingProvider = _borrowingProvider;
 
+        for (uint8 i = 0; i < s.lastCollateralIndex; ++i) {
+            updateCollateralApprove(i);
+        }
+
         emit ITradingStorageUtils.BorrowingProviderUpdated(_borrowingProvider);
     }
 
@@ -375,6 +379,9 @@ library TradingStorageUtils {
 
         t.isOpen = false;
         s.userCounters[_tradeId.user].openCount--;
+
+        if (t.tradeType == ITradingStorage.TradeType.TRADE)
+            TradingCommonUtils.updateOiTrade(t, false);
 
         emit ITradingStorageUtils.TradeClosed(_tradeId);
     }
