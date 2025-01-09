@@ -64,6 +64,10 @@ contract JavPriceAggregator is IJavPriceAggregator, BaseUpgradable {
     }
 
     function removeAllowedSigner(address _address) external onlyAdmin {
+        require(
+            _allowedSigners.length() > 1,
+            "JavPriceAggregator: Cannot remove the last allowed signer"
+        );
         _allowedSigners.remove(_address);
 
         emit RemoveAllowedSigner(_address);
