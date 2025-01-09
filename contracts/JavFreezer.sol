@@ -286,45 +286,6 @@ contract JavFreezer is
     }
 
     /**
-     * @notice Deposit in given pool from vesting
-     * @param _holder: holder address
-     * @param _pid: pool id
-     * @param _amount: Amount of want token that user wants to deposit
-     */
-    function depositVesting(
-        address _holder,
-        uint256 _pid,
-        uint256 _amount,
-        uint256 _depositTimestamp,
-        uint256 _withdrawalTimestamp,
-        uint256 _lockId
-    ) external nonReentrant whenNotPaused poolExists(_pid) onlyVesting {
-        UserInfo storage user = userInfo[_holder][_pid];
-        PoolInfo storage pool = poolInfo[_pid];
-        _updatePool(_pid, 0);
-
-        user.totalDepositTokens += _amount;
-        pool.totalShares += _amount;
-        tvl[_pid][_lockId] += _amount;
-
-        uint256 rewardDebt = (_amount * (pool.accRewardPerShare)) /
-            tokensPrecision[address(pool.rewardToken)].precision;
-        UserDeposit memory depositDetails = UserDeposit({
-            depositTokens: _amount,
-            stakePeriod: _lockId,
-            depositTimestamp: _depositTimestamp,
-            withdrawalTimestamp: _withdrawalTimestamp,
-            is_finished: false,
-            rewardsClaimed: 0,
-            rewardDebt: rewardDebt
-        });
-        userDeposits[_holder][_pid].push(depositDetails);
-        user.depositId = userDeposits[_holder][_pid].length;
-
-        emit Deposit(_holder, _amount, _pid, _lockId, _depositTimestamp, _withdrawalTimestamp);
-    }
-
-    /**
      * @notice Withdraw amount from freeze schedule
      * @param _holder: holder address
      * @param _pid: pool id
