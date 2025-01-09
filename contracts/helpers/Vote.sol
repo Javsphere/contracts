@@ -67,6 +67,7 @@ contract Vote is IVote, BaseUpgradable {
         uint256 _endTimestamp,
         string calldata _descriptionId
     ) external onlyAdmin {
+        require(_startTimestamp >= block.timestamp, WrongParams());
         require(_endTimestamp > _startTimestamp, WrongParams());
         proposals[proposalIndex] = Proposal({
             proposer: _msgSender(),
