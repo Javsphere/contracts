@@ -11,15 +11,15 @@ pragma solidity ^0.8.23;
  *
  */
 library StorageUtils {
-    uint256 internal constant GLOBAL_ADDRESSES_SLOT = 52;
-    uint256 internal constant GLOBAL_PAIRS_STORAGE_SLOT = 102;
-    uint256 internal constant GLOBAL_REFERRALS_SLOT = 152;
-    uint256 internal constant GLOBAL_FEE_TIERS_SLOT = 202;
-    uint256 internal constant GLOBAL_PRICE_IMPACT_SLOT = 252;
-    uint256 internal constant GLOBAL_DIAMOND_SLOT = 302;
-    uint256 internal constant GLOBAL_TRADING_STORAGE_SLOT = 352;
-    uint256 internal constant GLOBAL_TRADING_SLOT = 400;
-    uint256 internal constant GLOBAL_TRADING_CLOSE_SLOT = 448;
-    uint256 internal constant GLOBAL_BORROWING_FEES_SLOT = 497;
-    uint256 internal constant GLOBAL_PRICE_AGGREGATOR_SLOT = 547;
+    uint256 internal constant GLOBAL_ADDRESSES_SLOT = 3;
+    uint256 internal constant GLOBAL_PAIRS_STORAGE_SLOT = 51;
+    uint256 internal constant GLOBAL_REFERRALS_SLOT = 101;
+    uint256 internal constant GLOBAL_FEE_TIERS_SLOT = 151;
+    uint256 internal constant GLOBAL_PRICE_IMPACT_SLOT = 201;
+    uint256 internal constant GLOBAL_DIAMOND_SLOT = 251;
+    uint256 internal constant GLOBAL_TRADING_STORAGE_SLOT = 301;
+    uint256 internal constant GLOBAL_TRADING_SLOT = 351;
+    uint256 internal constant GLOBAL_TRADING_CLOSE_SLOT = 401;
+    uint256 internal constant GLOBAL_BORROWING_FEES_SLOT = 451;
+    uint256 internal constant GLOBAL_PRICE_AGGREGATOR_SLOT = 501;
 }
