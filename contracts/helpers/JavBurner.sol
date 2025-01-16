@@ -8,8 +8,9 @@ import "../base/BaseUpgradable.sol";
 import "../interfaces/IRouter.sol";
 import "../interfaces/helpers/IJavBurner.sol";
 import "../interfaces/IERC20Extended.sol";
+import "../interfaces/helpers/IGeneralErrors.sol";
 
-contract JavBurner is IJavBurner, BaseUpgradable {
+contract JavBurner is IJavBurner, IGeneralErrors, BaseUpgradable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -100,6 +101,5 @@ contract JavBurner is IJavBurner, BaseUpgradable {
         IERC20Extended(javAddress).burn(_burnAmount);
 
         emit SwapAndBurn(_token, _swapAmount, _burnAmount);
-
     }
 }

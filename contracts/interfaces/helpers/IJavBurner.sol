@@ -2,10 +2,11 @@
 
 pragma solidity ^0.8.24;
 
-import "./IGeneralErrors.sol";
 import "../IRouter.sol";
 
-interface IJavBurner is IGeneralErrors {
+interface IJavBurner {
+    function swapAndBurn(address _token, uint256 _swapAmount) external;
+
     event AddAllowedAddress(address indexed _address);
     event RemoveAllowedAddress(address indexed _address);
     event SetJavAddress(address indexed _address);
