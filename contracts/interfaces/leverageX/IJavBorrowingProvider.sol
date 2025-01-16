@@ -31,6 +31,9 @@ interface IJavBorrowingProvider {
     event SellActiveStateUpdated(bool isActive);
     event WhiteListAdded(address indexed _address);
     event WhiteListRemoved(address indexed _address);
+    event SetJavBurner(address indexed _address);
+    event SetBuyFee(uint256 fee);
+    event SetSellFee(uint256 fee);
 
     error OnlyTradingPnlHandler();
     error NotEnoughAssets();

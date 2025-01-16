@@ -14,6 +14,7 @@ import "../interfaces/leverageX/IJavBorrowingProvider.sol";
 import "../interfaces/IJavPriceAggregator.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../interfaces/IRouter.sol";
+import "../interfaces/helpers/IJavBurner.sol";
 
 contract JavBorrowingProvider is
     IJavBorrowingProvider,
@@ -74,6 +75,7 @@ contract JavBorrowingProvider is
     bool public isBuyActive;
     bool public isSellActive;
     address public termsAndConditionsAddress;
+    address public javBurner;
 
     /* ========== EVENTS ========== */
     event AddToken(TokenInfo tokenInfo);
@@ -233,6 +235,24 @@ contract JavBorrowingProvider is
         termsAndConditionsAddress = _termsAndConditionsAddress;
 
         emit SetTermsAndConditionsAddress(_termsAndConditionsAddress);
+    }
+
+    function setJavBurner(address _javBurner) external onlyAdmin nonZeroAddress(_javBurner) {
+        javBurner = _javBurner;
+
+        emit SetJavBurner(_javBurner);
+    }
+
+    function setBuyFee(uint256 _buyFee) external onlyAdmin {
+        buyFee = _buyFee;
+
+        emit SetBuyFee(_buyFee);
+    }
+
+    function setSellFee(uint256 _sellFee) external onlyAdmin {
+        sellFee = _sellFee;
+
+        emit SetSellFee(_sellFee);
     }
 
     function initialBuy(
@@ -413,15 +433,18 @@ contract JavBorrowingProvider is
     }
 
     function _buyLLP(uint256 _tokenId, TokenInfo memory _inputToken, uint256 _amount) private {
-        uint256 _inputAmountUsd = (_amount *
+        uint256 _fee = (_amount * buyFee) / 1e4;
+        uint256 _clearAmount = _amount - _fee;
+        uint256 _inputAmountUsd = (_clearAmount *
             _getUsdPrice(_inputToken.priceFeed) *
             tokensPrecision[_inputToken.asset].precisionDelta) / PRECISION_18;
         // calculate llp amount
-        uint256 _fee = (_inputAmountUsd * buyFee) / 1e4;
-        uint256 _llpAmount = ((_inputAmountUsd - _fee) * PRECISION_18) / _llpPrice();
-        tokenAmount[_tokenId] += _amount;
+        uint256 _llpAmount = (_inputAmountUsd * PRECISION_18) / _llpPrice();
+        tokenAmount[_tokenId] += _clearAmount;
 
-        IERC20(_inputToken.asset).safeTransferFrom(_msgSender(), address(this), _amount);
+        IERC20(_inputToken.asset).safeTransferFrom(_msgSender(), address(this), _clearAmount);
+        IERC20(_inputToken.asset).safeTransferFrom(_msgSender(), javBurner, _fee);
+        IJavBurner(javBurner).swapAndBurn(_inputToken.asset, _fee);
         IERC20Extended(llpToken).mint(_msgSender(), _llpAmount);
 
         emit BuyLLP(_msgSender(), _inputToken.asset, _tokenId, llpToken, _amount, _llpAmount);
@@ -432,17 +455,20 @@ contract JavBorrowingProvider is
             _llpPrice() *
             tokensPrecision[llpToken].precisionDelta) / PRECISION_18;
         // calculate tokens amount
-        uint256 _fee = (_inputAmountUsd * sellFee) / 1e4;
         uint256 _tokenUsdPrice = _getUsdPrice(_outputToken.priceFeed);
-        uint256 _tokensAmount = ((_inputAmountUsd - _fee) * PRECISION_18) /
+        uint256 _tokensAmount = (_inputAmountUsd * PRECISION_18) /
             _tokenUsdPrice /
             tokensPrecision[_outputToken.asset].precisionDelta;
+        uint256 _fee = (_tokensAmount * sellFee) / 1e4;
+        uint256 _clearAmount = _tokensAmount - _fee;
         tokenAmount[_tokenId] -= _tokensAmount;
 
         IERC20Extended(llpToken).burnFrom(_msgSender(), _amount);
-        IERC20(_outputToken.asset).safeTransfer(_msgSender(), _tokensAmount);
+        IERC20(_outputToken.asset).safeTransfer(_msgSender(), _clearAmount);
+        IERC20(_outputToken.asset).safeTransfer(javBurner, _fee);
+        IJavBurner(javBurner).swapAndBurn(_outputToken.asset, _fee);
 
-        emit SellLLP(_msgSender(), llpToken, _outputToken.asset, _tokenId, _amount, _tokensAmount);
+        emit SellLLP(_msgSender(), llpToken, _outputToken.asset, _tokenId, _amount, _clearAmount);
     }
 
     function _getUsdPrice(bytes32 _priceFeed) private view returns (uint256) {
