@@ -67,6 +67,13 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
+    function updateMinCollateralAmountUsd(
+        uint256 _minCollateralAmountUsd
+    ) external onlyRole(Role.GOV) {
+        TradingStorageUtils.updateMinCollateralAmountUsd(_minCollateralAmountUsd);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
     function updateCollateralApprove(uint8 _collateralIndex) external onlyRole(Role.GOV) {
         TradingStorageUtils.updateCollateralApprove(_collateralIndex);
     }
@@ -233,6 +240,11 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     /// @inheritdoc ITradingStorageUtils
     function getMaxPnlP() external view returns (uint256) {
         return TradingStorageUtils.getMaxPnlP();
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function getMinCollateralAmountUsd() external view returns (uint256) {
+        return TradingStorageUtils.getMinCollateralAmountUsd();
     }
 
     /// @inheritdoc ITradingStorageUtils
