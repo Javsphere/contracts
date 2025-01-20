@@ -16,7 +16,7 @@ library ConstantsUtils {
     uint256 internal constant MIN_LIQ_THRESHOLD_P = 50 * P_10; // -50% pnl
     uint256 internal constant MAX_OPEN_NEGATIVE_PNL_P = 40 * P_10; // -40% pnl
     uint256 internal constant MAX_LIQ_SPREAD_P = (5 * P_10) / 100; // 0.05%
-    uint16 internal constant DEFAULT_MAX_CLOSING_SLIPPAGE_P = 1 * 1e3; // 1%
+    uint16 internal constant DEFAULT_MAX_CLOSING_SLIPPAGE_P = 5 * 1e3; // 5%
 
     function getMarketOrderTypes()
         internal
