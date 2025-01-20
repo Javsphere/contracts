@@ -55,6 +55,12 @@ interface ITradingStorageUtils is ITradingStorage {
     function updateMaxPnlP(uint256 _max_pnl_p) external;
 
     /**
+     * @dev Update minCollateralAmountUsd
+     * @param _minCollateralAmountUsd _minCollateralAmountUsd
+     */
+    function updateMinCollateralAmountUsd(uint256 _minCollateralAmountUsd) external;
+
+    /**
      * @dev Update collateral approve
      * @param _collateralIndex index of collateral
      */
@@ -282,6 +288,11 @@ interface ITradingStorageUtils is ITradingStorage {
     function getMaxPnlP() external view returns (uint256);
 
     /**
+     * @dev Returns the number of the minCollateralAmountUsd (1e18)
+     */
+    function getMinCollateralAmountUsd() external view returns (uint256);
+
+    /**
      * @dev Emitted when the trading activated state is updated
      * @param activated the new trading activated state
      */
@@ -312,6 +323,11 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param max_pnl_p max_pnl_p
      */
     event MaxPnlPUpdated(uint256 indexed max_pnl_p);
+    /**
+     * @dev Emitted when an existing minCollateralAmountUsd is updated
+     * @param minCollateralAmountUsd minCollateralAmountUsd
+     */
+    event MinCollateralAmountUsd(uint256 indexed minCollateralAmountUsd);
     /**
      * @dev Emitted when an existing supported collateral is disabled (can still close trades but not open new ones)
      * @param index the index of the supported collateral
