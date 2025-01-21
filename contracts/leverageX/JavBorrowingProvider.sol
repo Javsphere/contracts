@@ -15,6 +15,7 @@ import "../interfaces/IJavPriceAggregator.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../interfaces/IRouter.sol";
 import "../interfaces/helpers/IJavBurner.sol";
+import "../interfaces/helpers/IJavInfoAggregator.sol";
 
 contract JavBorrowingProvider is
     IJavBorrowingProvider,
@@ -71,11 +72,14 @@ contract JavBorrowingProvider is
     // Parameters (adjustable)
     uint256 public lossesBurnP; // PRECISION_18 (% of all losses)
     mapping(uint256 => uint256) public tokenAmount; // PRECISION_18
-    EnumerableSet.AddressSet private _whiteListAddresses;
+    EnumerableSet.AddressSet private _whiteListAddresses; // @custom:deprecated
     bool public isBuyActive;
     bool public isSellActive;
     address public termsAndConditionsAddress;
     address public javBurner;
+    address public javInfoAggregator;
+    uint256 public minBuyAmountUsd;
+    uint256 public javHoldPercent;
 
     /* ========== EVENTS ========== */
     event AddToken(TokenInfo tokenInfo);
@@ -106,11 +110,6 @@ contract JavBorrowingProvider is
     modifier validToken(uint256 _tokenId) {
         require(_tokenId < tokens.length, "JavBorrowingProvider: Invalid token");
         require(tokens[_tokenId].isActive, "JavBorrowingProvider: Token is inactive");
-        _;
-    }
-
-    modifier onlyWhiteList() {
-        require(_whiteListAddresses.contains(_msgSender()), OnlyWhiteList());
         _;
     }
 
@@ -215,20 +214,6 @@ contract JavBorrowingProvider is
         emit SellActiveStateUpdated(toggled);
     }
 
-    function addWhiteListBatch(address[] calldata _addresses) external onlyAdmin {
-        for (uint8 i = 0; i < _addresses.length; ++i) {
-            _whiteListAddresses.add(_addresses[i]);
-            emit WhiteListAdded(_addresses[i]);
-        }
-    }
-
-    function removeWhiteListBatch(address[] calldata _addresses) external onlyAdmin {
-        for (uint8 i = 0; i < _addresses.length; ++i) {
-            _whiteListAddresses.remove(_addresses[i]);
-            emit WhiteListRemoved(_addresses[i]);
-        }
-    }
-
     function setTermsAndConditionsAddress(
         address _termsAndConditionsAddress
     ) external onlyAdmin nonZeroAddress(_termsAndConditionsAddress) {
@@ -243,6 +228,14 @@ contract JavBorrowingProvider is
         emit SetJavBurner(_javBurner);
     }
 
+    function setJavInfoAggregator(
+        address _javInfoAggregator
+    ) external onlyAdmin nonZeroAddress(_javInfoAggregator) {
+        javInfoAggregator = _javInfoAggregator;
+
+        emit SetJavInfoAggregator(_javInfoAggregator);
+    }
+
     function setBuyFee(uint256 _buyFee) external onlyAdmin {
         buyFee = _buyFee;
 
@@ -253,6 +246,18 @@ contract JavBorrowingProvider is
         sellFee = _sellFee;
 
         emit SetSellFee(_sellFee);
+    }
+
+    function setMinBuyAmountUsd(uint256 _minBuyAmountUsd) external onlyAdmin {
+        minBuyAmountUsd = _minBuyAmountUsd;
+
+        emit SetMinBuyAmountUsd(_minBuyAmountUsd);
+    }
+
+    function setJavHoldPercent(uint256 _javHoldPercent) external onlyAdmin {
+        javHoldPercent = _javHoldPercent;
+
+        emit SetJavHoldPercent(_javHoldPercent);
     }
 
     function initialBuy(
@@ -287,7 +292,6 @@ contract JavBorrowingProvider is
         onlyActiveBuy
         whenNotPaused
         validToken(_inputToken)
-        onlyWhiteList
         onlyAgreeToTerms(termsAndConditionsAddress)
     {
         require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Purchase not available");
@@ -308,7 +312,7 @@ contract JavBorrowingProvider is
     function sellLLP(
         uint256 _outputToken,
         uint256 _amount
-    ) external nonReentrant onlyActiveSell whenNotPaused validToken(_outputToken) onlyWhiteList {
+    ) external nonReentrant onlyActiveSell whenNotPaused validToken(_outputToken) {
         require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Sell not available");
         TokenInfo memory _token = tokens[_outputToken];
         require(
@@ -438,6 +442,10 @@ contract JavBorrowingProvider is
         uint256 _inputAmountUsd = (_clearAmount *
             _getUsdPrice(_inputToken.priceFeed) *
             tokensPrecision[_inputToken.asset].precisionDelta) / PRECISION_18;
+        require(_inputAmountUsd >= minBuyAmountUsd, BelowMinBuyAmount());
+
+        _validateJavHolder(_inputAmountUsd, _msgSender());
+
         // calculate llp amount
         uint256 _llpAmount = (_inputAmountUsd * PRECISION_18) / _llpPrice();
         tokenAmount[_tokenId] += _clearAmount;
@@ -454,6 +462,8 @@ contract JavBorrowingProvider is
         uint256 _inputAmountUsd = (_amount *
             _llpPrice() *
             tokensPrecision[llpToken].precisionDelta) / PRECISION_18;
+
+        _validateJavHolder(_inputAmountUsd, _msgSender());
         // calculate tokens amount
         uint256 _tokenUsdPrice = _getUsdPrice(_outputToken.priceFeed);
         uint256 _tokensAmount = (_inputAmountUsd * PRECISION_18) /
@@ -501,6 +511,13 @@ contract JavBorrowingProvider is
         return
             ((_calculateTotalTvlUsd() + rewardsAmountUsd) * PRECISION_18) /
             (IERC20(llpToken).totalSupply() * tokensPrecision[llpToken].precisionDelta);
+    }
+
+    function _validateJavHolder(uint256 _usdAmount, address _user) private view {
+        uint256 _javPrice = IJavInfoAggregator(javInfoAggregator).getJavPrice(18);
+        uint256 _javHolderAmount = IJavInfoAggregator(javInfoAggregator).getTotalJavAmount(_user);
+        uint256 minJavAmount = (((_usdAmount * javHoldPercent) / 100) * PRECISION_18) / _javPrice;
+        require(_javHolderAmount >= minJavAmount, NotEnoughJavAssets());
     }
 
     //    function _rebalance() private {
