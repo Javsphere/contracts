@@ -19,6 +19,7 @@ import "../interfaces/helpers/IJavInfoAggregator.sol";
 
 contract JavBorrowingProvider is
     IJavBorrowingProvider,
+    IGeneralErrors,
     TermsAndCondUtils,
     ReentrancyGuardUpgradeable,
     BaseUpgradable
@@ -58,8 +59,8 @@ contract JavBorrowingProvider is
     IRouter public swapRouter;
     address public pnlHandler;
     address public llpToken;
-    uint256 public buyFee; // * 1e4
-    uint256 public sellFee; // * 1e4
+    uint256 public buyFee; // @custom:deprecated
+    uint256 public sellFee; // @custom:deprecated
 
     TokenInfo[] public tokens;
     mapping(address => TokenPrecisionInfo) public tokensPrecision;
@@ -78,8 +79,12 @@ contract JavBorrowingProvider is
     address public termsAndConditionsAddress;
     address public javBurner;
     address public javInfoAggregator;
-    uint256 public minBuyAmountUsd;
-    uint256 public javHoldPercent;
+    uint256 public minBuyAmountUsd; //1e18
+    uint32[] public baseFees; //1e4
+    uint32[] public usdThresholds; // clear
+    uint32[] public javThresholds; // clear
+    uint32[] public reductionFactors; //1e4
+    uint32[] public sellFees; //1e4
 
     /* ========== EVENTS ========== */
     event AddToken(TokenInfo tokenInfo);
@@ -133,18 +138,12 @@ contract JavBorrowingProvider is
         address _swapRouter,
         address _llpToken,
         address _pnlHandler,
-        uint256 _buyFee,
-        uint256 _sellFee,
         TokenInfo[] memory _tokens
     ) external initializer {
-        require(_buyFee <= 10, WrongBuyFee());
-        require(_sellFee <= 10, WrongSellFee());
         priceAggregator = IJavPriceAggregator(_priceAggregator);
         swapRouter = IRouter(_swapRouter);
         pnlHandler = _pnlHandler;
         llpToken = _llpToken;
-        buyFee = _buyFee;
-        sellFee = _sellFee;
 
         CollateralUtils.CollateralConfig memory collateralConfig = CollateralUtils
             .getCollateralConfig(_llpToken);
@@ -236,28 +235,41 @@ contract JavBorrowingProvider is
         emit SetJavInfoAggregator(_javInfoAggregator);
     }
 
-    function setBuyFee(uint256 _buyFee) external onlyAdmin {
-        buyFee = _buyFee;
-
-        emit SetBuyFee(_buyFee);
-    }
-
-    function setSellFee(uint256 _sellFee) external onlyAdmin {
-        sellFee = _sellFee;
-
-        emit SetSellFee(_sellFee);
-    }
-
     function setMinBuyAmountUsd(uint256 _minBuyAmountUsd) external onlyAdmin {
         minBuyAmountUsd = _minBuyAmountUsd;
 
         emit SetMinBuyAmountUsd(_minBuyAmountUsd);
     }
 
-    function setJavHoldPercent(uint256 _javHoldPercent) external onlyAdmin {
-        javHoldPercent = _javHoldPercent;
+    function setSellFees(uint32[] memory _sellFees) external onlyAdmin {
+        require(javThresholds.length == _sellFees.length, InvalidInputLength());
+        sellFees = _sellFees;
 
-        emit SetJavHoldPercent(_javHoldPercent);
+        emit SetSellFees(_sellFees);
+    }
+
+    function setBuyConfiguration(
+        uint32[] memory _baseFees,
+        uint32[] memory _usdThresholds
+    ) external onlyAdmin {
+        require(_baseFees.length == _usdThresholds.length, InvalidInputLength());
+
+        baseFees = _baseFees;
+        usdThresholds = _usdThresholds;
+
+        emit SetBuyConfiguration(_baseFees, _usdThresholds);
+    }
+
+    function setJavAmountConfiguration(
+        uint32[] memory _javThresholds,
+        uint32[] memory _reductionFactors
+    ) external onlyAdmin {
+        require(_javThresholds.length == _reductionFactors.length, InvalidInputLength());
+
+        javThresholds = _javThresholds;
+        reductionFactors = _reductionFactors;
+
+        emit SetJavAmountConfiguration(_javThresholds, _reductionFactors);
     }
 
     function initialBuy(
@@ -437,17 +449,19 @@ contract JavBorrowingProvider is
     }
 
     function _buyLLP(uint256 _tokenId, TokenInfo memory _inputToken, uint256 _amount) private {
-        uint256 _fee = (_amount * buyFee) / 1e4;
-        uint256 _clearAmount = _amount - _fee;
-        uint256 _inputAmountUsd = (_clearAmount *
+        uint256 _inputAmountUsd = (_amount *
             _getUsdPrice(_inputToken.priceFeed) *
             tokensPrecision[_inputToken.asset].precisionDelta) / PRECISION_18;
         require(_inputAmountUsd >= minBuyAmountUsd, BelowMinBuyAmount());
 
-        _validateJavHolder(_inputAmountUsd, _msgSender());
+        uint256 _feeP = _calculateFeeP(_inputAmountUsd, _msgSender(), true);
+
+        uint256 _fee = (_amount * _feeP) / 1e4;
+        uint256 _clearAmount = _amount - _fee;
 
         // calculate llp amount
-        uint256 _llpAmount = (_inputAmountUsd * PRECISION_18) / _llpPrice();
+        uint256 _llpAmount = (((_inputAmountUsd * (1e4 - _feeP)) / 1e4) * PRECISION_18) /
+            _llpPrice();
         tokenAmount[_tokenId] += _clearAmount;
 
         IERC20(_inputToken.asset).safeTransferFrom(_msgSender(), address(this), _clearAmount);
@@ -463,13 +477,14 @@ contract JavBorrowingProvider is
             _llpPrice() *
             tokensPrecision[llpToken].precisionDelta) / PRECISION_18;
 
-        _validateJavHolder(_inputAmountUsd, _msgSender());
         // calculate tokens amount
         uint256 _tokenUsdPrice = _getUsdPrice(_outputToken.priceFeed);
         uint256 _tokensAmount = (_inputAmountUsd * PRECISION_18) /
             _tokenUsdPrice /
             tokensPrecision[_outputToken.asset].precisionDelta;
-        uint256 _fee = (_tokensAmount * sellFee) / 1e4;
+        uint256 _feeP = _calculateFeeP(_inputAmountUsd, _msgSender(), false);
+
+        uint256 _fee = (_tokensAmount * _feeP) / 1e4;
         uint256 _clearAmount = _tokensAmount - _fee;
         tokenAmount[_tokenId] -= _tokensAmount;
 
@@ -513,11 +528,40 @@ contract JavBorrowingProvider is
             (IERC20(llpToken).totalSupply() * tokensPrecision[llpToken].precisionDelta);
     }
 
-    function _validateJavHolder(uint256 _usdAmount, address _user) private view {
-        uint256 _javPrice = IJavInfoAggregator(javInfoAggregator).getJavPrice(18);
-        uint256 _javHolderAmount = IJavInfoAggregator(javInfoAggregator).getTotalJavAmount(_user);
-        uint256 minJavAmount = (((_usdAmount * javHoldPercent) / 100) * PRECISION_18) / _javPrice;
-        require(_javHolderAmount >= minJavAmount, NotEnoughJavAssets());
+    function _calculateFeeP(
+        uint256 _usdAmount,
+        address _user,
+        bool _isBuy
+    ) private view returns (uint256) {
+        uint256 _javFreezerAmount = IJavInfoAggregator(javInfoAggregator).getJavFreezerAmount(
+            _user
+        );
+        uint32 baseFee;
+        uint32 reductionFactor;
+
+        if (!_isBuy) {
+            for (uint8 i = uint8(javThresholds.length); i > 0; --i) {
+                if (_javFreezerAmount >= javThresholds[i - 1] * PRECISION_18) {
+                    return sellFees[i - 1];
+                }
+            }
+        }
+
+        for (uint8 i = uint8(usdThresholds.length); i > 0; --i) {
+            if (_usdAmount >= usdThresholds[i - 1] * PRECISION_18) {
+                baseFee = baseFees[i - 1];
+                break; // Exit the loop as we found the correct base fee
+            }
+        }
+
+        for (uint8 i = uint8(javThresholds.length); i > 0; --i) {
+            if (_javFreezerAmount >= javThresholds[i - 1] * PRECISION_18) {
+                reductionFactor = reductionFactors[i - 1];
+                break; // Exit the loop as the correct reduction factor is found
+            }
+        }
+
+        return (baseFee * reductionFactor) / 1e4;
     }
 
     //    function _rebalance() private {

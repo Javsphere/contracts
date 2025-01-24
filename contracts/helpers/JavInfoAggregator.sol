@@ -49,6 +49,10 @@ contract JavInfoAggregator is IJavInfoAggregator, BaseUpgradable {
         return _getTotalJavAmount(_holder);
     }
 
+    function getJavFreezerAmount(address _holder) external view returns (uint256) {
+        return _getJavFreezerAmount(_holder);
+    }
+
     function getJavPrice(uint8 _targetDecimals) external view returns (uint256) {
         return _getJavPrice(_targetDecimals);
     }
@@ -60,18 +64,18 @@ contract JavInfoAggregator is IJavInfoAggregator, BaseUpgradable {
     }
 
     function _getJavPrice(uint8 _targetDecimals) private view returns (uint256) {
-        uint256 javTthPrice;
+        uint256 javEthPrice;
         uint256 precision = 10 ** _targetDecimals;
         //        IPool pool = IPool(javPool);
         //        address ethToken = pool.token0() == javAddress ? pool.token1() : pool.token0();
         //        if (pool.token0() == javAddress) {
-        //            javTthPrice = (pool.reserve1() * precision) / pool.reserve0();
+        //            javEthPrice = (pool.reserve1() * precision) / pool.reserve0();
         //        } else {
-        //            javTthPrice = (pool.reserve0() * precision) / pool.reserve1();
+        //            javEthPrice = (pool.reserve0() * precision) / pool.reserve1();
         //        }
         //        uint256 ethPrice = _getUsdPrice(priceFeeds[ethToken], _targetDecimals);
         //
-        //        return (javTthPrice * ethPrice) / precision;
+        //        return (javEthPrice * ethPrice) / precision;
         return (140 * precision) / 1e4;
     }
 
@@ -80,16 +84,9 @@ contract JavInfoAggregator is IJavInfoAggregator, BaseUpgradable {
         if (stakingAmount > 0) {
             _totalAmount += stakingAmount;
         }
-        if (IJavFreezer(freezerAddress).userDepositTokens(0, _user) > 0) {
-            uint256 lastId = IJavFreezer(freezerAddress).getUserLastDepositId(0, _user);
-            for (uint256 i = 0; i <= lastId; ++i) {
-                IJavFreezer.UserDeposit memory depositDetails = IJavFreezer(freezerAddress)
-                    .userDeposit(_user, 0, i);
-                if (!depositDetails.is_finished) {
-                    _totalAmount += depositDetails.depositTokens;
-                }
-            }
-        }
+
+        _totalAmount += _getJavFreezerAmount(_user);
+
         uint256 vestingCount = ITokenVesting(vestingAddress).holdersVestingCount(_user);
         if (vestingCount > 0) {
             for (uint256 i = 0; i < vestingCount; ++i) {
@@ -97,6 +94,19 @@ contract JavInfoAggregator is IJavInfoAggregator, BaseUpgradable {
                     .getVestingScheduleByAddressAndIndex(_user, i);
                 if (schedule.released != schedule.amountTotal && !schedule.revoked) {
                     _totalAmount += (schedule.amountTotal - schedule.released);
+                }
+            }
+        }
+    }
+
+    function _getJavFreezerAmount(address _user) private view returns (uint256 _freezerAmount) {
+        if (IJavFreezer(freezerAddress).userDepositTokens(0, _user) > 0) {
+            uint256 lastId = IJavFreezer(freezerAddress).getUserLastDepositId(0, _user);
+            for (uint256 i = 0; i <= lastId; ++i) {
+                IJavFreezer.UserDeposit memory depositDetails = IJavFreezer(freezerAddress)
+                    .userDeposit(_user, 0, i);
+                if (!depositDetails.is_finished) {
+                    _freezerAmount += depositDetails.depositTokens;
                 }
             }
         }
