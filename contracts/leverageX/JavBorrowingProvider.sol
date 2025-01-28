@@ -128,6 +128,11 @@ contract JavBorrowingProvider is
         _;
     }
 
+    modifier onlyWhiteList() {
+        require(_whiteListAddresses.contains(_msgSender()), OnlyWhiteList());
+        _;
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -305,6 +310,7 @@ contract JavBorrowingProvider is
         whenNotPaused
         validToken(_inputToken)
         onlyAgreeToTerms(termsAndConditionsAddress)
+        onlyWhiteList
     {
         require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Purchase not available");
         TokenInfo memory _token = tokens[_inputToken];
@@ -324,7 +330,7 @@ contract JavBorrowingProvider is
     function sellLLP(
         uint256 _outputToken,
         uint256 _amount
-    ) external nonReentrant onlyActiveSell whenNotPaused validToken(_outputToken) {
+    ) external nonReentrant onlyActiveSell whenNotPaused validToken(_outputToken) onlyWhiteList {
         require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Sell not available");
         TokenInfo memory _token = tokens[_outputToken];
         require(

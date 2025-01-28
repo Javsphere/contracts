@@ -66,17 +66,16 @@ contract JavInfoAggregator is IJavInfoAggregator, BaseUpgradable {
     function _getJavPrice(uint8 _targetDecimals) private view returns (uint256) {
         uint256 javEthPrice;
         uint256 precision = 10 ** _targetDecimals;
-        //        IPool pool = IPool(javPool);
-        //        address ethToken = pool.token0() == javAddress ? pool.token1() : pool.token0();
-        //        if (pool.token0() == javAddress) {
-        //            javEthPrice = (pool.reserve1() * precision) / pool.reserve0();
-        //        } else {
-        //            javEthPrice = (pool.reserve0() * precision) / pool.reserve1();
-        //        }
-        //        uint256 ethPrice = _getUsdPrice(priceFeeds[ethToken], _targetDecimals);
-        //
-        //        return (javEthPrice * ethPrice) / precision;
-        return (140 * precision) / 1e4;
+        IPool pool = IPool(javPool);
+        address ethToken = pool.token0() == javAddress ? pool.token1() : pool.token0();
+        if (pool.token0() == javAddress) {
+            javEthPrice = (pool.reserve1() * precision) / pool.reserve0();
+        } else {
+            javEthPrice = (pool.reserve0() * precision) / pool.reserve1();
+        }
+        uint256 ethPrice = _getUsdPrice(priceFeeds[ethToken], _targetDecimals);
+
+        return (javEthPrice * ethPrice) / precision;
     }
 
     function _getTotalJavAmount(address _user) private view returns (uint256 _totalAmount) {

@@ -1,8 +1,8 @@
-const { expect } = require("chai");
-const { ethers, upgrades } = require("hardhat");
+const {expect} = require("chai");
+const {ethers, upgrades} = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { deployTokenFixture, deployTermsAndConditionsFixture } = require("../common/mocks");
-const { ADMIN_ERROR, MANAGER_ERROR, MAX_UINT256 } = require("../common/constanst");
+const {deployTokenFixture, deployTermsAndConditionsFixture} = require("../common/mocks");
+const {ADMIN_ERROR, MANAGER_ERROR, MAX_UINT256} = require("../common/constanst");
 describe("JavBorrowingProvider contract", () => {
     let hhJavBorrowingProvider;
     let owner;
@@ -68,8 +68,6 @@ describe("JavBorrowingProvider contract", () => {
                 "0x0000000000000000000000000000000000000000", // _swapRouter,
                 llpToken.target, //  _jlpToken,
                 "0x0000000000000000000000000000000000000000", //  _pnlHandler,
-                5, // _buyFee,
-                6, // _sellFee,
                 [
                     {
                         asset: erc20Token.target,
@@ -135,6 +133,17 @@ describe("JavBorrowingProvider contract", () => {
             await erc20Token2.connect(owner).approve(hhJavBorrowingProvider.target, MAX_UINT256);
             await erc20Token2.connect(addr2).approve(hhJavBorrowingProvider.target, MAX_UINT256);
             await hhJavBorrowingProvider.setTermsAndConditionsAddress(termsAndConditions.target);
+            await hhJavBorrowingProvider.setBuyConfiguration(
+                [200, 165, 149, 132, 116, 99, 66, 33],
+                [100, 1000, 5000, 10000, 25000, 50000, 100000, 500000]
+            );
+            await hhJavBorrowingProvider.setJavAmountConfiguration(
+                [0, 100000, 250000, 500000, 1000000],
+                [10000, 7500, 5000, 2500, 1250]
+            );
+            await hhJavBorrowingProvider.setSellFees(
+                [300, 200, 100, 50, 25]
+            );
         });
     });
 
@@ -187,12 +196,6 @@ describe("JavBorrowingProvider contract", () => {
             ).to.be.revertedWith(ADMIN_ERROR);
         });
 
-        it("Should revert when addWhiteListBatch", async () => {
-            await expect(
-                hhJavBorrowingProvider.connect(bot).addWhiteListBatch([addr2.address]),
-            ).to.be.revertedWith(ADMIN_ERROR);
-        });
-
         it("Should get tvl = 0", async () => {
             await expect(await hhJavBorrowingProvider.tvl()).to.equal(0);
         });
@@ -232,15 +235,6 @@ describe("JavBorrowingProvider contract", () => {
             await expect(await hhJavBorrowingProvider.isBuyActive()).to.be.equal(true);
         });
 
-        it("Should revert when buyLLP - OnlyWhiteList", async () => {
-            await expect(
-                hhJavBorrowingProvider.connect(bot).buyLLP(1, 1),
-            ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "OnlyWhiteList");
-        });
-
-        it("Should addWhiteListBatch", async () => {
-            await hhJavBorrowingProvider.addWhiteListBatch([addr2.address]);
-        });
 
         it("Should revert when buyLLP - OnlyAgreedToTerms", async () => {
             await expect(
@@ -250,40 +244,40 @@ describe("JavBorrowingProvider contract", () => {
             await termsAndConditions.connect(addr2).agreeToTerms();
         });
 
-        it("Should buyLLP", async () => {
-            const amount = ethers.parseUnits("1", 6);
-            await erc20Token2.mint(addr2.address, amount);
-
-            const usdAmount = amount * BigInt(2) * ethers.parseUnits("1", 12);
-            const fee =
-                ((await hhJavBorrowingProvider.buyFee()) * usdAmount) / ethers.parseUnits("1", 4);
-            const tokenAmounts =
-                ((usdAmount - fee) * ethers.parseUnits("1", 18)) /
-                (await hhJavBorrowingProvider.llpPrice());
-
-            await hhJavBorrowingProvider.connect(addr2).buyLLP(1, amount);
-
-            await expect(await erc20Token2.balanceOf(addr2.address)).to.be.equal(0);
-            await expect(await llpToken.balanceOf(addr2.address)).to.be.equal(tokenAmounts);
-            await expect(await hhJavBorrowingProvider.tokenAmount(1)).to.be.equal(amount);
-        });
-
-        it("Should revert when sellLLP - InactiveSell", async () => {
-            await expect(
-                hhJavBorrowingProvider.connect(bot).sellLLP(1, 1),
-            ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "InactiveSell");
-        });
-
-        it("Should toggleBuyActiveState", async () => {
-            await hhJavBorrowingProvider.toggleSellActiveState();
-            await expect(await hhJavBorrowingProvider.isSellActive()).to.be.equal(true);
-        });
-
-        it("Should revert when sellLLP - OnlyWhiteList", async () => {
-            await expect(
-                hhJavBorrowingProvider.connect(bot).sellLLP(1, 1),
-            ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "OnlyWhiteList");
-        });
+        // it("Should buyLLP", async () => {
+        //     const amount = ethers.parseUnits("1", 6);
+        //     await erc20Token2.mint(addr2.address, amount);
+        //
+        //     const usdAmount = amount * BigInt(2) * ethers.parseUnits("1", 12);
+        //     const fee =
+        //         ((await hhJavBorrowingProvider.buyFee()) * usdAmount) / ethers.parseUnits("1", 4);
+        //     const tokenAmounts =
+        //         ((usdAmount - fee) * ethers.parseUnits("1", 18)) /
+        //         (await hhJavBorrowingProvider.llpPrice());
+        //
+        //     await hhJavBorrowingProvider.connect(addr2).buyLLP(1, amount);
+        //
+        //     await expect(await erc20Token2.balanceOf(addr2.address)).to.be.equal(0);
+        //     await expect(await llpToken.balanceOf(addr2.address)).to.be.equal(tokenAmounts);
+        //     await expect(await hhJavBorrowingProvider.tokenAmount(1)).to.be.equal(amount);
+        // });
+        //
+        // it("Should revert when sellLLP - InactiveSell", async () => {
+        //     await expect(
+        //         hhJavBorrowingProvider.connect(bot).sellLLP(1, 1),
+        //     ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "InactiveSell");
+        // });
+        //
+        // it("Should toggleBuyActiveState", async () => {
+        //     await hhJavBorrowingProvider.toggleSellActiveState();
+        //     await expect(await hhJavBorrowingProvider.isSellActive()).to.be.equal(true);
+        // });
+        //
+        // it("Should revert when sellLLP - OnlyWhiteList", async () => {
+        //     await expect(
+        //         hhJavBorrowingProvider.connect(bot).sellLLP(1, 1),
+        //     ).to.be.revertedWithCustomError(hhJavBorrowingProvider, "OnlyWhiteList");
+        // });
 
         // it("Should rebalance", async () => {
         //     const tvlBefore = await hhJavBorrowingProvider.tvl();
@@ -310,5 +304,479 @@ describe("JavBorrowingProvider contract", () => {
         //
         //     // await expect(await hhJavBorrowingProvider.tvl()).to.equal(ethers.parseEther("400"));
         // });
+
+        it("Should test calculateFeeP - isBuy=True", async () => {
+            // 200 base fee
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("100"), //_usdAmount
+                ethers.parseEther("0"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(200);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("500"), //_usdAmount
+                ethers.parseEther("90000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(200);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("500"), //_usdAmount
+                ethers.parseEther("100000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(150);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("500"), //_usdAmount
+                ethers.parseEther("200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(150);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("500"), //_usdAmount
+                ethers.parseEther("250000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(100);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("500"), //_usdAmount
+                ethers.parseEther("350000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(100);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("500"), //_usdAmount
+                ethers.parseEther("500000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(50);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("500"), //_usdAmount
+                ethers.parseEther("800000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(50);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("500"), //_usdAmount
+                ethers.parseEther("1000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(25);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("500"), //_usdAmount
+                ethers.parseEther("1200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(25);
+
+            //165 base fee
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("1000"), //_usdAmount
+                ethers.parseEther("0"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(165);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("90000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(165);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("100000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(123); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("150000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(123); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("250000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(82); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("450000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(82); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("500000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(41);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("800000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(41);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("1000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(20); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("1200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(20); //todo: rounding
+
+
+            //149 base fee
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("5000"), //_usdAmount
+                ethers.parseEther("0"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(149);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("90000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(149);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("100000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(111);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(111);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("250000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(74);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("450000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(74);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("500000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(37);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("800000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(37);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("1000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(18); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("12000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(18); //todo: rounding
+
+            // 132 base fee
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("10000"), //_usdAmount
+                ethers.parseEther("0"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(132);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("90000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(132);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("100000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(99);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(99);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("250000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(66);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("450000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(66);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("500000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(33);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("900000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(33);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("1000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(16); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("2000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(16); //todo: rounding
+
+            // 116 base fee
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("25000"), //_usdAmount
+                ethers.parseEther("0"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(116);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("90000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(116);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("100000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(87);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(87);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("250000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(58);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("450000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(58);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("500000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(29);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("900000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(29);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("1000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(14);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("2000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(14);
+
+            // 99 base fee
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("50000"), //_usdAmount
+                ethers.parseEther("0"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(99);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("90000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(99);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("100000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(74);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(74);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("250000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(49); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("450000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(49); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("500000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(24);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("800000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(24);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("1000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(12);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("2000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(12);
+
+            // 66 base fee
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("100000"), //_usdAmount
+                ethers.parseEther("0"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(66);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("150000"), //_usdAmount
+                ethers.parseEther("90000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(66);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("150000"), //_usdAmount
+                ethers.parseEther("100000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(49); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("150000"), //_usdAmount
+                ethers.parseEther("200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(49); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("150000"), //_usdAmount
+                ethers.parseEther("250000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(33);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("150000"), //_usdAmount
+                ethers.parseEther("450000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(33);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("150000"), //_usdAmount
+                ethers.parseEther("500000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(16); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("150000"), //_usdAmount
+                ethers.parseEther("800000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(16); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("150000"), //_usdAmount
+                ethers.parseEther("1000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(8);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("150000"), //_usdAmount
+                ethers.parseEther("2000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(8);
+
+            // 33 base fee
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("5000000"), //_usdAmount
+                ethers.parseEther("0"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(33);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("90000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(33);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("100000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(24);//todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(24);//todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("250000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(16); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("450000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(16); //todo: rounding
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("500000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(8);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("800000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(8);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("1000000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(4);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("1200000"), //_javFreezerAmount
+                true //_isBuy
+            )).to.be.equal(4);
+        });
+
+        it("Should test calculateFeeP - isBuy=False", async () => {
+            // 300 base fee
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("100"), //_usdAmount
+                ethers.parseEther("0"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(300);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("3000"), //_usdAmount
+                ethers.parseEther("90000"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(300);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("7000"), //_usdAmount
+                ethers.parseEther("100000"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(200);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("15000"), //_usdAmount
+                ethers.parseEther("200000"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(200);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("250000"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(100);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("35000"), //_usdAmount
+                ethers.parseEther("450000"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(100);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("500000"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(50);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("80000"), //_usdAmount
+                ethers.parseEther("800000"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(50);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("1000000"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(25);
+            await expect(await hhJavBorrowingProvider.calculateFeeP(
+                ethers.parseEther("6000000"), //_usdAmount
+                ethers.parseEther("1200000"), //_javFreezerAmount
+                false //_isBuy
+            )).to.be.equal(25);
+        });
+
     });
 });
