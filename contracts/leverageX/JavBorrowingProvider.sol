@@ -94,7 +94,9 @@ contract JavBorrowingProvider is
         uint256 tokenInID,
         address tokenOut,
         uint256 amountIn,
-        uint256 amountOut
+        uint256 amountOut,
+        uint256 feeAmount,
+        uint256 feeAmountUsd
     );
     event SellLLP(
         address indexed user,
@@ -102,7 +104,9 @@ contract JavBorrowingProvider is
         address tokenOut,
         uint256 tokenOutID,
         uint256 amountIn,
-        uint256 amountOut
+        uint256 amountOut,
+        uint256 feeAmount,
+        uint256 feeAmountUsd
     );
     event UpdateToken(
         uint256 indexed tokenId,
@@ -246,13 +250,6 @@ contract JavBorrowingProvider is
         emit SetMinBuyAmountUsd(_minBuyAmountUsd);
     }
 
-    function setSellFees(uint32[] memory _sellFees) external onlyAdmin {
-        require(javThresholds.length == _sellFees.length, InvalidInputLength());
-        sellFees = _sellFees;
-
-        emit SetSellFees(_sellFees);
-    }
-
     function setBuyConfiguration(
         uint32[] memory _baseFees,
         uint32[] memory _usdThresholds
@@ -277,6 +274,13 @@ contract JavBorrowingProvider is
         emit SetJavAmountConfiguration(_javThresholds, _reductionFactors);
     }
 
+    function setSellFees(uint32[] memory _sellFees) external onlyAdmin {
+        require(javThresholds.length == _sellFees.length, InvalidInputLength());
+        sellFees = _sellFees;
+
+        emit SetSellFees(_sellFees);
+    }
+
     function initialBuy(
         uint256 _inputToken,
         uint256 _amount,
@@ -292,7 +296,7 @@ contract JavBorrowingProvider is
         IERC20(_token.asset).safeTransferFrom(_msgSender(), address(this), _amount);
         IERC20Extended(llpToken).mint(_msgSender(), _llpAmount);
 
-        emit BuyLLP(_msgSender(), _token.asset, _inputToken, llpToken, _amount, _llpAmount);
+        emit BuyLLP(_msgSender(), _token.asset, _inputToken, llpToken, _amount, _llpAmount, 0, 0);
     }
 
     /**
@@ -455,8 +459,9 @@ contract JavBorrowingProvider is
     }
 
     function _buyLLP(uint256 _tokenId, TokenInfo memory _inputToken, uint256 _amount) private {
+        uint256 _inputTokenPrice = _getUsdPrice(_inputToken.priceFeed);
         uint256 _inputAmountUsd = (_amount *
-            _getUsdPrice(_inputToken.priceFeed) *
+            _inputTokenPrice *
             tokensPrecision[_inputToken.asset].precisionDelta) / PRECISION_18;
         require(_inputAmountUsd >= minBuyAmountUsd, BelowMinBuyAmount());
 
@@ -475,7 +480,20 @@ contract JavBorrowingProvider is
         IJavBurner(javBurner).swapAndBurn(_inputToken.asset, _fee);
         IERC20Extended(llpToken).mint(_msgSender(), _llpAmount);
 
-        emit BuyLLP(_msgSender(), _inputToken.asset, _tokenId, llpToken, _amount, _llpAmount);
+        uint256 _feeAmountUsd = (_fee *
+            _inputTokenPrice *
+            tokensPrecision[_inputToken.asset].precisionDelta) / PRECISION_18;
+
+        emit BuyLLP(
+            _msgSender(),
+            _inputToken.asset,
+            _tokenId,
+            llpToken,
+            _amount,
+            _llpAmount,
+            _fee,
+            _feeAmountUsd
+        );
     }
 
     function _sellLLP(uint256 _tokenId, TokenInfo memory _outputToken, uint256 _amount) private {
@@ -499,7 +517,20 @@ contract JavBorrowingProvider is
         IERC20(_outputToken.asset).safeTransfer(javBurner, _fee);
         IJavBurner(javBurner).swapAndBurn(_outputToken.asset, _fee);
 
-        emit SellLLP(_msgSender(), llpToken, _outputToken.asset, _tokenId, _amount, _clearAmount);
+        uint256 _feeAmountUsd = (_fee *
+            _tokenUsdPrice *
+            tokensPrecision[_outputToken.asset].precisionDelta) / PRECISION_18;
+
+        emit SellLLP(
+            _msgSender(),
+            llpToken,
+            _outputToken.asset,
+            _tokenId,
+            _amount,
+            _clearAmount,
+            _fee,
+            _feeAmountUsd
+        );
     }
 
     function _getUsdPrice(bytes32 _priceFeed) private view returns (uint256) {
