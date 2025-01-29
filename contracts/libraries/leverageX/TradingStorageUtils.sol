@@ -135,6 +135,16 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
+    function updateMinCollateralAmountUsd(uint256 _minCollateralAmountUsd) internal {
+        ITradingStorage.TradingStorage storage s = _getStorage();
+        s.minCollateralAmountUsd = _minCollateralAmountUsd;
+
+        emit ITradingStorageUtils.MinCollateralAmountUsd(_minCollateralAmountUsd);
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
     function updateCollateralApprove(uint8 _collateralIndex) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         IERC20 collateral = IERC20(s.collaterals[_collateralIndex].collateral);
@@ -484,6 +494,13 @@ library TradingStorageUtils {
      */
     function getMaxPnlP() internal view returns (uint256) {
         return _getStorage().max_pnl_p;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getMinCollateralAmountUsd() internal view returns (uint256) {
+        return _getStorage().minCollateralAmountUsd;
     }
 
     /**
