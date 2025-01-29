@@ -15,9 +15,11 @@ import "../interfaces/IJavPriceAggregator.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../interfaces/IRouter.sol";
 import "../interfaces/helpers/IJavBurner.sol";
+import "../interfaces/helpers/IJavInfoAggregator.sol";
 
 contract JavBorrowingProvider is
     IJavBorrowingProvider,
+    IGeneralErrors,
     TermsAndCondUtils,
     ReentrancyGuardUpgradeable,
     BaseUpgradable
@@ -57,8 +59,8 @@ contract JavBorrowingProvider is
     IRouter public swapRouter;
     address public pnlHandler;
     address public llpToken;
-    uint256 public buyFee; // * 1e4
-    uint256 public sellFee; // * 1e4
+    uint256 public buyFee; // @custom:deprecated
+    uint256 public sellFee; // @custom:deprecated
 
     TokenInfo[] public tokens;
     mapping(address => TokenPrecisionInfo) public tokensPrecision;
@@ -71,11 +73,18 @@ contract JavBorrowingProvider is
     // Parameters (adjustable)
     uint256 public lossesBurnP; // PRECISION_18 (% of all losses)
     mapping(uint256 => uint256) public tokenAmount; // PRECISION_18
-    EnumerableSet.AddressSet private _whiteListAddresses;
+    EnumerableSet.AddressSet private _whiteListAddresses; // @custom:deprecated
     bool public isBuyActive;
     bool public isSellActive;
     address public termsAndConditionsAddress;
     address public javBurner;
+    address public javInfoAggregator;
+    uint256 public minBuyAmountUsd; //1e18
+    uint32[] public baseFees; //1e4
+    uint32[] public usdThresholds; // clear
+    uint32[] public javThresholds; // clear
+    uint32[] public reductionFactors; //1e4
+    uint32[] public sellFees; //1e4
 
     /* ========== EVENTS ========== */
     event AddToken(TokenInfo tokenInfo);
@@ -85,7 +94,9 @@ contract JavBorrowingProvider is
         uint256 tokenInID,
         address tokenOut,
         uint256 amountIn,
-        uint256 amountOut
+        uint256 amountOut,
+        uint256 feeAmount,
+        uint256 feeAmountUsd
     );
     event SellLLP(
         address indexed user,
@@ -93,7 +104,9 @@ contract JavBorrowingProvider is
         address tokenOut,
         uint256 tokenOutID,
         uint256 amountIn,
-        uint256 amountOut
+        uint256 amountOut,
+        uint256 feeAmount,
+        uint256 feeAmountUsd
     );
     event UpdateToken(
         uint256 indexed tokenId,
@@ -106,11 +119,6 @@ contract JavBorrowingProvider is
     modifier validToken(uint256 _tokenId) {
         require(_tokenId < tokens.length, "JavBorrowingProvider: Invalid token");
         require(tokens[_tokenId].isActive, "JavBorrowingProvider: Token is inactive");
-        _;
-    }
-
-    modifier onlyWhiteList() {
-        require(_whiteListAddresses.contains(_msgSender()), OnlyWhiteList());
         _;
     }
 
@@ -134,18 +142,12 @@ contract JavBorrowingProvider is
         address _swapRouter,
         address _llpToken,
         address _pnlHandler,
-        uint256 _buyFee,
-        uint256 _sellFee,
         TokenInfo[] memory _tokens
     ) external initializer {
-        require(_buyFee <= 10, WrongBuyFee());
-        require(_sellFee <= 10, WrongSellFee());
         priceAggregator = IJavPriceAggregator(_priceAggregator);
         swapRouter = IRouter(_swapRouter);
         pnlHandler = _pnlHandler;
         llpToken = _llpToken;
-        buyFee = _buyFee;
-        sellFee = _sellFee;
 
         CollateralUtils.CollateralConfig memory collateralConfig = CollateralUtils
             .getCollateralConfig(_llpToken);
@@ -215,20 +217,6 @@ contract JavBorrowingProvider is
         emit SellActiveStateUpdated(toggled);
     }
 
-    function addWhiteListBatch(address[] calldata _addresses) external onlyAdmin {
-        for (uint8 i = 0; i < _addresses.length; ++i) {
-            _whiteListAddresses.add(_addresses[i]);
-            emit WhiteListAdded(_addresses[i]);
-        }
-    }
-
-    function removeWhiteListBatch(address[] calldata _addresses) external onlyAdmin {
-        for (uint8 i = 0; i < _addresses.length; ++i) {
-            _whiteListAddresses.remove(_addresses[i]);
-            emit WhiteListRemoved(_addresses[i]);
-        }
-    }
-
     function setTermsAndConditionsAddress(
         address _termsAndConditionsAddress
     ) external onlyAdmin nonZeroAddress(_termsAndConditionsAddress) {
@@ -243,16 +231,49 @@ contract JavBorrowingProvider is
         emit SetJavBurner(_javBurner);
     }
 
-    function setBuyFee(uint256 _buyFee) external onlyAdmin {
-        buyFee = _buyFee;
+    function setJavInfoAggregator(
+        address _javInfoAggregator
+    ) external onlyAdmin nonZeroAddress(_javInfoAggregator) {
+        javInfoAggregator = _javInfoAggregator;
 
-        emit SetBuyFee(_buyFee);
+        emit SetJavInfoAggregator(_javInfoAggregator);
     }
 
-    function setSellFee(uint256 _sellFee) external onlyAdmin {
-        sellFee = _sellFee;
+    function setMinBuyAmountUsd(uint256 _minBuyAmountUsd) external onlyAdmin {
+        minBuyAmountUsd = _minBuyAmountUsd;
 
-        emit SetSellFee(_sellFee);
+        emit SetMinBuyAmountUsd(_minBuyAmountUsd);
+    }
+
+    function setBuyConfiguration(
+        uint32[] memory _baseFees,
+        uint32[] memory _usdThresholds
+    ) external onlyAdmin {
+        require(_baseFees.length == _usdThresholds.length, InvalidInputLength());
+
+        baseFees = _baseFees;
+        usdThresholds = _usdThresholds;
+
+        emit SetBuyConfiguration(_baseFees, _usdThresholds);
+    }
+
+    function setJavAmountConfiguration(
+        uint32[] memory _javThresholds,
+        uint32[] memory _reductionFactors
+    ) external onlyAdmin {
+        require(_javThresholds.length == _reductionFactors.length, InvalidInputLength());
+
+        javThresholds = _javThresholds;
+        reductionFactors = _reductionFactors;
+
+        emit SetJavAmountConfiguration(_javThresholds, _reductionFactors);
+    }
+
+    function setSellFees(uint32[] memory _sellFees) external onlyAdmin {
+        require(javThresholds.length == _sellFees.length, InvalidInputLength());
+        sellFees = _sellFees;
+
+        emit SetSellFees(_sellFees);
     }
 
     function initialBuy(
@@ -270,7 +291,7 @@ contract JavBorrowingProvider is
         IERC20(_token.asset).safeTransferFrom(_msgSender(), address(this), _amount);
         IERC20Extended(llpToken).mint(_msgSender(), _llpAmount);
 
-        emit BuyLLP(_msgSender(), _token.asset, _inputToken, llpToken, _amount, _llpAmount);
+        emit BuyLLP(_msgSender(), _token.asset, _inputToken, llpToken, _amount, _llpAmount, 0, 0);
     }
 
     /**
@@ -287,7 +308,6 @@ contract JavBorrowingProvider is
         onlyActiveBuy
         whenNotPaused
         validToken(_inputToken)
-        onlyWhiteList
         onlyAgreeToTerms(termsAndConditionsAddress)
     {
         require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Purchase not available");
@@ -308,7 +328,7 @@ contract JavBorrowingProvider is
     function sellLLP(
         uint256 _outputToken,
         uint256 _amount
-    ) external nonReentrant onlyActiveSell whenNotPaused validToken(_outputToken) onlyWhiteList {
+    ) external nonReentrant onlyActiveSell whenNotPaused validToken(_outputToken) {
         require(IERC20(llpToken).totalSupply() > 0, "JavBorrowingProvider: Sell not available");
         TokenInfo memory _token = tokens[_outputToken];
         require(
@@ -433,13 +453,20 @@ contract JavBorrowingProvider is
     }
 
     function _buyLLP(uint256 _tokenId, TokenInfo memory _inputToken, uint256 _amount) private {
-        uint256 _fee = (_amount * buyFee) / 1e4;
-        uint256 _clearAmount = _amount - _fee;
-        uint256 _inputAmountUsd = (_clearAmount *
-            _getUsdPrice(_inputToken.priceFeed) *
+        uint256 _inputTokenPrice = _getUsdPrice(_inputToken.priceFeed);
+        uint256 _inputAmountUsd = (_amount *
+            _inputTokenPrice *
             tokensPrecision[_inputToken.asset].precisionDelta) / PRECISION_18;
+        require(_inputAmountUsd >= minBuyAmountUsd, BelowMinBuyAmount());
+
+        uint256 _feeP = _calculateFeeP(_inputAmountUsd, _msgSender(), true);
+
+        uint256 _fee = (_amount * _feeP) / 1e4;
+        uint256 _clearAmount = _amount - _fee;
+
         // calculate llp amount
-        uint256 _llpAmount = (_inputAmountUsd * PRECISION_18) / _llpPrice();
+        uint256 _llpAmount = (((_inputAmountUsd * (1e4 - _feeP)) / 1e4) * PRECISION_18) /
+            _llpPrice();
         tokenAmount[_tokenId] += _clearAmount;
 
         IERC20(_inputToken.asset).safeTransferFrom(_msgSender(), address(this), _clearAmount);
@@ -447,19 +474,35 @@ contract JavBorrowingProvider is
         IJavBurner(javBurner).swapAndBurn(_inputToken.asset, _fee);
         IERC20Extended(llpToken).mint(_msgSender(), _llpAmount);
 
-        emit BuyLLP(_msgSender(), _inputToken.asset, _tokenId, llpToken, _amount, _llpAmount);
+        uint256 _feeAmountUsd = (_fee *
+            _inputTokenPrice *
+            tokensPrecision[_inputToken.asset].precisionDelta) / PRECISION_18;
+
+        emit BuyLLP(
+            _msgSender(),
+            _inputToken.asset,
+            _tokenId,
+            llpToken,
+            _amount,
+            _llpAmount,
+            _fee,
+            _feeAmountUsd
+        );
     }
 
     function _sellLLP(uint256 _tokenId, TokenInfo memory _outputToken, uint256 _amount) private {
         uint256 _inputAmountUsd = (_amount *
             _llpPrice() *
             tokensPrecision[llpToken].precisionDelta) / PRECISION_18;
+
         // calculate tokens amount
         uint256 _tokenUsdPrice = _getUsdPrice(_outputToken.priceFeed);
         uint256 _tokensAmount = (_inputAmountUsd * PRECISION_18) /
             _tokenUsdPrice /
             tokensPrecision[_outputToken.asset].precisionDelta;
-        uint256 _fee = (_tokensAmount * sellFee) / 1e4;
+        uint256 _feeP = _calculateFeeP(_inputAmountUsd, _msgSender(), false);
+
+        uint256 _fee = (_tokensAmount * _feeP) / 1e4;
         uint256 _clearAmount = _tokensAmount - _fee;
         tokenAmount[_tokenId] -= _tokensAmount;
 
@@ -468,7 +511,20 @@ contract JavBorrowingProvider is
         IERC20(_outputToken.asset).safeTransfer(javBurner, _fee);
         IJavBurner(javBurner).swapAndBurn(_outputToken.asset, _fee);
 
-        emit SellLLP(_msgSender(), llpToken, _outputToken.asset, _tokenId, _amount, _clearAmount);
+        uint256 _feeAmountUsd = (_fee *
+            _tokenUsdPrice *
+            tokensPrecision[_outputToken.asset].precisionDelta) / PRECISION_18;
+
+        emit SellLLP(
+            _msgSender(),
+            llpToken,
+            _outputToken.asset,
+            _tokenId,
+            _amount,
+            _clearAmount,
+            _fee,
+            _feeAmountUsd
+        );
     }
 
     function _getUsdPrice(bytes32 _priceFeed) private view returns (uint256) {
@@ -501,6 +557,42 @@ contract JavBorrowingProvider is
         return
             ((_calculateTotalTvlUsd() + rewardsAmountUsd) * PRECISION_18) /
             (IERC20(llpToken).totalSupply() * tokensPrecision[llpToken].precisionDelta);
+    }
+
+    function _calculateFeeP(
+        uint256 _usdAmount,
+        address _user,
+        bool _isBuy
+    ) private view returns (uint256) {
+        uint256 _javFreezerAmount = IJavInfoAggregator(javInfoAggregator).getJavFreezerAmount(
+            _user
+        );
+        uint32 baseFee;
+        uint32 reductionFactor;
+
+        if (!_isBuy) {
+            for (uint8 i = uint8(javThresholds.length); i > 0; --i) {
+                if (_javFreezerAmount >= javThresholds[i - 1] * PRECISION_18) {
+                    return sellFees[i - 1];
+                }
+            }
+        }
+
+        for (uint8 i = uint8(usdThresholds.length); i > 0; --i) {
+            if (_usdAmount >= usdThresholds[i - 1] * PRECISION_18) {
+                baseFee = baseFees[i - 1];
+                break; // Exit the loop as we found the correct base fee
+            }
+        }
+
+        for (uint8 i = uint8(javThresholds.length); i > 0; --i) {
+            if (_javFreezerAmount >= javThresholds[i - 1] * PRECISION_18) {
+                reductionFactor = reductionFactors[i - 1];
+                break; // Exit the loop as the correct reduction factor is found
+            }
+        }
+
+        return (baseFee * reductionFactor) / 1e4;
     }
 
     //    function _rebalance() private {
