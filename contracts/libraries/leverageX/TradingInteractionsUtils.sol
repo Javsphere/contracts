@@ -373,6 +373,13 @@ library TradingInteractionsUtils {
         if (
             (positionSizeUsd * 1e3) / _trade.leverage <
             5 * _getMultiCollatDiamond().pairMinFeeUsd(_trade.pairIndex)
+        ) revert ITradingInteractionsUtils.BelowMinPositionSizeUsd();
+
+        if (
+            _getMultiCollatDiamond().getUsdNormalizedValue(
+                _trade.collateralIndex,
+                _trade.collateralAmount
+            ) < _getMultiCollatDiamond().getMinCollateralAmountUsd()
         ) revert ITradingInteractionsUtils.InsufficientCollateral();
 
         if (

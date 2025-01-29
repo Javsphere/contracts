@@ -10,7 +10,5 @@ interface IRewardsCollector is IRewardsDistributor, IGeneralErrors {
 
     event SetTokenPoolFee(address token, bool isStable);
     event Withdraw(address indexed token, address indexed recipient, uint256 amount);
-    event SetJavAddress(address indexed _address);
-    event SetSwapRouterAddress(address indexed _address);
-    event SwapAndBurn(address indexed token, uint256 swapAmount, uint256 burnAmount);
+    event SetJavBurner(address indexed _address);
 }

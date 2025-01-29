@@ -31,12 +31,17 @@ interface IJavBorrowingProvider {
     event SellActiveStateUpdated(bool isActive);
     event WhiteListAdded(address indexed _address);
     event WhiteListRemoved(address indexed _address);
+    event SetJavBurner(address indexed _address);
+    event SetJavInfoAggregator(address indexed _address);
+    event SetSellFees(uint32[] sellFees);
+    event SetMinBuyAmountUsd(uint256 minBuyAmountUsd);
+    event SetBuyConfiguration(uint32[] baseFees, uint32[] usdThresholds);
+    event SetJavAmountConfiguration(uint32[] javThresholds, uint32[] reductionFactors);
 
     error OnlyTradingPnlHandler();
     error NotEnoughAssets();
     error OnlyWhiteList();
     error InactiveBuy();
     error InactiveSell();
-    error WrongBuyFee();
-    error WrongSellFee();
+    error BelowMinBuyAmount();
 }

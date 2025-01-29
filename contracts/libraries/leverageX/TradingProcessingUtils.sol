@@ -629,6 +629,7 @@ library TradingProcessingUtils {
 
         // 2. Store final trade in storage contract
         ITradingStorage.TradeInfo memory tradeInfo;
+        tradeInfo.maxSlippageP = _pendingOrder.maxSlippageP;
         _trade = _getMultiCollatDiamond().storeTrade(_trade, tradeInfo);
 
         return _trade;

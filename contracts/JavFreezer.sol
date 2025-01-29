@@ -186,7 +186,10 @@ contract JavFreezer is
         emit SetLockPeriod(_lockId, _duration);
     }
 
-    function setLockPeriodMultiplier(uint256 _lockId, uint256 _multiplier) external onlyAdmin validLockId(_lockId){
+    function setLockPeriodMultiplier(
+        uint256 _lockId,
+        uint256 _multiplier
+    ) external onlyAdmin validLockId(_lockId) {
         lockPeriodMultiplier[_lockId] = _multiplier;
 
         emit SetLockPeriodMultiplier(_lockId, _multiplier);

@@ -11,19 +11,24 @@ import "../interfaces/IJavFreezer.sol";
 import "../interfaces/IJavStakeX.sol";
 import "../base/BaseUpgradable.sol";
 import "../interfaces/IRouter.sol";
+import "../interfaces/helpers/IJavBurner.sol";
 
 contract RewardsCollector is IRewardsCollector, BaseUpgradable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     EnumerableSet.AddressSet private _allowedAddresses;
-    IRouter public swapRouter;
-    address public javAddress;
-    mapping(address => bool) public tokenPoolFee;
+    IRouter public swapRouter; // @custom:deprecated
+    address public javAddress; // @custom:deprecated
+    mapping(address => bool) public tokenPoolFee; // @custom:deprecated
+    EnumerableSet.AddressSet private _swapTokens;
+    address public javBurner;
 
     /* ========== EVENTS ========== */
     event AddAllowedAddress(address indexed _address);
+    event AddSwapToken(address indexed _address);
     event RemoveAllowedAddress(address indexed _address);
+    event RemoveSwapToken(address indexed _address);
     event DistributeRewards(uint256 amount);
 
     modifier onlyAllowedAddresses() {
@@ -44,10 +49,24 @@ contract RewardsCollector is IRewardsCollector, BaseUpgradable {
         __Base_init();
     }
 
+    function getAllowedAddresses() external view returns (address[] memory) {
+        return _allowedAddresses.values();
+    }
+
+    function getSwapTokens() external view returns (address[] memory) {
+        return _swapTokens.values();
+    }
+
     function addAllowedAddress(address _address) external onlyAdmin {
         _allowedAddresses.add(_address);
 
         emit AddAllowedAddress(_address);
+    }
+
+    function addSwapToken(address _token) external onlyAdmin {
+        _swapTokens.add(_token);
+
+        emit AddSwapToken(_token);
     }
 
     function removeAllowedAddress(address _address) external onlyAdmin {
@@ -56,64 +75,28 @@ contract RewardsCollector is IRewardsCollector, BaseUpgradable {
         emit RemoveAllowedAddress(_address);
     }
 
-    function setJavAddress(address _javAddress) external onlyAdmin {
-        javAddress = _javAddress;
+    function removeSwapToken(address _token) external onlyAdmin {
+        _swapTokens.remove(_token);
 
-        emit SetJavAddress(_javAddress);
+        emit RemoveSwapToken(_token);
     }
 
-    function setSwapRouterAddress(address _swapRouter) external onlyAdmin {
-        swapRouter = IRouter(_swapRouter);
+    function setJavBurner(address _javBurner) external onlyAdmin nonZeroAddress(_javBurner) {
+        javBurner = _javBurner;
 
-        emit SetSwapRouterAddress(_swapRouter);
-    }
-
-    function setTokenPoolFee(address _token, bool _isStable) external onlyAdmin {
-        tokenPoolFee[_token] = _isStable;
-
-        emit SetTokenPoolFee(_token, _isStable);
+        emit SetJavBurner(_javBurner);
     }
 
     function distributeRewards(address[] memory _tokens) external {}
 
-    function withdraw(address _token) external onlyAdmin {
-        uint256 _amount = IERC20(_token).balanceOf(address(this));
-
-        IERC20(_token).transfer(_msgSender(), _amount);
-
-        emit Withdraw(_token, _msgSender(), _amount);
-    }
-
-    function swapAndBurn(address _token) external onlyAllowedAddresses {
-        //        uint256 _swapAmount = IERC20(_token).balanceOf(address(this));
-        //        require(_swapAmount > 0, InvalidSwapAmount());
-        //
-        //        _swapToken(_token, javAddress, _swapAmount);
-        //
-        //        uint256 _burnAmount = IERC20(javAddress).balanceOf(address(this));
-        //        IERC20Extended(javAddress).burn(_burnAmount);
-        //
-        //        emit SwapAndBurn(_token, _swapAmount, _burnAmount);
-    }
-
-    function _swapToken(address _tokenIn, address _tokenOut, uint256 _amount) private {
-        IERC20(_tokenIn).safeDecreaseAllowance(address(swapRouter), 0);
-        IERC20(_tokenIn).safeIncreaseAllowance(address(swapRouter), _amount);
-
-        IRouter.Route[] memory route = new IRouter.Route[](1);
-        route[0] = IRouter.Route({
-            from: _tokenIn,
-            to: _tokenOut,
-            stable: tokenPoolFee[_tokenIn],
-            factory: address(0)
-        });
-
-        swapRouter.swapExactTokensForTokens(
-            _amount,
-            0,
-            route,
-            address(this),
-            block.timestamp + 1000
-        );
+    function swapAndBurn() external onlyAllowedAddresses {
+        address _token;
+        uint256 _amount;
+        for (uint256 i = 0; i < _swapTokens.length(); i++) {
+            _token = _swapTokens.at(i);
+            _amount = IERC20(_token).balanceOf(address(this));
+            IERC20(_token).safeTransfer(javBurner, _amount);
+            IJavBurner(javBurner).swapAndBurn(_token, _amount);
+        }
     }
 }
