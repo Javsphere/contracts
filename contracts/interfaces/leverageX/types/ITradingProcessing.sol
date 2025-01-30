@@ -43,7 +43,9 @@ interface ITradingProcessing {
         uint8 vaultClosingFeeP; // 8 bits
         uint80 __placeholder;
         mapping(uint8 => uint256) pendingGovFees; // collateralIndex => pending gov fee (collateral)
-        uint256[47] __gap;
+        mapping(address => mapping(uint256 => uint256)) tradeTimestamp;
+        uint32[] usdThresholds;
+        uint16[] duration;
+        uint256[44] __gap;
     }
-
 }

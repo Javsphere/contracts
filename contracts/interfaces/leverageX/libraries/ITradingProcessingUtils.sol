@@ -32,6 +32,16 @@ interface ITradingProcessingUtils is
     function claimPendingGovFees() external;
 
     /**
+     * @dev Set trade usd thresholds
+     */
+    function setTradeUsdThresholds(uint32[] memory _usdThresholds) external;
+
+    /**
+     * @dev Set trade lock duration
+     */
+    function setTradeLockDuration(uint16[] memory _duration) external;
+
+    /**
      * @dev Returns the current vaultClosingFeeP value (%)
      */
     function getVaultClosingFeeP() external view returns (uint8);
@@ -40,6 +50,21 @@ interface ITradingProcessingUtils is
      * @dev Returns the current pending gov fees for a collateral index (collateral precision)
      */
     function getPendingGovFeesCollateral(uint8 _collateralIndex) external view returns (uint256);
+
+    /**
+     * @dev Returns the open trade timestamp
+     */
+    function getTradeTimestamp(address _trader, uint256 _tradeId) external view returns (uint256);
+
+    /**
+     * @dev Returns trade usd thresholds
+     */
+    function getTradeUsdThresholds() external view returns (uint32[] memory);
+
+    /**
+     * @dev Returns trade lock duration
+     */
+    function getTradeLockDuration() external view returns (uint16[] memory);
 
     /**
      * @dev Open market order
@@ -189,4 +214,16 @@ interface ITradingProcessingUtils is
         uint8 indexed collateralIndex,
         uint256 amountCollateral
     );
+
+    /**
+     *
+     * @param usdThresholds usd thresholds array
+     */
+    event SetTradeUsdThresholds(uint32[] usdThresholds);
+
+    /**
+     *
+     * @param duration trade lock duration
+     */
+    event SetTradeLockDuration(uint16[] duration);
 }

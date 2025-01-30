@@ -80,6 +80,21 @@ library TradingProcessingUtils {
             }
         }
     }
+    /**
+     * @dev Check ITradingProcessingUtils interface for documentation
+     */
+    function setTradeUsdThresholds(uint32[] memory _usdThresholds) internal {
+        _getStorage().usdThresholds = _usdThresholds;
+
+        emit ITradingProcessingUtils.SetTradeUsdThresholds(_usdThresholds);
+    }
+    /**
+     * @dev Check ITradingProcessingUtils interface for documentation
+     */
+    function setTradeLockDuration(uint16[] memory _duration) internal {
+        _getStorage().duration = _duration;
+        emit ITradingProcessingUtils.SetTradeLockDuration(_duration);
+    }
 
     /**
      * @dev Check ITradingProcessingUtils interface for documentation
@@ -93,6 +108,27 @@ library TradingProcessingUtils {
      */
     function getPendingGovFeesCollateral(uint8 _collateralIndex) internal view returns (uint256) {
         return _getStorage().pendingGovFees[_collateralIndex];
+    }
+
+    /**
+     * @dev Check ITradingProcessingUtils interface for documentation
+     */
+    function getTradeTimestamp(address _trader, uint256 _tradeId) internal view returns (uint256) {
+        return _getStorage().tradeTimestamp[_trader][_tradeId];
+    }
+
+    /**
+     * @dev Check ITradingProcessingUtils interface for documentation
+     */
+    function getTradeUsdThresholds() internal view returns (uint32[] memory) {
+        return _getStorage().usdThresholds;
+    }
+
+    /**
+     * @dev Check ITradingProcessingUtils interface for documentation
+     */
+    function getTradeLockDuration() internal view returns (uint16[] memory) {
+        return _getStorage().duration;
     }
 
     /**
@@ -371,6 +407,12 @@ library TradingProcessingUtils {
             ITradingProcessing.Values memory v;
 
             if (cancelReason == ITradingProcessing.CancelReason.NONE) {
+                require(
+                    block.timestamp - _getStorage().tradeTimestamp[t.user][t.index] >=
+                        _getTradeLockDuration(t),
+                    IGeneralErrors.EarlyTradeClose()
+                );
+
                 v.profitP = TradingCommonUtils.getPnlPercent(
                     t.openPrice,
                     uint64(priceAfterImpact),
@@ -620,7 +662,7 @@ library TradingProcessingUtils {
         ITradingStorage.Trade memory _trade,
         ITradingStorage.PendingOrder memory _pendingOrder
     ) internal returns (ITradingStorage.Trade memory) {
-        // 1. Deduct gov fee, GNS staking fee (previously dev fee), Market/Limit fee
+        // 1. Deduct gov fee, JAv staking fee (previously dev fee), Market/Limit fee
         _trade.collateralAmount -= TradingCommonUtils.processOpeningFees(
             _trade,
             TradingCommonUtils.getPositionSizeCollateral(_trade.collateralAmount, _trade.leverage),
@@ -631,6 +673,8 @@ library TradingProcessingUtils {
         ITradingStorage.TradeInfo memory tradeInfo;
         tradeInfo.maxSlippageP = _pendingOrder.maxSlippageP;
         _trade = _getMultiCollatDiamond().storeTrade(_trade, tradeInfo);
+
+        _getStorage().tradeTimestamp[_trade.user][_trade.index] = block.timestamp;
 
         return _trade;
     }
@@ -756,5 +800,28 @@ library TradingProcessingUtils {
         uint32 _index
     ) internal view returns (ITradingStorage.TradeInfo memory) {
         return _getMultiCollatDiamond().getTradeInfo(_trader, _index);
+    }
+
+    function _getTradeLockDuration(
+        ITradingStorage.Trade memory _trade
+    ) internal view returns (uint256) {
+        ITradingProcessing.TradingProcessingStorage storage s = _getStorage();
+
+        uint256 positionSizeCollateral = TradingCommonUtils.getPositionSizeCollateral(
+            _trade.collateralAmount,
+            _trade.leverage
+        );
+        uint256 positionSizeUsd = _getMultiCollatDiamond().getUsdNormalizedValue(
+            _trade.collateralIndex,
+            positionSizeCollateral
+        );
+
+        for (uint8 i = uint8(s.usdThresholds.length); i > 0; --i) {
+            if (positionSizeUsd >= s.usdThresholds[i - 1] * 1e18) {
+                return s.duration[i - 1];
+            }
+        }
+
+        return s.duration[0];
     }
 }
