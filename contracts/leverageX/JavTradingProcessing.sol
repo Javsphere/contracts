@@ -46,6 +46,11 @@ contract JavTradingProcessing is JavAddressStore, ITradingProcessingUtils {
         TradingProcessingUtils.setTradeLockDuration(_duration);
     }
 
+    /// @inheritdoc ITradingProcessingUtils
+    function setLimitedGroups(uint8[] memory _limitedGroups) external onlyRole(Role.GOV) {
+        TradingProcessingUtils.setLimitedGroups(_limitedGroups);
+    }
+
     // Interactions
 
     /// @inheritdoc ITradingProcessingUtils
@@ -101,5 +106,10 @@ contract JavTradingProcessing is JavAddressStore, ITradingProcessingUtils {
     /// @inheritdoc ITradingProcessingUtils
     function getTradeLockDuration() external view returns (uint16[] memory) {
         return TradingProcessingUtils.getTradeLockDuration();
+    }
+
+    /// @inheritdoc ITradingProcessingUtils
+    function getLimitedGroups() external view returns (uint8[] memory) {
+        return TradingProcessingUtils.getLimitedGroups();
     }
 }

@@ -80,6 +80,7 @@ library TradingProcessingUtils {
             }
         }
     }
+
     /**
      * @dev Check ITradingProcessingUtils interface for documentation
      */
@@ -88,12 +89,21 @@ library TradingProcessingUtils {
 
         emit ITradingProcessingUtils.SetTradeUsdThresholds(_usdThresholds);
     }
+
     /**
      * @dev Check ITradingProcessingUtils interface for documentation
      */
     function setTradeLockDuration(uint16[] memory _duration) internal {
         _getStorage().duration = _duration;
         emit ITradingProcessingUtils.SetTradeLockDuration(_duration);
+    }
+
+    /**
+     * @dev Check ITradingProcessingUtils interface for documentation
+     */
+    function setLimitedGroups(uint8[] memory _limitedGroups) internal {
+        _getStorage().limitedGroups = _limitedGroups;
+        emit ITradingProcessingUtils.SetLimitedGroups(_limitedGroups);
     }
 
     /**
@@ -129,6 +139,13 @@ library TradingProcessingUtils {
      */
     function getTradeLockDuration() internal view returns (uint16[] memory) {
         return _getStorage().duration;
+    }
+
+    /**
+     * @dev Check ITradingProcessingUtils interface for documentation
+     */
+    function getLimitedGroups() internal view returns (uint8[] memory) {
+        return _getStorage().limitedGroups;
     }
 
     /**
@@ -806,6 +823,11 @@ library TradingProcessingUtils {
         ITradingStorage.Trade memory _trade
     ) internal view returns (uint256) {
         ITradingProcessing.TradingProcessingStorage storage s = _getStorage();
+        IPairsStorage.Pair memory pair = _getMultiCollatDiamond().pairs(_trade.pairIndex);
+
+        if (!_isInLimitedGroups(pair.groupIndex)) {
+            return 0;
+        }
 
         uint256 positionSizeCollateral = TradingCommonUtils.getPositionSizeCollateral(
             _trade.collateralAmount,
@@ -816,12 +838,22 @@ library TradingProcessingUtils {
             positionSizeCollateral
         );
 
-        for (uint8 i = uint8(s.usdThresholds.length); i > 0; --i) {
-            if (positionSizeUsd >= s.usdThresholds[i - 1] * 1e18) {
+        for (uint256 i = s.usdThresholds.length; i > 0; --i) {
+            if (positionSizeUsd >= uint256(s.usdThresholds[i - 1]) * 1e18) {
                 return s.duration[i - 1];
             }
         }
 
         return s.duration[0];
+    }
+
+    function _isInLimitedGroups(uint256 _groupIndex) internal view returns (bool) {
+        ITradingProcessing.TradingProcessingStorage storage s = _getStorage();
+        for (uint8 i = 0; i < s.limitedGroups.length; ++i) {
+            if (s.limitedGroups[i] == uint8(_groupIndex)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

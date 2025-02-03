@@ -46,6 +46,7 @@ interface ITradingProcessing {
         mapping(address => mapping(uint256 => uint256)) tradeTimestamp;
         uint32[] usdThresholds;
         uint16[] duration;
-        uint256[44] __gap;
+        uint8[] limitedGroups;
+        uint256[43] __gap;
     }
 }

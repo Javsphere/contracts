@@ -42,6 +42,11 @@ interface ITradingProcessingUtils is
     function setTradeLockDuration(uint16[] memory _duration) external;
 
     /**
+     * @dev Set limited groups
+     */
+    function setLimitedGroups(uint8[] memory _limitedGroups) external;
+
+    /**
      * @dev Returns the current vaultClosingFeeP value (%)
      */
     function getVaultClosingFeeP() external view returns (uint8);
@@ -65,6 +70,11 @@ interface ITradingProcessingUtils is
      * @dev Returns trade lock duration
      */
     function getTradeLockDuration() external view returns (uint16[] memory);
+
+    /**
+     * @dev Returns limited groups
+     */
+    function getLimitedGroups() external view returns (uint8[] memory);
 
     /**
      * @dev Open market order
@@ -226,4 +236,10 @@ interface ITradingProcessingUtils is
      * @param duration trade lock duration
      */
     event SetTradeLockDuration(uint16[] duration);
+
+    /**
+     *
+     * @param limitedGroups limited groups indexes
+     */
+    event SetLimitedGroups(uint8[] limitedGroups);
 }
