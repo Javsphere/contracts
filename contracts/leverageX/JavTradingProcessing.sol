@@ -36,6 +36,21 @@ contract JavTradingProcessing is JavAddressStore, ITradingProcessingUtils {
         TradingProcessingUtils.claimPendingGovFees();
     }
 
+    /// @inheritdoc ITradingProcessingUtils
+    function setTradeUsdThresholds(uint32[] memory _usdThresholds) external onlyRole(Role.GOV) {
+        TradingProcessingUtils.setTradeUsdThresholds(_usdThresholds);
+    }
+
+    /// @inheritdoc ITradingProcessingUtils
+    function setTradeLockDuration(uint16[] memory _duration) external onlyRole(Role.GOV) {
+        TradingProcessingUtils.setTradeLockDuration(_duration);
+    }
+
+    /// @inheritdoc ITradingProcessingUtils
+    function setLimitedGroups(uint8[] memory _limitedGroups) external onlyRole(Role.GOV) {
+        TradingProcessingUtils.setLimitedGroups(_limitedGroups);
+    }
+
     // Interactions
 
     /// @inheritdoc ITradingProcessingUtils
@@ -76,5 +91,25 @@ contract JavTradingProcessing is JavAddressStore, ITradingProcessingUtils {
     /// @inheritdoc ITradingProcessingUtils
     function getPendingGovFeesCollateral(uint8 _collateralIndex) external view returns (uint256) {
         return TradingProcessingUtils.getPendingGovFeesCollateral(_collateralIndex);
+    }
+
+    /// @inheritdoc ITradingProcessingUtils
+    function getTradeTimestamp(address _trader, uint256 _tradeId) external view returns (uint256) {
+        return TradingProcessingUtils.getTradeTimestamp(_trader, _tradeId);
+    }
+
+    /// @inheritdoc ITradingProcessingUtils
+    function getTradeUsdThresholds() external view returns (uint32[] memory) {
+        return TradingProcessingUtils.getTradeUsdThresholds();
+    }
+
+    /// @inheritdoc ITradingProcessingUtils
+    function getTradeLockDuration() external view returns (uint16[] memory) {
+        return TradingProcessingUtils.getTradeLockDuration();
+    }
+
+    /// @inheritdoc ITradingProcessingUtils
+    function getLimitedGroups() external view returns (uint8[] memory) {
+        return TradingProcessingUtils.getLimitedGroups();
     }
 }

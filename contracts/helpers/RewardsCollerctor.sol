@@ -95,8 +95,10 @@ contract RewardsCollector is IRewardsCollector, BaseUpgradable {
         for (uint256 i = 0; i < _swapTokens.length(); i++) {
             _token = _swapTokens.at(i);
             _amount = IERC20(_token).balanceOf(address(this));
-            IERC20(_token).safeTransfer(javBurner, _amount);
-            IJavBurner(javBurner).swapAndBurn(_token, _amount);
+            if (_amount > 0) {
+                IERC20(_token).safeTransfer(javBurner, _amount);
+                IJavBurner(javBurner).swapAndBurn(_token, _amount);
+            }
         }
     }
 }
