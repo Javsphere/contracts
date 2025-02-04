@@ -254,6 +254,10 @@ describe("Vote contract", () => {
             ).to.be.revertedWithCustomError(hhVote, "AlreadyVoted");
         });
 
+        it("Should return isActiveProposal - true", async () => {
+            await expect(await hhVote.isActiveProposal()).to.be.equal(true);
+        });
+
         it("Should revert when voteForProposal - InvalidVotePeriod - end time", async () => {
             await time.increase(1000);
             await helpers.mine(1);
@@ -272,6 +276,10 @@ describe("Vote contract", () => {
 
             await expect(proposal.isExecuted).to.be.equal(true);
             await expect(proposal.isApproved).to.be.equal(true);
+        });
+
+        it("Should return isActiveProposal - false", async () => {
+            await expect(await hhVote.isActiveProposal()).to.be.equal(false);
         });
 
         it("Should revert when execute proposal - WrongIndex", async () => {
