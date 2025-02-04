@@ -235,7 +235,11 @@ contract JavStakeX is
      * @param _amount: _amount for unstake
      */
     function unstake(uint256 _pid, uint256 _amount) external nonReentrant whenNotPaused {
-        require(!IVote(voteAddress).isActiveProposal(), ActiveVoteProposal());
+        require(
+            !(IVote(voteAddress).isVoteForActiveProposal(_msgSender()) &&
+                IVote(voteAddress).isActiveProposal()),
+            ActiveVoteProposal()
+        );
         _updatePool(_pid, 0);
         _unstake(_pid, _msgSender(), _amount);
     }
