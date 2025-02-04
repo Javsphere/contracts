@@ -16,6 +16,8 @@ interface IVote is IGeneralErrors {
 
     function isActiveProposal() external view returns (bool);
 
+    function isVoteForActiveProposal(address _user) external view returns (bool);
+
     event CreateProposal(
         uint256 indexed id,
         address indexed proposer,
