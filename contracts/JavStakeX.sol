@@ -13,6 +13,7 @@ import "./abstract/TearmsAndCondUtils.sol";
 import "./interfaces/IERC20Extended.sol";
 import "./base/BaseUpgradable.sol";
 import "./interfaces/IJavStakeX.sol";
+import "./interfaces/helpers/IVote.sol";
 
 contract JavStakeX is
     IJavStakeX,
@@ -36,6 +37,7 @@ contract JavStakeX is
     address public infinityPass;
     address public migratorAddress;
     address public termsAndConditionsAddress;
+    address public voteAddress;
 
     modifier poolExists(uint256 _pid) {
         require(_pid < poolInfo.length, WrongPool());
@@ -80,6 +82,12 @@ contract JavStakeX is
         rewardsDistributorAddress = _address;
 
         emit SetRewardsDistributorAddress(_address);
+    }
+
+    function setVoteAddress(address _address) external onlyAdmin {
+        voteAddress = _address;
+
+        emit SetVoteAddress(_address);
     }
 
     function setInfinityPassPercent(uint256 _percent) external onlyAdmin {
@@ -227,6 +235,7 @@ contract JavStakeX is
      * @param _amount: _amount for unstake
      */
     function unstake(uint256 _pid, uint256 _amount) external nonReentrant whenNotPaused {
+        require(!IVote(voteAddress).isActiveProposal(), ActiveVoteProposal());
         _updatePool(_pid, 0);
         _unstake(_pid, _msgSender(), _amount);
     }

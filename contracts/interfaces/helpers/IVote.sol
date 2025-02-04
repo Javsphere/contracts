@@ -14,6 +14,8 @@ interface IVote is IGeneralErrors {
         bool isApproved;
     }
 
+    function isActiveProposal() external view returns (bool);
+
     event CreateProposal(
         uint256 indexed id,
         address indexed proposer,
@@ -34,4 +36,5 @@ interface IVote is IGeneralErrors {
     error ZeroVotingPower();
     error InvalidVotePeriod();
     error NotEnded();
+    error PrevProposalNotExecuted();
 }

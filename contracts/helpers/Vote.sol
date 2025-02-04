@@ -62,11 +62,19 @@ contract Vote is IVote, BaseUpgradable {
         return _calculateVotingWeight(_user);
     }
 
+    function isActiveProposal() external view returns (bool) {
+        return proposals[proposalIndex - 1].endTimestamp >= block.timestamp;
+    }
+
     function createProposal(
         uint256 _startTimestamp,
         uint256 _endTimestamp,
         string calldata _descriptionId
     ) external onlyAdmin {
+        // check for only 1 active proposal
+        if (proposalIndex != 0) {
+            require(proposals[proposalIndex - 1].isExecuted, PrevProposalNotExecuted());
+        }
         require(_startTimestamp >= block.timestamp, WrongParams());
         require(_endTimestamp > _startTimestamp, WrongParams());
         proposals[proposalIndex] = Proposal({
