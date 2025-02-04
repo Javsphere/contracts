@@ -66,6 +66,10 @@ contract Vote is IVote, BaseUpgradable {
         return proposals[proposalIndex - 1].endTimestamp >= block.timestamp;
     }
 
+    function isVoteForActiveProposal(address _user) external view returns (bool) {
+        return votedProposal[_user][proposalIndex - 1];
+    }
+
     function createProposal(
         uint256 _startTimestamp,
         uint256 _endTimestamp,
