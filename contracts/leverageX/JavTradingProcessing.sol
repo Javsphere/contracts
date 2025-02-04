@@ -112,4 +112,9 @@ contract JavTradingProcessing is JavAddressStore, ITradingProcessingUtils {
     function getLimitedGroups() external view returns (uint8[] memory) {
         return TradingProcessingUtils.getLimitedGroups();
     }
+
+    /// @inheritdoc ITradingProcessingUtils
+    function isTradeInLockLimit(address _trader, uint32 _tradeId) external view returns (bool) {
+        return TradingProcessingUtils.isTradeInLockLimit(_trader, _tradeId);
+    }
 }

@@ -349,6 +349,10 @@ library TradingStorageUtils {
 
         if (!t.isOpen) revert IGeneralErrors.DoesntExist();
         if (t.tradeType != ITradingStorage.TradeType.TRADE) revert IGeneralErrors.WrongTradeType();
+        require(
+            !_getMultiCollatDiamond().isTradeInLockLimit(t.user, t.index),
+            IGeneralErrors.EarlyTpSlUpdate()
+        );
 
         _newTp = _limitTpDistance(t.openPrice, t.leverage, _newTp, t.long);
 
@@ -369,6 +373,10 @@ library TradingStorageUtils {
 
         if (!t.isOpen) revert IGeneralErrors.DoesntExist();
         if (t.tradeType != ITradingStorage.TradeType.TRADE) revert IGeneralErrors.WrongTradeType();
+        require(
+            !_getMultiCollatDiamond().isTradeInLockLimit(t.user, t.index),
+            IGeneralErrors.EarlyTpSlUpdate()
+        );
 
         _newSl = _limitTradeSlDistance(t, _newSl);
 

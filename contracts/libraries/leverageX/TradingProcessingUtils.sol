@@ -151,6 +151,15 @@ library TradingProcessingUtils {
     /**
      * @dev Check ITradingProcessingUtils interface for documentation
      */
+    function isTradeInLockLimit(address _trader, uint32 _tradeId) internal view returns (bool) {
+        return
+            block.timestamp - _getStorage().tradeTimestamp[_trader][_tradeId] <
+            _getTradeLockDuration(_trader, _tradeId);
+    }
+
+    /**
+     * @dev Check ITradingProcessingUtils interface for documentation
+     */
     function validateTriggerOpenOrder(
         ITradingStorage.Id memory _tradeId,
         ITradingStorage.PendingOrder memory _pendingOrder
@@ -424,11 +433,7 @@ library TradingProcessingUtils {
             ITradingProcessing.Values memory v;
 
             if (cancelReason == ITradingProcessing.CancelReason.NONE) {
-                require(
-                    block.timestamp - _getStorage().tradeTimestamp[t.user][t.index] >=
-                        _getTradeLockDuration(t),
-                    IGeneralErrors.EarlyTradeClose()
-                );
+                require(!isTradeInLockLimit(t.user, t.index), IGeneralErrors.EarlyTradeClose());
 
                 v.profitP = TradingCommonUtils.getPnlPercent(
                     t.openPrice,
@@ -820,9 +825,11 @@ library TradingProcessingUtils {
     }
 
     function _getTradeLockDuration(
-        ITradingStorage.Trade memory _trade
+        address _trader,
+        uint32 _tradeId
     ) internal view returns (uint256) {
         ITradingProcessing.TradingProcessingStorage storage s = _getStorage();
+        ITradingStorage.Trade memory _trade = _getTrade(_trader, _tradeId);
         IPairsStorage.Pair memory pair = _getMultiCollatDiamond().pairs(_trade.pairIndex);
 
         if (!_isInLimitedGroups(pair.groupIndex)) {

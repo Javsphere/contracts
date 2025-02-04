@@ -32,4 +32,5 @@ interface IGeneralErrors {
     error TpReached();
     error Slippage();
     error EarlyTradeClose();
+    error EarlyTpSlUpdate();
 }
