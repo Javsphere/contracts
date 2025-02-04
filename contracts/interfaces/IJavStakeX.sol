@@ -68,6 +68,8 @@ interface IJavStakeX is IGeneralErrors {
     event SetInfinityPassPercent(uint256 indexed _percent);
     event SetInfinityPass(address indexed _address);
     event SetMigratorAddress(address indexed _address);
+    event SetVoteAddress(address indexed _address);
 
     error WrongPool();
+    error ActiveVoteProposal();
 }
