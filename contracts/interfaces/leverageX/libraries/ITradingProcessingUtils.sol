@@ -77,6 +77,11 @@ interface ITradingProcessingUtils is
     function getLimitedGroups() external view returns (uint8[] memory);
 
     /**
+     * @dev Returns is trade in lock limit
+     */
+    function isTradeInLockLimit(address _trader, uint32 _tradeId) external view returns (bool);
+
+    /**
      * @dev Open market order
      */
     function openTradeMarketOrder(ITradingStorage.PendingOrder memory _pendingOrder) external;

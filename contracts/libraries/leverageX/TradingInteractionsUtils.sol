@@ -174,6 +174,10 @@ library TradingInteractionsUtils {
      */
     function updateTp(uint32 _index, uint64 _newTp) internal tradingActivated {
         ITradingStorage.Trade memory t = _getMultiCollatDiamond().getTrade(msg.sender, _index);
+        require(
+            !_getMultiCollatDiamond().isTradeInLockLimit(t.user, t.index),
+            IGeneralErrors.EarlyTpSlUpdate()
+        );
         ITradingStorage.Id memory tradeId = ITradingStorage.Id({user: t.user, index: t.index});
 
         _getMultiCollatDiamond().updateTradeTp(tradeId, _newTp);
@@ -184,6 +188,10 @@ library TradingInteractionsUtils {
      */
     function updateSl(uint32 _index, uint64 _newSl) internal tradingActivated {
         ITradingStorage.Trade memory t = _getMultiCollatDiamond().getTrade(msg.sender, _index);
+        require(
+            !_getMultiCollatDiamond().isTradeInLockLimit(t.user, t.index),
+            IGeneralErrors.EarlyTpSlUpdate()
+        );
         ITradingStorage.Id memory tradeId = ITradingStorage.Id({user: t.user, index: t.index});
 
         _getMultiCollatDiamond().updateTradeSl(tradeId, _newSl);
@@ -197,6 +205,10 @@ library TradingInteractionsUtils {
         uint24 _newLeverage,
         bytes[][] calldata _priceUpdate
     ) internal tradingActivated onlyWithPriceUpdate(_priceUpdate) {
+        require(
+            !_getMultiCollatDiamond().isTradeInLockLimit(msg.sender, _index),
+            IGeneralErrors.EarlyTradeUpdate()
+        );
         UpdateLeverageUtils.updateLeverage(
             IUpdateLeverage.UpdateLeverageInput(msg.sender, _index, _newLeverage)
         );
@@ -213,6 +225,10 @@ library TradingInteractionsUtils {
         uint16 _maxSlippageP,
         bytes[][] calldata _priceUpdate
     ) internal tradingActivated onlyWithPriceUpdate(_priceUpdate) {
+        require(
+            !_getMultiCollatDiamond().isTradeInLockLimit(msg.sender, _index),
+            IGeneralErrors.EarlyTradeUpdate()
+        );
         UpdatePositionSizeUtils.increasePositionSize(
             IUpdatePositionSize.IncreasePositionSizeInput(
                 msg.sender,
@@ -234,6 +250,10 @@ library TradingInteractionsUtils {
         uint24 _leverageDelta,
         bytes[][] calldata _priceUpdate
     ) internal tradingActivatedOrCloseOnly onlyWithPriceUpdate(_priceUpdate) {
+        require(
+            !_getMultiCollatDiamond().isTradeInLockLimit(msg.sender, _index),
+            IGeneralErrors.EarlyTradeUpdate()
+        );
         UpdatePositionSizeUtils.decreasePositionSize(
             IUpdatePositionSize.DecreasePositionSizeInput(
                 msg.sender,
