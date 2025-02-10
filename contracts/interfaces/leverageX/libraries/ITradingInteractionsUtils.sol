@@ -132,6 +132,16 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     function triggerOrder(uint256 _packed, bytes[][] calldata _priceUpdate) external payable;
 
     /**
+     * @dev Allows admin to close trade when deactivate pair from pyth oracle
+     * @param _trades array of ITradingStorage.Id for close
+     * @param _priceUpdate Array of price update data.
+     */
+    function closeTrades(
+        ITradingStorage.Id[] memory _trades,
+        bytes[][] calldata _priceUpdate
+    ) external payable;
+
+    /**
      * @dev Emitted when a market order is initiated
      * @param trader address of the trader
      * @param pairIndex index of the trading pair
