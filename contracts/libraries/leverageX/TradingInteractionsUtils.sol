@@ -327,6 +327,46 @@ library TradingInteractionsUtils {
     }
 
     /**
+     * @dev Check ITradingInteractionsUtils interface for documentation
+     */
+    function closeTrades(
+        ITradingStorage.Id[] memory _trades,
+        bytes[][] calldata _priceUpdate
+    ) internal onlyWithPriceUpdate(_priceUpdate) {
+        for (uint256 i = 0; i < _trades.length; ++i) {
+            ITradingStorage.Id memory tradeId = _trades[i];
+            ITradingStorage.Trade memory t = _getMultiCollatDiamond().getTrade(
+                tradeId.user,
+                tradeId.index
+            );
+
+            if (!t.isOpen) revert IGeneralErrors.DoesntExist();
+
+            if (t.tradeType == ITradingStorage.TradeType.TRADE) {
+                ITradingStorage.PendingOrder memory pendingOrder;
+                pendingOrder.trade.user = t.user;
+                pendingOrder.trade.index = t.index;
+                pendingOrder.trade.pairIndex = t.pairIndex;
+                pendingOrder.user = tradeId.user;
+                pendingOrder.orderType = ITradingStorage.PendingOrderType.MARKET_CLOSE;
+                pendingOrder.price = uint64(_getMultiCollatDiamond().getPrice(t.pairIndex));
+
+                _getMultiCollatDiamond().closeTradeMarketOrder(pendingOrder);
+            } else {
+                _getMultiCollatDiamond().closeTrade(tradeId);
+
+                _transferCollateralToTrader(t.collateralIndex, tradeId.user, t.collateralAmount);
+
+                emit ITradingInteractionsUtils.OpenLimitCanceled(
+                    tradeId.user,
+                    t.pairIndex,
+                    tradeId.index
+                );
+            }
+        }
+    }
+
+    /**
      * @dev Returns storage slot to use when fetching storage relevant to library
      */
     function _getSlot() internal pure returns (uint256) {

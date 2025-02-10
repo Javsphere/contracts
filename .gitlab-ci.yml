@@ -4,7 +4,7 @@ stages:
   - test
 
 cache:
-  key: ${CI_PIPELINE_ID}
+  key: "solidity"
   paths:
     - node_modules/
     - artifacts/

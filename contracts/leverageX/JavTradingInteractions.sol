@@ -123,4 +123,12 @@ contract JavTradingInteractions is JavAddressStore, ITradingInteractionsUtils {
     function triggerOrder(uint256 _packed, bytes[][] calldata _priceUpdate) external payable {
         TradingInteractionsUtils.triggerOrder(_packed, _priceUpdate);
     }
+
+    /// @inheritdoc ITradingInteractionsUtils
+    function closeTrades(
+        ITradingStorage.Id[] memory _trades,
+        bytes[][] calldata _priceUpdate
+    ) external payable onlyRole(Role.GOV) {
+        TradingInteractionsUtils.closeTrades(_trades, _priceUpdate);
+    }
 }
