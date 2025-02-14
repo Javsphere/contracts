@@ -12,7 +12,8 @@ interface IPriceImpact {
         mapping(uint48 => mapping(uint256 => mapping(uint256 => PairOi))) windows; // duration => pairIndex => windowId => Oi
         mapping(uint256 => PairDepth) pairDepths; // pairIndex => depth (USD)
         mapping(uint256 => PairFactors) pairFactors;
-        uint256[46] __gap;
+        uint40 negPnlCumulVolMultiplier;
+        uint256[45] __gap;
     }
 
     struct OiWindowsSettings {
@@ -34,6 +35,7 @@ interface IPriceImpact {
         uint256 windowId;
         bool long;
         bool open;
+        bool isPnlPositive;
         uint128 openInterestUsd; // 1e18 USD
     }
 

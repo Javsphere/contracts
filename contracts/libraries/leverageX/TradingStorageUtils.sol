@@ -195,7 +195,7 @@ library TradingStorageUtils {
         }
 
         if (_trade.tradeType == ITradingStorage.TradeType.TRADE)
-            TradingCommonUtils.updateOiTrade(_trade, true);
+            TradingCommonUtils.updateOiTrade(_trade, true, false);
 
         emit ITradingStorageUtils.TradeStored(_trade, _tradeInfo, liquidationParams);
 
@@ -227,12 +227,20 @@ library TradingStorageUtils {
     ) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
+        ITradingStorage.TradeInfo storage i = s.tradeInfos[_tradeId.user][_tradeId.index];
 
         if (!t.isOpen) revert IGeneralErrors.DoesntExist();
         if (t.tradeType != ITradingStorage.TradeType.TRADE) revert IGeneralErrors.WrongTradeType();
         if (_collateralAmount == 0) revert ITradingStorageUtils.TradePositionSizeZero();
 
+        TradingCommonUtils.handleOiDelta(
+            t,
+            TradingCommonUtils.getPositionSizeCollateral(_collateralAmount, t.leverage),
+            false
+        );
+
         t.collateralAmount = _collateralAmount;
+        i.createdBlock = uint32(block.number);
 
         emit ITradingStorageUtils.TradeCollateralUpdated(_tradeId, _collateralAmount);
     }
@@ -245,7 +253,8 @@ library TradingStorageUtils {
         uint120 _collateralAmount,
         uint24 _leverage,
         uint64 _openPrice,
-        bool _isPartialIncrease
+        bool _isPartialIncrease,
+        bool _isPnlPositive
     ) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
@@ -258,7 +267,8 @@ library TradingStorageUtils {
 
         TradingCommonUtils.handleOiDelta(
             t,
-            TradingCommonUtils.getPositionSizeCollateral(_collateralAmount, _leverage)
+            TradingCommonUtils.getPositionSizeCollateral(_collateralAmount, _leverage),
+            _isPnlPositive
         );
 
         uint32 blockNumber = uint32(block.number);
@@ -381,7 +391,7 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function closeTrade(ITradingStorage.Id memory _tradeId) internal {
+    function closeTrade(ITradingStorage.Id memory _tradeId, bool _isPnlPositive) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
 
@@ -391,7 +401,7 @@ library TradingStorageUtils {
         s.userCounters[_tradeId.user].openCount--;
 
         if (t.tradeType == ITradingStorage.TradeType.TRADE)
-            TradingCommonUtils.updateOiTrade(t, false);
+            TradingCommonUtils.updateOiTrade(t, false, _isPnlPositive);
 
         emit ITradingStorageUtils.TradeClosed(_tradeId);
     }
@@ -501,6 +511,13 @@ library TradingStorageUtils {
      */
     function getMinCollateralAmountUsd() internal view returns (uint256) {
         return _getStorage().minCollateralAmountUsd;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getTradersCount() external view returns (uint256) {
+        return _getStorage().traders.length;
     }
 
     /**

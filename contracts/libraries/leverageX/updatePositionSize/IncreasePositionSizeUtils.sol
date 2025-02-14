@@ -304,7 +304,8 @@ library IncreasePositionSizeUtils {
             uint120(_values.newCollateralAmount),
             uint24(_values.newLeverage),
             uint64(_values.newOpenPrice),
-            true // refresh liquidation params
+            true, // refresh liquidation params
+            false
         );
 
         // 3. Reset trade borrowing fees to zero

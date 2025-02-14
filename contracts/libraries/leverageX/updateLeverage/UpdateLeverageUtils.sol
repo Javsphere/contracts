@@ -223,6 +223,7 @@ library UpdateLeverageUtils {
             uint120(_values.newCollateralAmount),
             uint24(_values.newLeverage),
             _trade.openPrice,
+            false,
             false
         );
 

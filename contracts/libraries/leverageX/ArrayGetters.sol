@@ -11,7 +11,7 @@ library ArrayGetters {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getCollaterals() public view returns (ITradingStorage.Collateral[] memory) {
+    function getCollaterals() external view returns (ITradingStorage.Collateral[] memory) {
         ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
         uint256 collateralsCount = s.lastCollateralIndex + 1;
         ITradingStorage.Collateral[] memory collaterals = new ITradingStorage.Collateral[](
@@ -64,6 +64,64 @@ library ArrayGetters {
             ITradingStorage.Trade memory trade = s.trades[_trader][i];
             if (trade.isOpen) {
                 trades[currentIndex++] = trade;
+
+                // Exit loop if all open trades have been found
+                if (currentIndex == traderCounter.openCount) break;
+            }
+        }
+
+        return trades;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getAllTradesForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (ITradingStorage.Trade[] memory) {
+        ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
+
+        uint256 currentTradeIndex; // current global trade index
+        uint256 currentArrayIndex; // current index in returned trades array
+
+        ITradingStorage.Trade[] memory trades = new ITradingStorage.Trade[](_limit - _offset + 1);
+
+        // Fetch all trades for each trader
+        for (uint256 i; i < _traders.length; ++i) {
+            // Exit loop if limit is reached
+            if (currentTradeIndex > _limit) break;
+
+            // Skip if next trader address is 0; `getTraders` can return address(0)
+            address trader = _traders[i];
+            if (trader == address(0)) continue;
+
+            // Fetch trader trade counter
+            ITradingStorage.Counter memory traderCounter = s.userCounters[trader];
+
+            // Exit if user has no open trades
+            // We check because `getTraders` also traders with pending orders
+            if (traderCounter.openCount == 0) continue;
+
+            // If current trade index + openCount is lte to offset, skip to next trader
+            if (currentTradeIndex + traderCounter.openCount <= _offset) {
+                currentTradeIndex += traderCounter.openCount;
+                continue;
+            }
+
+            ITradingStorage.Trade[] memory traderTrades = getTrades(trader);
+
+            // Add trader trades to final trades array only if within _offset and _limit
+            for (uint256 j; j < traderTrades.length; ++j) {
+                if (currentTradeIndex > _limit) break; // Exit loop if limit is reached
+
+                // Only process trade if currentTradeIndex is >= offset
+                if (currentTradeIndex >= _offset) {
+                    trades[currentArrayIndex++] = traderTrades[j];
+                }
+
+                currentTradeIndex++;
             }
         }
 
@@ -117,10 +175,69 @@ library ArrayGetters {
         for (uint32 i; i < traderCounter.currentIndex; ++i) {
             if (s.trades[_trader][i].isOpen) {
                 tradeInfos[currentIndex++] = s.tradeInfos[_trader][i];
+
+                // Exit loop if all open trade infos have been found
+                if (currentIndex == traderCounter.openCount) break;
             }
         }
 
         return tradeInfos;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getAllTradeInfosForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (ITradingStorage.TradeInfo[] memory) {
+        ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
+
+        uint256 currentTradeIndex; // current global trade index
+        uint256 currentArrayIndex; // current index in returned trades array
+
+        ITradingStorage.TradeInfo[] memory tradesInfos = new ITradingStorage.TradeInfo[](
+            _limit - _offset + 1
+        );
+
+        // Fetch all trades for each trader
+        for (uint256 i; i < _traders.length; ++i) {
+            // Exit loop if limit is reached
+            if (currentTradeIndex > _limit) break;
+
+            // Skip if next trader address is 0; `getTraders` can return address(0)
+            address trader = _traders[i];
+            if (trader == address(0)) continue;
+
+            // Fetch trader trade counter
+            ITradingStorage.Counter memory traderCounter = s.userCounters[trader];
+
+            // Exit if user has no open trades
+            // We check because `getTraders` also traders with pending orders
+            if (traderCounter.openCount == 0) continue;
+
+            // If current trade index + openCount is lte to offset, skip to next trader
+            if (currentTradeIndex + traderCounter.openCount <= _offset) {
+                currentTradeIndex += traderCounter.openCount;
+                continue;
+            }
+
+            ITradingStorage.TradeInfo[] memory traderTradesInfos = getTradeInfos(trader);
+
+            // Add trader trades to final trades array only if within _offset and _limit
+            for (uint256 j; j < traderTradesInfos.length; ++j) {
+                if (currentTradeIndex > _limit) break; // Exit loop if limit is reached
+
+                if (currentTradeIndex >= _offset) {
+                    tradesInfos[currentArrayIndex++] = traderTradesInfos[j];
+                }
+
+                currentTradeIndex++;
+            }
+        }
+
+        return tradesInfos;
     }
 
     /**
@@ -173,6 +290,67 @@ library ArrayGetters {
         for (uint32 i; i < traderCounter.currentIndex; ++i) {
             if (s.trades[_trader][i].isOpen) {
                 tradeLiquidationParams[currentIndex++] = s.tradeLiquidationParams[_trader][i];
+
+                // Exit loop if all open trades have been found
+                if (currentIndex == traderCounter.openCount) break;
+            }
+        }
+
+        return tradeLiquidationParams;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getAllTradesLiquidationParamsForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
+    ) public view returns (IPairsStorage.GroupLiquidationParams[] memory) {
+        ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
+
+        uint256 currentTradeLiquidationParamIndex; // current global trade liquidation params index
+        uint256 currentArrayIndex; // current index in returned trade liquidation params array
+
+        IPairsStorage.GroupLiquidationParams[]
+            memory tradeLiquidationParams = new IPairsStorage.GroupLiquidationParams[](
+                _limit - _offset + 1
+            );
+
+        // Fetch all trades for each trader
+        for (uint256 i; i < _traders.length; ++i) {
+            // Exit loop if limit is reached
+            if (currentTradeLiquidationParamIndex > _limit) break;
+
+            // Skip if next trader address is 0; `getTraders` can return address(0)
+            address trader = _traders[i];
+            if (trader == address(0)) continue;
+
+            // Fetch trader trade counter
+            ITradingStorage.Counter memory traderCounter = s.userCounters[trader];
+
+            // Exit if user has no open trades
+            // We check because `getTraders` also traders with pending orders
+            if (traderCounter.openCount == 0) continue;
+
+            // If current trade index + openCount is lte to offset, skip to next trader
+            if (currentTradeLiquidationParamIndex + traderCounter.openCount <= _offset) {
+                currentTradeLiquidationParamIndex += traderCounter.openCount;
+                continue;
+            }
+
+            IPairsStorage.GroupLiquidationParams[]
+                memory traderLiquidationParams = getTradesLiquidationParams(trader);
+
+            // Add trader trades to final trades array only if within _offset and _limit
+            for (uint256 j; j < traderLiquidationParams.length; ++j) {
+                if (currentTradeLiquidationParamIndex > _limit) break; // Exit loop if limit is reached
+
+                if (currentTradeLiquidationParamIndex >= _offset) {
+                    tradeLiquidationParams[currentArrayIndex++] = traderLiquidationParams[j];
+                }
+
+                currentTradeLiquidationParamIndex++;
             }
         }
 
@@ -188,32 +366,22 @@ library ArrayGetters {
     ) external view returns (IPairsStorage.GroupLiquidationParams[] memory) {
         // Fetch all traders with open trades (no pagination, return size is not an issue here)
         address[] memory traders = getTraders(0, 0);
+        return getAllTradesLiquidationParamsForTraders(traders, _offset, _limit);
+    }
 
-        uint256 currentTradeLiquidationParamIndex; // current global trade liquidation params index
-        uint256 currentArrayIndex; // current index in returned trade liquidation params array
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getCountersForTraders(
+        address[] calldata _traders
+    ) external view returns (ITradingStorage.Counter[] memory) {
+        ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
+        ITradingStorage.Counter[] memory counters = new ITradingStorage.Counter[](_traders.length);
 
-        IPairsStorage.GroupLiquidationParams[]
-            memory tradeLiquidationParams = new IPairsStorage.GroupLiquidationParams[](
-                _limit - _offset + 1
-            );
-
-        // Fetch all trades for each trader
-        for (uint256 i; i < traders.length; ++i) {
-            IPairsStorage.GroupLiquidationParams[]
-                memory traderLiquidationParams = getTradesLiquidationParams(traders[i]);
-
-            // Add trader trades to final trades array only if within _offset and _limit
-            for (uint256 j; j < traderLiquidationParams.length; ++j) {
-                if (
-                    currentTradeLiquidationParamIndex >= _offset &&
-                    currentTradeLiquidationParamIndex <= _limit
-                ) {
-                    tradeLiquidationParams[currentArrayIndex++] = traderLiquidationParams[j];
-                }
-                currentTradeLiquidationParamIndex++;
-            }
+        for (uint256 i; i < _traders.length; ++i) {
+            counters[i] = s.userCounters[_traders[i]];
         }
 
-        return tradeLiquidationParams;
+        return counters;
     }
 }

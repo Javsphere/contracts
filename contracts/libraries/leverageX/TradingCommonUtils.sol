@@ -865,11 +865,13 @@ library TradingCommonUtils {
      * @param _trade trade struct
      * @param _positionSizeCollateral position size in collateral tokens (collateral precision)
      * @param _open whether it corresponds to a trade opening or closing
+     * @param _isPnlPositive whether it corresponds to a positive pnl trade (only relevant when _open = false)
      */
     function updateOi(
         ITradingStorage.Trade memory _trade,
         uint256 _positionSizeCollateral,
-        bool _open
+        bool _open,
+        bool _isPnlPositive
     ) public {
         _getMultiCollatDiamond().handleTradeBorrowingCallback(
             _trade.collateralIndex,
@@ -884,7 +886,8 @@ library TradingCommonUtils {
             _trade.user,
             _trade.index,
             _positionSizeCollateral,
-            _open
+            _open,
+            _isPnlPositive
         );
     }
 
@@ -893,12 +896,18 @@ library TradingCommonUtils {
      * @dev CAREFUL: this will reset the trade's borrowing fees to 0 when _open = true
      * @param _trade trade struct
      * @param _open whether it corresponds to a trade opening or closing
+     * @param _isPnlPositive whether it corresponds to a positive pnl trade (only relevant when _open = false)
      */
-    function updateOiTrade(ITradingStorage.Trade memory _trade, bool _open) external {
+    function updateOiTrade(
+        ITradingStorage.Trade memory _trade,
+        bool _open,
+        bool _isPnlPositive
+    ) external {
         updateOi(
             _trade,
             getPositionSizeCollateral(_trade.collateralAmount, _trade.leverage),
-            _open
+            _open,
+            _isPnlPositive
         );
     }
 
@@ -906,10 +915,12 @@ library TradingCommonUtils {
      * @dev Handles OI delta for an existing trade (for trade updates)
      * @param _trade trade struct
      * @param _newPositionSizeCollateral new position size in collateral tokens (collateral precision)
+     * @param _isPnlPositive whether it corresponds to a positive pnl trade (only relevant when closing)
      */
     function handleOiDelta(
         ITradingStorage.Trade memory _trade,
-        uint256 _newPositionSizeCollateral
+        uint256 _newPositionSizeCollateral,
+        bool _isPnlPositive
     ) external {
         uint256 existingPositionSizeCollateral = getPositionSizeCollateral(
             _trade.collateralAmount,
@@ -917,9 +928,19 @@ library TradingCommonUtils {
         );
 
         if (_newPositionSizeCollateral > existingPositionSizeCollateral) {
-            updateOi(_trade, _newPositionSizeCollateral - existingPositionSizeCollateral, true);
+            updateOi(
+                _trade,
+                _newPositionSizeCollateral - existingPositionSizeCollateral,
+                true,
+                _isPnlPositive
+            );
         } else if (_newPositionSizeCollateral < existingPositionSizeCollateral) {
-            updateOi(_trade, existingPositionSizeCollateral - _newPositionSizeCollateral, false);
+            updateOi(
+                _trade,
+                existingPositionSizeCollateral - _newPositionSizeCollateral,
+                false,
+                _isPnlPositive
+            );
         }
     }
 

@@ -162,7 +162,7 @@ library TradingInteractionsUtils {
 
         if (o.tradeType == ITradingStorage.TradeType.TRADE) revert IGeneralErrors.WrongTradeType();
 
-        _getMultiCollatDiamond().closeTrade(tradeId);
+        _getMultiCollatDiamond().closeTrade(tradeId, false);
 
         _transferCollateralToTrader(o.collateralIndex, msg.sender, o.collateralAmount);
 
@@ -353,7 +353,7 @@ library TradingInteractionsUtils {
 
                 _getMultiCollatDiamond().closeTradeMarketOrder(pendingOrder);
             } else {
-                _getMultiCollatDiamond().closeTrade(tradeId);
+                _getMultiCollatDiamond().closeTrade(tradeId, false);
 
                 _transferCollateralToTrader(t.collateralIndex, tradeId.user, t.collateralAmount);
 

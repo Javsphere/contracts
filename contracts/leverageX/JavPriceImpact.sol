@@ -82,9 +82,16 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
         address _trader,
         uint32 _index,
         uint256 _oiDeltaCollateral,
-        bool _open
+        bool _open,
+        bool _isPnlPositive
     ) external virtual onlySelf {
-        PriceImpactUtils.addPriceImpactOpenInterest(_trader, _index, _oiDeltaCollateral, _open);
+        PriceImpactUtils.addPriceImpactOpenInterest(
+            _trader,
+            _index,
+            _oiDeltaCollateral,
+            _open,
+            _isPnlPositive
+        );
     }
 
     // Getters

@@ -200,7 +200,8 @@ library PriceImpactUtils {
         address _trader,
         uint32 _index,
         uint256 _oiDeltaCollateral,
-        bool _open
+        bool _open,
+        bool _isPnlPositive
     ) internal {
         // 1. Prepare variables
         IPriceImpact.OiWindowsSettings storage settings = _getStorage().oiWindowsSettings;
@@ -215,11 +216,16 @@ library PriceImpactUtils {
         );
 
         uint128 oiDeltaUsd = uint128(
-            TradingCommonUtils.convertCollateralToUsd(
+            (TradingCommonUtils.convertCollateralToUsd(
                 _oiDeltaCollateral,
                 _getMultiCollatDiamond().getCollateral(trade.collateralIndex).precisionDelta,
                 currentCollateralPriceUsd
-            )
+            ) *
+                (
+                    !_open && !_isPnlPositive
+                        ? _getStorage().negPnlCumulVolMultiplier
+                        : ConstantsUtils.P_10
+                )) / ConstantsUtils.P_10
         );
 
         // 2. Add OI to current window
@@ -247,6 +253,7 @@ library PriceImpactUtils {
                 currentWindowId,
                 long,
                 _open,
+                _isPnlPositive,
                 oiDeltaUsd
             )
         );

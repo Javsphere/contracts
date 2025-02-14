@@ -513,7 +513,10 @@ library TradingProcessingUtils {
 
         if (cancelReason == ITradingProcessing.CancelReason.NONE) {
             // Unregister open order
-            _getMultiCollatDiamond().closeTrade(ITradingStorage.Id({user: t.user, index: t.index}));
+            _getMultiCollatDiamond().closeTrade(
+                ITradingStorage.Id({user: t.user, index: t.index}),
+                false
+            );
 
             // Store trade
             t.openPrice = uint64(priceAfterImpact);
@@ -740,7 +743,8 @@ library TradingProcessingUtils {
 
         // 4. Unregister trade from storage
         _getMultiCollatDiamond().closeTrade(
-            ITradingStorage.Id({user: _trade.user, index: _trade.index})
+            ITradingStorage.Id({user: _trade.user, index: _trade.index}),
+            _profitP > 0
         );
     }
 

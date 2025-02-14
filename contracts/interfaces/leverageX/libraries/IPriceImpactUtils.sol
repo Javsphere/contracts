@@ -77,12 +77,14 @@ interface IPriceImpactUtils is IPriceImpact {
      * @param _index trade index
      * @param _oiDeltaCollateral open interest to add (collateral precision)
      * @param _open whether it corresponds to opening or closing a trade
+     * @param _isPnlPositive whether it corresponds to a positive pnl trade (only relevant when _open = false)
      */
     function addPriceImpactOpenInterest(
         address _trader,
         uint32 _index,
         uint256 _oiDeltaCollateral,
-        bool _open
+        bool _open,
+        bool _isPnlPositive
     ) external;
 
     /**

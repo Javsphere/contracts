@@ -175,7 +175,8 @@ library DecreasePositionSizeUtils {
             _values.newCollateralAmount,
             _values.newLeverage,
             _existingTrade.openPrice, // open price stays the same
-            false // don't refresh liquidation params
+            false, // don't refresh liquidation params
+            _values.existingPnlCollateral > 0
         );
 
         // 3. Reset trade borrowing fee to zero
