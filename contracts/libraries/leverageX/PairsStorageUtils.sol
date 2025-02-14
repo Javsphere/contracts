@@ -444,10 +444,17 @@ library PairsStorageUtils {
         IPairsStorage.Pair storage p = s.pairs[_pairIndex];
         if (!s.isPairListed[p.from][p.to]) revert IPairsStorageUtils.PairNotListed();
 
+        s.isPairListed[p.from][p.to] = false;
+
+        p.from = _pair.from;
+        p.to = _pair.to;
         p.spreadP = _pair.spreadP;
         p.groupIndex = _pair.groupIndex;
         p.feeIndex = _pair.feeIndex;
         p.feedId = _pair.feedId;
+        p.altPriceOracle = _pair.altPriceOracle;
+
+        s.isPairListed[p.from][p.to] = true;
 
         emit IPairsStorageUtils.PairUpdated(_pairIndex);
     }
