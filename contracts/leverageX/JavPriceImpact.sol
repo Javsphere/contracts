@@ -43,6 +43,21 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
     }
 
     /// @inheritdoc IPriceImpactUtils
+    function setNegPnlCumulVolMultiplier(
+        uint40 _negPnlCumulVolMultiplier
+    ) external onlyRole(Role.GOV) {
+        PriceImpactUtils.setNegPnlCumulVolMultiplier(_negPnlCumulVolMultiplier);
+    }
+
+    /// @inheritdoc IPriceImpactUtils
+    function setProtectionCloseFactorWhitelist(
+        address[] calldata _traders,
+        bool[] calldata _whitelisted
+    ) external onlyRole(Role.GOV) {
+        PriceImpactUtils.setProtectionCloseFactorWhitelist(_traders, _whitelisted);
+    }
+
+    /// @inheritdoc IPriceImpactUtils
     function setPairDepths(
         uint256[] calldata _indices,
         uint128[] calldata _depthsAboveUsd,
@@ -73,6 +88,25 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
         uint40[] calldata _cumulativeFactors
     ) external onlyRole(Role.GOV) {
         PriceImpactUtils.setCumulativeFactors(_pairIndices, _cumulativeFactors);
+    }
+
+    /// @inheritdoc IPriceImpactUtils
+    function setExemptOnOpen(
+        uint16[] calldata _pairIndices,
+        bool[] calldata _exemptOnOpen
+    ) external onlyRole(Role.GOV) {
+        PriceImpactUtils.setExemptOnOpen(_pairIndices, _exemptOnOpen);
+    }
+
+    /// @inheritdoc IPriceImpactUtils
+    function setExemptAfterProtectionCloseFactor(
+        uint16[] calldata _pairIndices,
+        bool[] calldata _exemptAfterProtectionCloseFactor
+    ) external onlyRole(Role.GOV) {
+        PriceImpactUtils.setExemptAfterProtectionCloseFactor(
+            _pairIndices,
+            _exemptAfterProtectionCloseFactor
+        );
     }
 
     // Interactions
@@ -106,6 +140,7 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
 
     /// @inheritdoc IPriceImpactUtils
     function getTradePriceImpact(
+        address _trader,
         uint256 _marketPrice,
         uint256 _pairIndex,
         bool _long,
@@ -115,6 +150,7 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
         uint256 _lastPosIncreaseBlock
     ) external view returns (uint256 priceImpactP, uint256 priceAfterImpact) {
         (priceImpactP, priceAfterImpact) = PriceImpactUtils.getTradePriceImpact(
+            _trader,
             _marketPrice,
             _pairIndex,
             _long,
@@ -170,5 +206,15 @@ contract JavPriceImpact is JavAddressStore, IPriceImpactUtils {
         uint256[] calldata _indices
     ) external view returns (IPriceImpact.PairFactors[] memory) {
         return PriceImpactUtils.getPairFactors(_indices);
+    }
+
+    /// @inheritdoc IPriceImpactUtils
+    function getNegPnlCumulVolMultiplier() external view returns (uint48) {
+        return PriceImpactUtils.getNegPnlCumulVolMultiplier();
+    }
+
+    /// @inheritdoc IPriceImpactUtils
+    function getProtectionCloseFactorWhitelist(address _trader) external view returns (bool) {
+        return PriceImpactUtils.getProtectionCloseFactorWhitelist(_trader);
     }
 }

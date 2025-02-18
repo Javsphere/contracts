@@ -8,6 +8,7 @@ import "./StorageUtils.sol";
 import "./ConstantsUtils.sol";
 import "./TradingCommonUtils.sol";
 import "./TradingStorageUtils.sol";
+import "./ChainUtils.sol";
 
 /**
  * @custom:version 8
@@ -24,6 +25,8 @@ library PriceImpactUtils {
     uint48 private constant MAX_WINDOWS_COUNT = 5;
     uint48 private constant MAX_WINDOWS_DURATION = 10 minutes;
     uint48 private constant MIN_WINDOWS_DURATION = 1 minutes;
+    uint256 private constant MAX_PROTECTION_CLOSE_FACTOR_DURATION = 10 minutes;
+    uint256 private constant MIN_NEG_PNL_CUMUL_VOL_MULTIPLIER = (20 * ConstantsUtils.P_10) / 100;
 
     /**
      * @dev Validates new windowsDuration value
@@ -107,6 +110,41 @@ library PriceImpactUtils {
     /**
      * @dev Check IPriceImpactUtils interface for documentation
      */
+    function setNegPnlCumulVolMultiplier(uint40 _negPnlCumulVolMultiplier) internal {
+        if (_negPnlCumulVolMultiplier < MIN_NEG_PNL_CUMUL_VOL_MULTIPLIER)
+            revert IGeneralErrors.BelowMin();
+        if (_negPnlCumulVolMultiplier > ConstantsUtils.P_10) revert IGeneralErrors.AboveMax();
+
+        _getStorage().negPnlCumulVolMultiplier = _negPnlCumulVolMultiplier;
+
+        emit IPriceImpactUtils.NegPnlCumulVolMultiplierUpdated(_negPnlCumulVolMultiplier);
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
+    function setProtectionCloseFactorWhitelist(
+        address[] calldata _traders,
+        bool[] calldata _whitelisted
+    ) internal {
+        if (_traders.length != _whitelisted.length) revert IGeneralErrors.WrongLength();
+
+        IPriceImpact.PriceImpactStorage storage s = _getStorage();
+
+        for (uint256 i = 0; i < _traders.length; ++i) {
+            (address trader, bool whitelisted) = (_traders[i], _whitelisted[i]);
+
+            if (trader == address(0)) revert IGeneralErrors.ZeroAddress();
+
+            s.protectionCloseFactorWhitelist[trader] = whitelisted;
+
+            emit IPriceImpactUtils.ProtectionCloseFactorWhitelistUpdated(trader, whitelisted);
+        }
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
     function setPairDepths(
         uint256[] calldata _indices,
         uint128[] calldata _depthsAboveUsd,
@@ -133,6 +171,9 @@ library PriceImpactUtils {
         }
     }
 
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
     function setProtectionCloseFactors(
         uint16[] calldata _pairIndices,
         uint40[] calldata _protectionCloseFactors
@@ -154,6 +195,9 @@ library PriceImpactUtils {
         }
     }
 
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
     function setProtectionCloseFactorBlocks(
         uint16[] calldata _pairIndices,
         uint32[] calldata _protectionCloseFactorBlocks
@@ -164,17 +208,27 @@ library PriceImpactUtils {
         IPriceImpact.PriceImpactStorage storage s = _getStorage();
 
         for (uint256 i = 0; i < _protectionCloseFactorBlocks.length; ++i) {
+            uint32 protectionCloseFactorBlocks = _protectionCloseFactorBlocks[i];
+
+            if (
+                ChainUtils.convertBlocksToSeconds(uint256(protectionCloseFactorBlocks)) >
+                MAX_PROTECTION_CLOSE_FACTOR_DURATION
+            ) revert IGeneralErrors.AboveMax();
+
             s
                 .pairFactors[_pairIndices[i]]
-                .protectionCloseFactorBlocks = _protectionCloseFactorBlocks[i];
+                .protectionCloseFactorBlocks = protectionCloseFactorBlocks;
 
             emit IPriceImpactUtils.ProtectionCloseFactorBlocksUpdated(
                 _pairIndices[i],
-                _protectionCloseFactorBlocks[i]
+                protectionCloseFactorBlocks
             );
         }
     }
 
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
     function setCumulativeFactors(
         uint16[] calldata _pairIndices,
         uint40[] calldata _cumulativeFactors
@@ -190,6 +244,51 @@ library PriceImpactUtils {
             s.pairFactors[_pairIndices[i]].cumulativeFactor = _cumulativeFactors[i];
 
             emit IPriceImpactUtils.CumulativeFactorUpdated(_pairIndices[i], _cumulativeFactors[i]);
+        }
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
+    function setExemptOnOpen(
+        uint16[] calldata _pairIndices,
+        bool[] calldata _exemptOnOpen
+    ) internal {
+        if (_pairIndices.length == 0 || _exemptOnOpen.length != _pairIndices.length)
+            revert IGeneralErrors.WrongLength();
+
+        IPriceImpact.PriceImpactStorage storage s = _getStorage();
+
+        for (uint256 i = 0; i < _exemptOnOpen.length; ++i) {
+            s.pairFactors[_pairIndices[i]].exemptOnOpen = _exemptOnOpen[i];
+
+            emit IPriceImpactUtils.ExemptOnOpenUpdated(_pairIndices[i], _exemptOnOpen[i]);
+        }
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
+    function setExemptAfterProtectionCloseFactor(
+        uint16[] calldata _pairIndices,
+        bool[] calldata _exemptAfterProtectionCloseFactor
+    ) internal {
+        if (
+            _pairIndices.length == 0 ||
+            _exemptAfterProtectionCloseFactor.length != _pairIndices.length
+        ) revert IGeneralErrors.WrongLength();
+
+        IPriceImpact.PriceImpactStorage storage s = _getStorage();
+
+        for (uint256 i = 0; i < _exemptAfterProtectionCloseFactor.length; ++i) {
+            s
+                .pairFactors[_pairIndices[i]]
+                .exemptAfterProtectionCloseFactor = _exemptAfterProtectionCloseFactor[i];
+
+            emit IPriceImpactUtils.ExemptAfterProtectionCloseFactorUpdated(
+                _pairIndices[i],
+                _exemptAfterProtectionCloseFactor[i]
+            );
         }
     }
 
@@ -292,6 +391,7 @@ library PriceImpactUtils {
      * @dev Check IPriceImpactUtils interface for documentation
      */
     function getTradePriceImpact(
+        address _trader,
         uint256 _marketPrice, // 1e10
         uint256 _pairIndex,
         bool _long,
@@ -307,12 +407,24 @@ library PriceImpactUtils {
             uint256 priceAfterImpact // 1e10
         )
     {
-        IPriceImpact.PairDepth storage pDepth = _getStorage().pairDepths[_pairIndex];
         IPriceImpact.PairFactors memory pairFactors = _getStorage().pairFactors[_pairIndex];
 
+        bool protectionCloseFactorActive = _isPnlPositive &&
+            !_open &&
+            pairFactors.protectionCloseFactor != 0 &&
+            block.number <= _lastPosIncreaseBlock + pairFactors.protectionCloseFactorBlocks &&
+            !_getStorage().protectionCloseFactorWhitelist[_trader];
+
+        if (
+            (_open && pairFactors.exemptOnOpen) ||
+            (!_open && !protectionCloseFactorActive && pairFactors.exemptAfterProtectionCloseFactor)
+        ) {
+            return (0, _marketPrice);
+        }
+
         uint256 depth = (_long && _open) || (!_long && !_open)
-            ? pDepth.onePercentDepthAboveUsd
-            : pDepth.onePercentDepthBelowUsd; // on close use opposite side depth
+            ? _getStorage().pairDepths[_pairIndex].onePercentDepthAboveUsd
+            : _getStorage().pairDepths[_pairIndex].onePercentDepthBelowUsd; // on close use opposite side depth
 
         (priceImpactP, priceAfterImpact) = _getTradePriceImpact(
             _marketPrice,
@@ -321,12 +433,7 @@ library PriceImpactUtils {
             _tradeOpenInterestUsd,
             depth,
             _open,
-            _isPnlPositive &&
-                !_open &&
-                pairFactors.protectionCloseFactor != 0 &&
-                block.number <= _lastPosIncreaseBlock + pairFactors.protectionCloseFactorBlocks
-                ? pairFactors.protectionCloseFactor
-                : ConstantsUtils.P_10,
+            protectionCloseFactorActive ? pairFactors.protectionCloseFactor : ConstantsUtils.P_10,
             pairFactors.cumulativeFactor != 0 ? pairFactors.cumulativeFactor : ConstantsUtils.P_10
         );
     }
@@ -414,6 +521,20 @@ library PriceImpactUtils {
         for (uint256 i = 0; i < _indices.length; ++i) {
             pairFactors[i] = s.pairFactors[_indices[i]];
         }
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
+    function getNegPnlCumulVolMultiplier() internal view returns (uint40) {
+        return _getStorage().negPnlCumulVolMultiplier;
+    }
+
+    /**
+     * @dev Check IPriceImpactUtils interface for documentation
+     */
+    function getProtectionCloseFactorWhitelist(address _trader) internal view returns (bool) {
+        return _getStorage().protectionCloseFactorWhitelist[_trader];
     }
 
     /**

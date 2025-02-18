@@ -294,6 +294,7 @@ library TradingCommonUtils {
         ITradingStorage.Trade memory trade = _input.trade;
 
         (priceImpactP, priceAfterImpact) = _getMultiCollatDiamond().getTradePriceImpact(
+            trade.user,
             getMarketExecutionPrice(_input.marketPrice, _input.spreadP, trade.long, true),
             trade.pairIndex,
             trade.long,
@@ -343,6 +344,7 @@ library TradingCommonUtils {
 
         // 2. Calculate PnL after fees, spread, and price impact without protection factor
         (, uint256 priceNoProtectionFactor) = _getMultiCollatDiamond().getTradePriceImpact(
+            trade.user,
             priceAfterSpread,
             trade.pairIndex,
             trade.long,
@@ -370,11 +372,12 @@ library TradingCommonUtils {
         );
 
         (priceImpactP, priceAfterImpact) = _getMultiCollatDiamond().getTradePriceImpact(
+            trade.user,
             priceAfterSpread,
             trade.pairIndex,
             trade.long,
             positionSizeUsd,
-            tradeValueCollateralNoFactor > trade.collateralAmount, // use protection factor when pnl > 0 without protection factor
+            tradeValueCollateralNoFactor > trade.collateralAmount, // _isPnlPositive = true when net pnl after fees is positive
             open,
             tradeInfo.lastPosIncreaseBlock
         );

@@ -13,7 +13,9 @@ interface IPriceImpact {
         mapping(uint256 => PairDepth) pairDepths; // pairIndex => depth (USD)
         mapping(uint256 => PairFactors) pairFactors;
         uint40 negPnlCumulVolMultiplier;
-        uint256[45] __gap;
+        uint216 __placeholder;
+        mapping(address => bool) protectionCloseFactorWhitelist;
+        uint256[43] __gap;
     }
 
     struct OiWindowsSettings {
@@ -48,7 +50,9 @@ interface IPriceImpact {
         uint40 protectionCloseFactor; // 1e10; max 109.95x
         uint32 protectionCloseFactorBlocks;
         uint40 cumulativeFactor; // 1e10; max 109.95x
-        uint144 __placeholder;
+        bool exemptOnOpen;
+        bool exemptAfterProtectionCloseFactor;
+        uint128 __placeholder;
     }
 
 
