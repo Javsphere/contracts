@@ -286,8 +286,9 @@ library BorrowingFeesUtils {
     function getTradeLiquidationPrice(
         IBorrowingFees.LiqPriceInput calldata _input
     ) internal view returns (uint256) {
-        uint256 closingFeesCollateral = TradingCommonUtils.getTotalClosingFeesCollateral(
+        uint256 closingFeesCollateral = TradingCommonUtils.getTotalTradeFeesCollateral(
             _input.collateralIndex,
+            address(0), // never apply fee tiers
             _input.pairIndex,
             (_input.collateral * _input.leverage) / 1e3
         );

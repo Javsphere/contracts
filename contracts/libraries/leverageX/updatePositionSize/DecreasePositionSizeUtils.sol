@@ -37,7 +37,7 @@ library DecreasePositionSizeUtils {
         if (
             isLeverageUpdate &&
             _trade.leverage - _input.leverageDelta <
-            _getMultiCollatDiamond().pairMinLeverage(_trade.pairIndex) * 1e3
+            _getMultiCollatDiamond().pairMinLeverage(_trade.pairIndex)
         ) revert ITradingInteractionsUtils.WrongLeverage();
 
         // 3. Make sure new trade collateral is enough to pay borrowing fees and closing fees
@@ -48,15 +48,12 @@ library DecreasePositionSizeUtils {
 
         uint256 newCollateralAmount = _trade.collateralAmount - _input.collateralDelta;
         uint256 borrowingFeeCollateral = TradingCommonUtils.getTradeBorrowingFeeCollateral(_trade);
-        uint256 closingFeesCollateral = ((_getMultiCollatDiamond().pairCloseFeeP(_trade.pairIndex) +
-            _getMultiCollatDiamond().pairTriggerOrderFeeP(_trade.pairIndex)) *
-            TradingCommonUtils.getPositionSizeCollateralBasis(
-                _trade.collateralIndex,
-                _trade.pairIndex,
-                positionSizeCollateralDelta
-            )) /
-            ConstantsUtils.P_10 /
-            100;
+        uint256 closingFeesCollateral = TradingCommonUtils.getTotalTradeFeesCollateral(
+            _trade.collateralIndex,
+            _trade.user,
+            _trade.pairIndex,
+            positionSizeCollateralDelta
+        );
 
         if (newCollateralAmount <= borrowingFeeCollateral + closingFeesCollateral)
             revert ITradingInteractionsUtils.InsufficientCollateral();
@@ -107,28 +104,12 @@ library DecreasePositionSizeUtils {
 
         // 5. Calculate partial trade closing fees
 
-        // 5.1 Apply fee tiers
-        uint256 pairCloseFeeP = _getMultiCollatDiamond().calculateFeeAmount(
-            _existingTrade.user,
-            _getMultiCollatDiamond().pairCloseFeeP(_existingTrade.pairIndex)
-        );
-        uint256 pairTriggerFeeP = _getMultiCollatDiamond().calculateFeeAmount(
-            _existingTrade.user,
-            _getMultiCollatDiamond().pairTriggerOrderFeeP(_existingTrade.pairIndex)
-        );
-
-        // 5.2 Calculate closing fees on on max(positionSizeCollateralDelta, minPositionSizeCollateral)
-        uint256 feePositionSizeCollateralBasis = TradingCommonUtils.getPositionSizeCollateralBasis(
+        values.closingFeeCollateral = TradingCommonUtils.getTotalTradeFeesCollateral(
             _existingTrade.collateralIndex,
+            _existingTrade.user,
             _existingTrade.pairIndex,
             values.positionSizeCollateralDelta
         );
-        (values.vaultFeeCollateral, values.gnsStakingFeeCollateral) = TradingCommonUtils
-            .getClosingFeesCollateral(
-                (feePositionSizeCollateralBasis * pairCloseFeeP) / 100 / ConstantsUtils.P_10,
-                (feePositionSizeCollateralBasis * pairTriggerFeeP) / 100 / ConstantsUtils.P_10,
-                ITradingStorage.PendingOrderType.MARKET_PARTIAL_CLOSE
-            );
 
         // 6. Calculate final collateral delta
         // Collateral delta = value to send to trader after position size is decreased
@@ -138,8 +119,7 @@ library DecreasePositionSizeUtils {
 
         values.availableCollateralInDiamond =
             int256(uint256(_collateralAmount)) -
-            int256(values.vaultFeeCollateral) -
-            int256(values.gnsStakingFeeCollateral);
+            int256(values.closingFeeCollateral);
 
         values.collateralSentToTrader =
             values.availableCollateralInDiamond +

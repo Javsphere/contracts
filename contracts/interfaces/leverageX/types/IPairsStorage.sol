@@ -10,7 +10,7 @@ interface IPairsStorage {
     struct PairsStorage {
         mapping(uint256 => Pair) pairs;
         mapping(uint256 => Group) groups;
-        mapping(uint256 => Fee) fees;
+        mapping(uint256 => Fee) fees; /// @custom:deprecated
         mapping(string => mapping(string => bool)) isPairListed;
         mapping(uint256 => uint256) pairCustomMaxLeverage; // 0 decimal precision
         uint256 pairsCount;
@@ -18,7 +18,9 @@ interface IPairsStorage {
         uint256 feesCount;
         mapping(uint256 => GroupLiquidationParams) groupLiquidationParams;
         mapping(uint256 => bool) isPairRemoved;
-        uint256[40] __gap;
+        mapping(uint256 => FeeGroup) feeGroups;
+        GlobalTradeFeeParams globalTradeFeeParams;
+        uint256[38] __gap;
     }
 
 
@@ -34,8 +36,8 @@ interface IPairsStorage {
 
     struct Group {
         string name;
-        uint256 minLeverage; // 0 decimal precision
-        uint256 maxLeverage; // 0 decimal precision
+        uint256 minLeverage; // 1e3 precision
+        uint256 maxLeverage; // 1e3 precision
     }
     struct Fee {
         string name;
@@ -43,6 +45,27 @@ interface IPairsStorage {
         uint256 closeFeeP; // PRECISION (% of position size)
         uint256 triggerOrderFeeP; // PRECISION (% of position size)
         uint256 minPositionSizeUsd; // 1e18 (collateral x leverage, useful for min fee)
+    }
+
+    struct GlobalTradeFeeParams {
+        uint24 referralFeeP; // 1e3 (%)
+        uint24 govFeeP; // 1e3 (%)
+        uint24 llpTokenFeeP; // 1e3 (%)
+        uint136 __placeholder;
+    }
+
+    struct FeeGroup {
+        uint40 totalPositionSizeFeeP; // 1e10 (%)
+        uint40 totalLiqCollateralFeeP; // 1e10 (%)
+        uint32 minPositionSizeUsd; // 1e3
+        uint104 __placeholder;
+    }
+
+    struct TradeFees {
+        uint256 totalFeeCollateral; // collateral precision
+        uint256 referralFeeCollateral; // collateral precision
+        uint256 govFeeCollateral; // collateral precision
+        uint256 llpTokenFeeCollateral; // collateral precision
     }
 
     struct GroupLiquidationParams {

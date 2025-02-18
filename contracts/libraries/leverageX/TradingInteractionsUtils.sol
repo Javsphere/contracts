@@ -443,8 +443,8 @@ library TradingInteractionsUtils {
         ) revert ITradingInteractionsUtils.InsufficientCollateral();
 
         if (
-            _trade.leverage < _getMultiCollatDiamond().pairMinLeverage(_trade.pairIndex) * 1e3 ||
-            _trade.leverage > _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) * 1e3
+            _trade.leverage < _getMultiCollatDiamond().pairMinLeverage(_trade.pairIndex) ||
+            _trade.leverage > _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex)
         ) revert ITradingInteractionsUtils.WrongLeverage();
 
         (uint256 priceImpactP, ) = TradingCommonUtils.getTradeOpeningPriceImpact(

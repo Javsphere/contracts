@@ -372,17 +372,20 @@ library TradingProcessingUtils {
         } else {
             // Gov fee to pay for oracle cost
             TradingCommonUtils.updateFeeTierPoints(t.collateralIndex, t.user, t.pairIndex, 0);
-            uint256 govFees = TradingCommonUtils.distributeGovFeeCollateral(
+            uint256 govFeeCollateral = TradingCommonUtils.getMinGovFeeCollateral(
                 t.collateralIndex,
                 t.user,
-                t.pairIndex,
-                TradingCommonUtils.getMinPositionSizeCollateral(t.collateralIndex, t.pairIndex) / 2, // use min fee / 2
-                0
+                t.pairIndex
+            );
+            TradingCommonUtils.distributeExactGovFeeCollateral(
+                t.collateralIndex,
+                t.user,
+                govFeeCollateral
             );
             TradingCommonUtils.transferCollateralTo(
                 t.collateralIndex,
                 t.user,
-                t.collateralAmount - govFees
+                t.collateralAmount - govFeeCollateral
             );
 
             emit ITradingProcessingUtils.MarketOpenCanceled(
@@ -442,7 +445,13 @@ library TradingProcessingUtils {
                     t.leverage
                 );
 
-                v.amountSentToTrader = _unregisterTrade(t, v.profitP, _pendingOrder.orderType);
+                v.amountSentToTrader = _unregisterTrade(
+                    t,
+                    v.profitP,
+                    _pendingOrder.orderType,
+                    _pendingOrder.price,
+                    v.liqPrice
+                );
 
                 emit ITradingProcessingUtils.MarketExecuted(
                     orderId,
@@ -457,21 +466,21 @@ library TradingProcessingUtils {
             } else {
                 // Charge gov fee
                 TradingCommonUtils.updateFeeTierPoints(t.collateralIndex, t.user, t.pairIndex, 0);
-                uint256 govFee = TradingCommonUtils.distributeGovFeeCollateral(
+                uint256 govFeeCollateral = TradingCommonUtils.getMinGovFeeCollateral(
                     t.collateralIndex,
                     t.user,
-                    t.pairIndex,
-                    TradingCommonUtils.getMinPositionSizeCollateral(
-                        t.collateralIndex,
-                        t.pairIndex
-                    ) / 2, // use min fee / 2
-                    0
+                    t.pairIndex
+                );
+                TradingCommonUtils.distributeExactGovFeeCollateral(
+                    t.collateralIndex,
+                    t.user,
+                    govFeeCollateral
                 );
 
                 // Deduct from trade collateral
                 _getMultiCollatDiamond().updateTradeCollateralAmount(
                     ITradingStorage.Id({user: t.user, index: t.index}),
-                    t.collateralAmount - uint120(govFee)
+                    t.collateralAmount - uint120(govFeeCollateral)
                 );
             }
         }
@@ -573,7 +582,13 @@ library TradingProcessingUtils {
                 t.long,
                 t.leverage
             );
-            v.amountSentToTrader = _unregisterTrade(t, v.profitP, _pendingOrder.orderType);
+            v.amountSentToTrader = _unregisterTrade(
+                t,
+                v.profitP,
+                _pendingOrder.orderType,
+                _pendingOrder.price,
+                v.liqPrice
+            );
 
             emit ITradingProcessingUtils.LimitExecuted(
                 orderId,
@@ -670,8 +685,7 @@ library TradingProcessingUtils {
                                     ConstantsUtils.MAX_OPEN_NEGATIVE_PNL_P
                                     ? ITradingProcessing.CancelReason.PRICE_IMPACT
                                     : _trade.leverage >
-                                        _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) *
-                                            1e3
+                                        _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex)
                                         ? ITradingProcessing.CancelReason.MAX_LEVERAGE
                                         : ITradingProcessing.CancelReason.NONE
             );
@@ -688,10 +702,15 @@ library TradingProcessingUtils {
         ITradingStorage.PendingOrder memory _pendingOrder
     ) internal returns (ITradingStorage.Trade memory) {
         // 1. Deduct gov fee, JAv staking fee (previously dev fee), Market/Limit fee
-        _trade.collateralAmount -= TradingCommonUtils.processOpeningFees(
-            _trade,
-            TradingCommonUtils.getPositionSizeCollateral(_trade.collateralAmount, _trade.leverage),
-            _pendingOrder.orderType
+        _trade.collateralAmount -= uint120(
+            TradingCommonUtils.processFees(
+                _trade,
+                TradingCommonUtils.getPositionSizeCollateral(
+                    _trade.collateralAmount,
+                    _trade.leverage
+                ),
+                _pendingOrder.orderType
+            )
         );
 
         // 2. Store final trade in storage contract
@@ -709,35 +728,47 @@ library TradingProcessingUtils {
      * @param _trade Trade to unregister
      * @param _profitP Profit percentage (1e10)
      * @param _orderType pending order type
+     * @param _oraclePrice oracle price without closing spread/impact (1e10)
+     * @param _liqPrice trade liquidation price (1e10)
      * @return tradeValueCollateral Amount of collateral sent to trader, collateral + pnl (collateral precision)
      */
     function _unregisterTrade(
         ITradingStorage.Trade memory _trade,
         int256 _profitP,
-        ITradingStorage.PendingOrderType _orderType
+        ITradingStorage.PendingOrderType _orderType,
+        uint256 _oraclePrice,
+        uint256 _liqPrice
     ) internal returns (uint256 tradeValueCollateral) {
         // 1. Process closing fees, fill 'v' with closing/trigger fees and collateral left in storage, to avoid stack too deep
-        ITradingProcessing.Values memory v = TradingCommonUtils.processClosingFees(
+        uint256 totalFeesCollateral = TradingCommonUtils.processFees(
             _trade,
             TradingCommonUtils.getPositionSizeCollateral(_trade.collateralAmount, _trade.leverage),
             _orderType
         );
 
-        // 2. Calculate borrowing fee and net trade value (with pnl and after all closing/holding fees)
+        // 2.1 Calculate borrowing fee and net trade value (with pnl and after all closing/holding fees)
         uint256 borrowingFeeCollateral;
         (tradeValueCollateral, borrowingFeeCollateral) = TradingCommonUtils.getTradeValueCollateral(
             _trade,
             _profitP,
-            v.closingFeeCollateral + v.triggerFeeCollateral,
-            _getMultiCollatDiamond().getCollateral(_trade.collateralIndex).precisionDelta,
-            _orderType
+            totalFeesCollateral,
+            _getMultiCollatDiamond().getCollateral(_trade.collateralIndex).precisionDelta
         );
+
+        // 2.2 If trade is liquidated, set trade value to 0
+        tradeValueCollateral = (_trade.long ? _oraclePrice <= _liqPrice : _oraclePrice >= _liqPrice)
+            ? 0
+            : tradeValueCollateral;
 
         // 3. Take collateral from vault if winning trade or send collateral to vault if losing trade
         TradingCommonUtils.handleTradePnl(
             _trade,
             int256(tradeValueCollateral),
-            int256(v.collateralLeftInStorage),
+            int256(
+                _trade.collateralAmount >= totalFeesCollateral
+                    ? _trade.collateralAmount - totalFeesCollateral
+                    : _trade.collateralAmount // fees only charged when collateral enough to pay (due to min fee)
+            ),
             borrowingFeeCollateral
         );
 
