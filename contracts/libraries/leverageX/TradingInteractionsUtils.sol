@@ -278,7 +278,7 @@ library TradingInteractionsUtils {
 
         if (
             orderType == ITradingStorage.PendingOrderType.MARKET_OPEN &&
-            _getMultiCollatDiamond().isValidTrigger(msg.sender)
+            !_getMultiCollatDiamond().isValidTrigger(msg.sender)
         ) revert IGeneralErrors.NotAuthorized();
 
         bool isOpenLimit = orderType == ITradingStorage.PendingOrderType.LIMIT_OPEN ||

@@ -396,7 +396,9 @@ library TradingProcessingUtils {
             );
         }
 
-        _getMultiCollatDiamond().closePendingOrder(orderId);
+        _getMultiCollatDiamond().closePendingOrder(
+            ITradingStorage.Id({user: _pendingOrder.trade.user, index: _pendingOrder.index})
+        );
     }
 
     /**
