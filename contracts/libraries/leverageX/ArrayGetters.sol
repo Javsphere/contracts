@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "./TradingStorageUtils.sol";
+import "./TradingOrdersUtils.sol";
 
 /**
  * @dev External library for array getters to save bytecode size in facet libraries
@@ -271,6 +272,99 @@ library ArrayGetters {
         }
 
         return tradesInfos;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getPendingOrders(
+        address _trader
+    ) public view returns (ITradingStorage.PendingOrder[] memory) {
+        ITradingOrders.TradingOrders storage s = TradingOrdersUtils._getStorage();
+        ITradingStorage.Counter memory traderCounter = s.pendingOrdersCounters[_trader];
+        ITradingStorage.PendingOrder[] memory pendingOrders = new ITradingStorage.PendingOrder[](
+            traderCounter.openCount
+        );
+
+        uint32 currentIndex;
+        for (uint32 i; i < traderCounter.currentIndex; ++i) {
+            if (s.pendingOrders[_trader][i].isOpen) {
+                pendingOrders[currentIndex++] = s.pendingOrders[_trader][i];
+
+                // Exit loop if all open pending orders have been found
+                if (currentIndex == traderCounter.openCount) break;
+            }
+        }
+
+        return pendingOrders;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getAllPendingOrdersForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
+    ) public view returns (ITradingStorage.PendingOrder[] memory) {
+        ITradingOrders.TradingOrders storage s = TradingOrdersUtils._getStorage();
+
+        uint256 currentPendingOrderIndex; // current global pending order index
+        uint256 currentArrayIndex; // current index in returned pending orders array
+
+        ITradingStorage.PendingOrder[] memory pendingOrders = new ITradingStorage.PendingOrder[](
+            _limit - _offset + 1
+        );
+
+        // Fetch all trades for each trader
+        for (uint256 i; i < _traders.length; ++i) {
+            // Exit loop if limit is reached
+            if (currentPendingOrderIndex > _limit) break;
+
+            // Skip if next trader address is 0; `getTraders` can return address(0)
+            address trader = _traders[i];
+            if (trader == address(0)) continue;
+
+            // Fetch trader trade counter
+            ITradingStorage.Counter memory traderCounter = s.pendingOrdersCounters[trader];
+
+            // Exit if user has no open pending orders
+            // We check because `getTraders` also traders with pending orders
+            if (traderCounter.openCount == 0) continue;
+
+            // If current trade index + openCount is lte to offset, skip to next trader
+            if (currentPendingOrderIndex + traderCounter.openCount <= _offset) {
+                currentPendingOrderIndex += traderCounter.openCount;
+                continue;
+            }
+
+            ITradingStorage.PendingOrder[] memory traderPendingOrders = getPendingOrders(trader);
+
+            // Add trader trades to final trades array only if within _offset and _limit
+            for (uint256 j; j < traderPendingOrders.length; ++j) {
+                if (currentPendingOrderIndex > _limit) break; // Exit loop if limit is reached
+
+                if (currentPendingOrderIndex >= _offset) {
+                    pendingOrders[currentArrayIndex++] = traderPendingOrders[j];
+                }
+
+                currentPendingOrderIndex++;
+            }
+        }
+
+        return pendingOrders;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getAllPendingOrders(
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (ITradingStorage.PendingOrder[] memory) {
+        // Fetch all traders with open trades (no pagination, return size is not an issue here)
+        address[] memory traders = getTraders(0, 0);
+        return getAllPendingOrdersForTraders(traders, _offset, _limit);
     }
 
     /**

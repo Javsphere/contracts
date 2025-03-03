@@ -149,6 +149,12 @@ interface ITradingStorageUtils is ITradingStorage {
     function closeTrade(Id memory _tradeId, bool _isPnlPositive) external;
 
     /**
+     * @dev Validation for trade struct (used by storeTrade and storePendingOrder for market open orders)
+     * @param _trade trade struct to validate
+     */
+    function validateTrade(ITradingStorage.Trade memory _trade) external view;
+
+    /**
      * @dev Returns collateral data by index
      * @param _index the index of the supported collateral
      */
@@ -271,9 +277,6 @@ interface ITradingStorageUtils is ITradingStorage {
         uint256 _offset,
         uint256 _limit
     ) external view returns (TradeInfo[] memory);
-
-    /**
-
 
     /**
      * @dev Returns the counters of a trader (currentIndex / open count for trades/tradeInfos and pendingOrders mappings)

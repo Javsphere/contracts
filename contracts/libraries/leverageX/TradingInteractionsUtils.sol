@@ -83,9 +83,8 @@ library TradingInteractionsUtils {
     function openTrade(
         ITradingStorage.Trade memory _trade,
         uint16 _maxSlippageP,
-        address _referrer,
-        bytes[][] calldata _priceUpdate
-    ) internal tradingActivated onlyAgreeToTerms onlyWithPriceUpdate(_priceUpdate) {
+        address _referrer
+    ) internal tradingActivated onlyAgreeToTerms {
         _openTrade(_trade, _maxSlippageP, _referrer, false);
     }
 
@@ -277,6 +276,11 @@ library TradingInteractionsUtils {
 
         if (ConstantsUtils.isOrderTypeMarket(orderType)) revert IGeneralErrors.WrongOrderType();
 
+        if (
+            orderType == ITradingStorage.PendingOrderType.MARKET_OPEN &&
+            _getMultiCollatDiamond().isValidTrigger(msg.sender)
+        ) revert IGeneralErrors.NotAuthorized();
+
         bool isOpenLimit = orderType == ITradingStorage.PendingOrderType.LIMIT_OPEN ||
             orderType == ITradingStorage.PendingOrderType.STOP_OPEN;
 
@@ -286,6 +290,18 @@ library TradingInteractionsUtils {
             (!isOpenLimit && activated == ITradingStorage.TradingActivated.PAUSED)
         ) {
             revert IGeneralErrors.GeneralPaused();
+        }
+
+        if (orderType == ITradingStorage.PendingOrderType.MARKET_OPEN) {
+            ITradingStorage.PendingOrder memory _pendingOrder = _getMultiCollatDiamond()
+                .getPendingOrder(ITradingStorage.Id({user: _trader, index: _index}));
+            if (!_pendingOrder.isOpen) return;
+
+            _pendingOrder.price = uint64(
+                _getMultiCollatDiamond().getPrice(_pendingOrder.trade.pairIndex)
+            );
+            _getMultiCollatDiamond().openTradeMarketOrder(_pendingOrder);
+            return;
         }
 
         ITradingStorage.Trade memory t = _getMultiCollatDiamond().getTrade(_trader, _index);
@@ -474,11 +490,20 @@ library TradingInteractionsUtils {
             pendingOrder.user = sender;
             pendingOrder.orderType = ITradingStorage.PendingOrderType.MARKET_OPEN;
             pendingOrder.maxSlippageP = _maxSlippageP;
-            pendingOrder.price = uint64(_getMultiCollatDiamond().getPrice(_trade.pairIndex));
 
-            _getMultiCollatDiamond().openTradeMarketOrder(pendingOrder);
+            pendingOrder = _getMultiCollatDiamond().storePendingOrder(pendingOrder);
 
-            emit ITradingInteractionsUtils.MarketOrderInitiated(msg.sender, _trade.pairIndex, true);
+            ITradingStorage.Id memory orderId = ITradingStorage.Id({
+                user: pendingOrder.user,
+                index: pendingOrder.index
+            });
+
+            emit ITradingInteractionsUtils.MarketOrderInitiated(
+                orderId,
+                sender,
+                _trade.pairIndex,
+                true
+            );
         }
 
         if (_referrer != address(0)) {

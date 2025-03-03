@@ -476,6 +476,14 @@ library TradingCommonUtils {
             ((tradeFees.totalFeeCollateral * feeParams.govFeeP) / 1e3 / 100) +
             (missingReferralFeeCollateral / 2);
 
+        uint256 triggerOrderFeeCollateral = (tradeFees.totalFeeCollateral *
+            feeParams.triggerOrderFeeP) /
+            1e3 /
+            100;
+        tradeFees.triggerOrderFeeCollateral = ConstantsUtils.isOrderTypeMarket(_orderType)
+            ? 0
+            : triggerOrderFeeCollateral;
+
         tradeFees.llpTokenFeeCollateral =
             (tradeFees.totalFeeCollateral * feeParams.llpTokenFeeP) /
             1e3 /
@@ -686,6 +694,26 @@ library TradingCommonUtils {
     }
 
     /**
+     * @dev Distributes trigger fee in GNS tokens
+     * @param _trader address of trader
+     * @param _collateralIndex index of collateral
+     * @param _triggerFeeCollateral trigger fee in collateral tokens (collateral precision)
+     */
+    function _distributeTriggerFee(
+        address _trader,
+        uint8 _collateralIndex,
+        uint256 _triggerFeeCollateral
+    ) internal {
+        _getMultiCollatDiamond().distributeTriggerReward(_triggerFeeCollateral, _collateralIndex);
+
+        emit ITradingCommonUtils.TriggerFeeCharged(
+            _trader,
+            _collateralIndex,
+            _triggerFeeCollateral
+        );
+    }
+
+    /**
      * @dev Distributes opening fees for trade and returns the trade fees charged in collateral tokens
      * @param _trade trade struct
      * @param _positionSizeCollateral position size in collateral tokens (collateral precision)
@@ -733,6 +761,15 @@ library TradingCommonUtils {
                 tradeFees.govFeeCollateral
             );
 
+            //            // 3.3 Distribute trigger fee
+            if (tradeFees.triggerOrderFeeCollateral > 0) {
+                _distributeTriggerFee(
+                    _trade.user,
+                    _trade.collateralIndex,
+                    tradeFees.triggerOrderFeeCollateral
+                );
+            }
+
             // 3.3 Distribute GToken fees
             distributeVaultFeeCollateral(
                 _trade.collateralIndex,
@@ -769,8 +806,6 @@ library TradingCommonUtils {
             ),
             _getMultiCollatDiamond().getRewardsTokenPriceUsd()
         );
-
-        _sendCollateralToVault(_collateralIndex, _referralFeeCollateral, _trader);
 
         emit ITradingCommonUtils.ReferralFeeCharged(
             _trader,

@@ -149,6 +149,11 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         TradingStorageUtils.closeTrade(_tradeId, _isPnlPositive);
     }
 
+    /// @inheritdoc ITradingStorageUtils
+    function validateTrade(ITradingStorage.Trade memory _trade) external view virtual {
+        TradingStorageUtils.validateTrade(_trade);
+    }
+
     // Getters
 
     /// @inheritdoc ITradingStorageUtils

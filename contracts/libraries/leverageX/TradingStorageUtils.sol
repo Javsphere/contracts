@@ -160,7 +160,7 @@ library TradingStorageUtils {
     ) internal returns (ITradingStorage.Trade memory) {
         ITradingStorage.TradingStorage storage s = _getStorage();
 
-        _validateTrade(_trade);
+        validateTrade(_trade);
 
         if (_trade.tradeType != ITradingStorage.TradeType.TRADE && _tradeInfo.maxSlippageP == 0)
             revert ITradingStorageUtils.MaxSlippageZero();
@@ -516,7 +516,7 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getTradersCount() external view returns (uint256) {
+    function getTradersCount() internal view returns (uint256) {
         return _getStorage().traders.length;
     }
 
@@ -632,7 +632,7 @@ library TradingStorageUtils {
      * @dev Validation for trade struct (used by storeTrade and storePendingOrder for market open orders)
      * @param _trade trade struct to validate
      */
-    function _validateTrade(ITradingStorage.Trade memory _trade) internal view {
+    function validateTrade(ITradingStorage.Trade memory _trade) internal view {
         if (_trade.user == address(0)) revert IGeneralErrors.ZeroAddress();
 
         if (!_getMultiCollatDiamond().isPairIndexListed(_trade.pairIndex))

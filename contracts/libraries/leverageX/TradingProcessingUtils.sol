@@ -395,6 +395,8 @@ library TradingProcessingUtils {
                 cancelReason
             );
         }
+
+        _getMultiCollatDiamond().closePendingOrder(orderId);
     }
 
     /**
@@ -424,13 +426,13 @@ library TradingProcessingUtils {
             );
 
         ITradingProcessing.CancelReason cancelReason;
-        {
-            cancelReason = !t.isOpen
-                ? ITradingProcessing.CancelReason.NO_TRADE
-                : _pendingOrder.price == 0
-                    ? ITradingProcessing.CancelReason.MARKET_CLOSED
-                    : ITradingProcessing.CancelReason.NONE;
-        }
+        //        {
+        //            cancelReason = !t.isOpen
+        //                ? ITradingProcessing.CancelReason.NO_TRADE
+        //                : _pendingOrder.price == 0
+        //                    ? ITradingProcessing.CancelReason.MARKET_CLOSED
+        //                    : ITradingProcessing.CancelReason.NONE;
+        //        }
 
         if (cancelReason != ITradingProcessing.CancelReason.NO_TRADE) {
             ITradingProcessing.Values memory v;

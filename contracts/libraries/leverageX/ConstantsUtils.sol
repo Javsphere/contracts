@@ -21,10 +21,9 @@ library ConstantsUtils {
     function getMarketOrderTypes()
         internal
         pure
-        returns (ITradingStorage.PendingOrderType[5] memory)
+        returns (ITradingStorage.PendingOrderType[4] memory)
     {
         return [
-            ITradingStorage.PendingOrderType.MARKET_OPEN,
             ITradingStorage.PendingOrderType.MARKET_CLOSE,
             ITradingStorage.PendingOrderType.UPDATE_LEVERAGE,
             ITradingStorage.PendingOrderType.MARKET_PARTIAL_OPEN,
@@ -39,7 +38,7 @@ library ConstantsUtils {
     function isOrderTypeMarket(
         ITradingStorage.PendingOrderType _orderType
     ) internal pure returns (bool) {
-        ITradingStorage.PendingOrderType[5] memory marketOrderTypes = ConstantsUtils
+        ITradingStorage.PendingOrderType[4] memory marketOrderTypes = ConstantsUtils
             .getMarketOrderTypes();
         for (uint256 i; i < marketOrderTypes.length; ++i) {
             if (_orderType == marketOrderTypes[i]) return true;

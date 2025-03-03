@@ -25,7 +25,9 @@ interface ITradingStorage {
         mapping(address => mapping(uint32 => IPairsStorage.GroupLiquidationParams)) tradeLiquidationParams;
         uint256 max_pnl_p;
         uint256 minCollateralAmountUsd;
-        uint256[36] __gap;
+        mapping(address => mapping(uint32 => PendingOrder)) pendingOrders;
+        mapping(address => Counter) pendingOrdersCounters;
+        uint256[34] __gap;
     }
 
     enum PendingOrderType {

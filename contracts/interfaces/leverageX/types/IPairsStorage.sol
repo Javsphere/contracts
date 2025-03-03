@@ -51,7 +51,8 @@ interface IPairsStorage {
         uint24 referralFeeP; // 1e3 (%)
         uint24 govFeeP; // 1e3 (%)
         uint24 llpTokenFeeP; // 1e3 (%)
-        uint136 __placeholder;
+        uint24 triggerOrderFeeP; // 1e3 (%)
+        uint112 __placeholder;
     }
 
     struct FeeGroup {
@@ -66,6 +67,7 @@ interface IPairsStorage {
         uint256 referralFeeCollateral; // collateral precision
         uint256 govFeeCollateral; // collateral precision
         uint256 llpTokenFeeCollateral; // collateral precision
+        uint256 triggerOrderFeeCollateral; // collateral precision
     }
 
     struct GroupLiquidationParams {
