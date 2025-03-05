@@ -397,7 +397,7 @@ library TradingProcessingUtils {
         }
 
         _getMultiCollatDiamond().closePendingOrder(
-            ITradingStorage.Id({user: _pendingOrder.trade.user, index: _pendingOrder.index})
+            ITradingStorage.Id({user: _pendingOrder.user, index: _pendingOrder.index})
         );
     }
 
@@ -416,6 +416,10 @@ library TradingProcessingUtils {
             _pendingOrder.trade.user,
             _pendingOrder.trade.index
         );
+        ITradingStorage.TradeInfo memory i = _getTradeInfo(
+            _pendingOrder.trade.user,
+            _pendingOrder.trade.index
+        );
 
         (uint256 priceImpactP, uint256 priceAfterImpact, ) = TradingCommonUtils
             .getTradeClosingPriceImpact(
@@ -428,13 +432,29 @@ library TradingProcessingUtils {
             );
 
         ITradingProcessing.CancelReason cancelReason;
-        //        {
-        //            cancelReason = !t.isOpen
-        //                ? ITradingProcessing.CancelReason.NO_TRADE
-        //                : _pendingOrder.price == 0
-        //                    ? ITradingProcessing.CancelReason.MARKET_CLOSED
-        //                    : ITradingProcessing.CancelReason.NONE;
-        //        }
+        {
+            uint256 expectedPrice = _pendingOrder.trade.openPrice;
+            uint256 maxSlippage = (expectedPrice *
+                (
+                    i.maxSlippageP > 0
+                        ? i.maxSlippageP
+                        : ConstantsUtils.DEFAULT_MAX_CLOSING_SLIPPAGE_P
+                )) /
+                100 /
+                1e3;
+
+            cancelReason = !t.isOpen
+                ? ITradingProcessing.CancelReason.NO_TRADE
+                : _pendingOrder.price == 0
+                    ? ITradingProcessing.CancelReason.MARKET_CLOSED
+                    : (
+                        t.long
+                            ? priceAfterImpact < expectedPrice - maxSlippage
+                            : priceAfterImpact > expectedPrice + maxSlippage
+                    )
+                        ? ITradingProcessing.CancelReason.SLIPPAGE
+                        : ITradingProcessing.CancelReason.NONE;
+        }
 
         if (cancelReason != ITradingProcessing.CancelReason.NO_TRADE) {
             ITradingProcessing.Values memory v;
@@ -498,6 +518,9 @@ library TradingProcessingUtils {
                 cancelReason
             );
         }
+        _getMultiCollatDiamond().closePendingOrder(
+            ITradingStorage.Id({user: _pendingOrder.user, index: _pendingOrder.index})
+        );
     }
 
     /**

@@ -106,19 +106,28 @@ library TradingInteractionsUtils {
      */
     function closeTradeMarket(
         uint32 _index,
-        bytes[][] calldata _priceUpdate
-    ) internal tradingActivatedOrCloseOnly onlyWithPriceUpdate(_priceUpdate) {
-        ITradingStorage.Trade memory t = _getMultiCollatDiamond().getTrade(msg.sender, _index);
+        uint64 _expectedPrice
+    ) internal tradingActivatedOrCloseOnly {
+        if (_expectedPrice == 0) revert IGeneralErrors.ZeroValue();
+        address sender = msg.sender;
+        ITradingStorage.Trade memory t = _getMultiCollatDiamond().getTrade(sender, _index);
 
         ITradingStorage.PendingOrder memory pendingOrder;
         pendingOrder.trade.user = t.user;
         pendingOrder.trade.index = t.index;
         pendingOrder.trade.pairIndex = t.pairIndex;
-        pendingOrder.user = msg.sender;
+        pendingOrder.trade.openPrice = _expectedPrice;
+        pendingOrder.user = sender;
         pendingOrder.orderType = ITradingStorage.PendingOrderType.MARKET_CLOSE;
-        pendingOrder.price = uint64(_getMultiCollatDiamond().getPrice(t.pairIndex));
 
-        _getMultiCollatDiamond().closeTradeMarketOrder(pendingOrder);
+        pendingOrder = _getMultiCollatDiamond().storePendingOrder(pendingOrder);
+
+        emit ITradingInteractionsUtils.MarketOrderInitiated(
+            ITradingStorage.Id({user: pendingOrder.user, index: pendingOrder.index}),
+            sender,
+            t.pairIndex,
+            false
+        );
     }
 
     /**
@@ -277,7 +286,8 @@ library TradingInteractionsUtils {
         if (ConstantsUtils.isOrderTypeMarket(orderType)) revert IGeneralErrors.WrongOrderType();
 
         if (
-            orderType == ITradingStorage.PendingOrderType.MARKET_OPEN &&
+            (orderType == ITradingStorage.PendingOrderType.MARKET_OPEN ||
+                orderType == ITradingStorage.PendingOrderType.MARKET_CLOSE) &&
             !_getMultiCollatDiamond().isValidTrigger(msg.sender)
         ) revert IGeneralErrors.NotAuthorized();
 
@@ -301,6 +311,18 @@ library TradingInteractionsUtils {
                 _getMultiCollatDiamond().getPrice(_pendingOrder.trade.pairIndex)
             );
             _getMultiCollatDiamond().openTradeMarketOrder(_pendingOrder);
+            return;
+        }
+
+        if (orderType == ITradingStorage.PendingOrderType.MARKET_CLOSE) {
+            ITradingStorage.PendingOrder memory _pendingOrder = _getMultiCollatDiamond()
+                .getPendingOrder(ITradingStorage.Id({user: _trader, index: _index}));
+            if (!_pendingOrder.isOpen) return;
+
+            _pendingOrder.price = uint64(
+                _getMultiCollatDiamond().getPrice(_pendingOrder.trade.pairIndex)
+            );
+            _getMultiCollatDiamond().closeTradeMarketOrder(_pendingOrder);
             return;
         }
 

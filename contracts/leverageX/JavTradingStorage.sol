@@ -154,6 +154,11 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         TradingStorageUtils.validateTrade(_trade);
     }
 
+    /// @inheritdoc ITradingStorageUtils
+    function storeTrader(address _trader) external virtual onlySelf {
+        TradingStorageUtils.storeTrader(_trader);
+    }
+
     // Getters
 
     /// @inheritdoc ITradingStorageUtils

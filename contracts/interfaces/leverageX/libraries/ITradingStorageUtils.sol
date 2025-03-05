@@ -155,6 +155,12 @@ interface ITradingStorageUtils is ITradingStorage {
     function validateTrade(ITradingStorage.Trade memory _trade) external view;
 
     /**
+     * @dev Function for store trader address
+     * @param _trader trader address
+     */
+    function storeTrader(address _trader) external;
+
+    /**
      * @dev Returns collateral data by index
      * @param _index the index of the supported collateral
      */

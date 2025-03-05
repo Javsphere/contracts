@@ -42,7 +42,10 @@ library ArrayGetters {
         uint32 currentIndex;
         for (uint32 i = _offset; i <= _limit; ++i) {
             address trader = s.traders[i];
-            if (s.userCounters[trader].openCount > 0) {
+            if (
+                s.userCounters[trader].openCount > 0 ||
+                s.pendingOrdersCounters[trader].openCount > 0
+            ) {
                 traders[currentIndex++] = trader;
             }
         }

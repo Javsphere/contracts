@@ -189,10 +189,7 @@ library TradingStorageUtils {
         s.tradeInfos[_trade.user][_trade.index] = _tradeInfo;
         s.userCounters[_trade.user] = counter;
 
-        if (!s.traderStored[_trade.user]) {
-            s.traders.push(_trade.user);
-            s.traderStored[_trade.user] = true;
-        }
+        storeTrader(_trade.user);
 
         if (_trade.tradeType == ITradingStorage.TradeType.TRADE)
             TradingCommonUtils.updateOiTrade(_trade, true, false);
@@ -659,5 +656,17 @@ library TradingStorageUtils {
             _trade.sl != 0 &&
             (_trade.long ? _trade.sl >= _trade.openPrice : _trade.sl <= _trade.openPrice)
         ) revert ITradingStorageUtils.TradeSlInvalid();
+    }
+
+    /**
+     * @dev Function for store trader address
+     * @param _trader trader address
+     */
+    function storeTrader(address _trader) internal {
+        ITradingStorage.TradingStorage storage s = _getStorage();
+        if (!s.traderStored[_trader]) {
+            s.traders.push(_trader);
+            s.traderStored[_trader] = true;
+        }
     }
 }

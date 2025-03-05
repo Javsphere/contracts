@@ -41,6 +41,10 @@ library TradingOrdersUtils {
         s.pendingOrders[_pendingOrder.user][_pendingOrder.index] = _pendingOrder;
         s.pendingOrdersCounters[_pendingOrder.user] = counter;
 
+        if (!_getMultiCollatDiamond().getTraderStored(_pendingOrder.user)) {
+            _getMultiCollatDiamond().storeTrader(_pendingOrder.user);
+        }
+
         emit ITradingOrdersUtils.PendingOrderStored(_pendingOrder);
 
         return _pendingOrder;

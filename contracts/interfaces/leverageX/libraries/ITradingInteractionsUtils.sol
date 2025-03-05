@@ -38,9 +38,9 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     /**
      * @dev Closes an open trade (market order) for caller
      * @param _index the index of the trade of caller
-     * @param _priceUpdate Array of price update data.
+     * @param _expectedPrice expected closing price, used to check max slippage (1e10 precision)
      */
-    function closeTradeMarket(uint32 _index, bytes[][] calldata _priceUpdate) external payable;
+    function closeTradeMarket(uint32 _index, uint64 _expectedPrice) external;
 
     /**
      * @dev Updates an existing limit/stop order for caller
