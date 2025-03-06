@@ -126,7 +126,8 @@ library TradingInteractionsUtils {
             ITradingStorage.Id({user: pendingOrder.user, index: pendingOrder.index}),
             sender,
             t.pairIndex,
-            false
+            false,
+            t
         );
     }
 
@@ -524,7 +525,8 @@ library TradingInteractionsUtils {
                 orderId,
                 sender,
                 _trade.pairIndex,
-                true
+                true,
+                _trade
             );
         }
 

@@ -145,12 +145,14 @@ interface ITradingInteractionsUtils is ITradingInteractions {
      * @param trader address of the trader
      * @param pairIndex index of the trading pair
      * @param open whether the market order is for opening or closing a trade
+     * @param _trade the trade
      */
     event MarketOrderInitiated(
         ITradingStorage.Id orderId,
         address indexed trader,
         uint16 indexed pairIndex,
-        bool open
+        bool open,
+        ITradingStorage.Trade _trade
     );
 
     /**
