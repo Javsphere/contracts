@@ -30,21 +30,23 @@ library ArrayGetters {
      * @dev Check ITradingStorageUtils interface for documentation
      */
     function getTraders(uint32 _offset, uint32 _limit) public view returns (address[] memory) {
-        ITradingStorage.TradingStorage storage s = TradingStorageUtils._getStorage();
+        ITradingStorage.TradingStorage storage trading_s = TradingStorageUtils._getStorage();
+        ITradingOrdersUtils.TradingOrders storage tradingOrders_s = TradingOrdersUtils
+            ._getStorage();
 
-        if (s.traders.length == 0) return new address[](0);
+        if (trading_s.traders.length == 0) return new address[](0);
 
-        uint256 lastIndex = s.traders.length - 1;
+        uint256 lastIndex = trading_s.traders.length - 1;
         _limit = _limit == 0 || _limit > lastIndex ? uint32(lastIndex) : _limit;
 
         address[] memory traders = new address[](_limit - _offset + 1);
 
         uint32 currentIndex;
         for (uint32 i = _offset; i <= _limit; ++i) {
-            address trader = s.traders[i];
+            address trader = trading_s.traders[i];
             if (
-                s.userCounters[trader].openCount > 0 ||
-                s.pendingOrdersCounters[trader].openCount > 0
+                trading_s.userCounters[trader].openCount > 0 ||
+                tradingOrders_s.pendingOrdersCounters[trader].openCount > 0
             ) {
                 traders[currentIndex++] = trader;
             }
