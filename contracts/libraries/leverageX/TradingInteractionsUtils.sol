@@ -111,13 +111,13 @@ library TradingInteractionsUtils {
         if (_expectedPrice == 0) revert IGeneralErrors.ZeroValue();
         address sender = msg.sender;
         ITradingStorage.Trade memory t = _getMultiCollatDiamond().getTrade(sender, _index);
+        if (!t.isOpen) revert IGeneralErrors.DoesntExist();
 
         ITradingStorage.PendingOrder memory pendingOrder;
-        pendingOrder.trade.user = t.user;
-        pendingOrder.trade.index = t.index;
-        pendingOrder.trade.pairIndex = t.pairIndex;
+        pendingOrder.trade = t;
         pendingOrder.trade.openPrice = _expectedPrice;
         pendingOrder.user = sender;
+        pendingOrder.maxSlippageP = _getMultiCollatDiamond().getTradeInfo(sender, _index).maxSlippageP;
         pendingOrder.orderType = ITradingStorage.PendingOrderType.MARKET_CLOSE;
 
         pendingOrder = _getMultiCollatDiamond().storePendingOrder(pendingOrder);
