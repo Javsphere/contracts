@@ -13,6 +13,8 @@ import "./libraries/ITradingProcessingUtils.sol";
 import "./libraries/IBorrowingFeesUtils.sol";
 import "./libraries/IPriceAggregatorUtils.sol";
 import "../libraries/IPriceUtils.sol";
+import "./libraries/ITriggerRewardsUtils.sol";
+import "./libraries/ITradingOrdersUtils.sol";
 
 /**
  * @custom:version 8
@@ -31,5 +33,7 @@ interface IJavMultiCollatDiamond is
     ITradingProcessingUtils,
     IBorrowingFeesUtils,
     IPriceAggregatorUtils,
-    IPriceUtils
+    IPriceUtils,
+    ITriggerRewardsUtils,
+    ITradingOrdersUtils
 {}

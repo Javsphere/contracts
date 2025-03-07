@@ -110,14 +110,16 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         uint120 _collateralAmount,
         uint24 _leverage,
         uint64 _openPrice,
-        bool _isPartialIncrease
+        bool _isPartialIncrease,
+        bool _isPnlPositive
     ) external virtual onlySelf {
         TradingStorageUtils.updateTradePosition(
             _tradeId,
             _collateralAmount,
             _leverage,
             _openPrice,
-            _isPartialIncrease
+            _isPartialIncrease,
+            _isPnlPositive
         );
     }
 
@@ -143,8 +145,18 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function closeTrade(Id memory _tradeId) external virtual onlySelf {
-        TradingStorageUtils.closeTrade(_tradeId);
+    function closeTrade(Id memory _tradeId, bool _isPnlPositive) external virtual onlySelf {
+        TradingStorageUtils.closeTrade(_tradeId, _isPnlPositive);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function validateTrade(ITradingStorage.Trade memory _trade) external view virtual {
+        TradingStorageUtils.validateTrade(_trade);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function storeTrader(address _trader) external virtual onlySelf {
+        TradingStorageUtils.storeTrader(_trader);
     }
 
     // Getters
@@ -190,6 +202,11 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
+    function getTradersCount() external view returns (uint256) {
+        return TradingStorageUtils.getTradersCount();
+    }
+
+    /// @inheritdoc ITradingStorageUtils
     function getTraders(uint32 _offset, uint32 _limit) external view returns (address[] memory) {
         return ArrayGetters.getTraders(_offset, _limit);
     }
@@ -202,6 +219,15 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     /// @inheritdoc ITradingStorageUtils
     function getTrades(address _trader) external view returns (Trade[] memory) {
         return ArrayGetters.getTrades(_trader);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function getAllTradesForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (Trade[] memory) {
+        return ArrayGetters.getAllTradesForTraders(_traders, _offset, _limit);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -220,6 +246,15 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
+    function getAllTradeInfosForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (TradeInfo[] memory) {
+        return ArrayGetters.getAllTradeInfosForTraders(_traders, _offset, _limit);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
     function getAllTradeInfos(
         uint256 _offset,
         uint256 _limit
@@ -230,6 +265,13 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     /// @inheritdoc ITradingStorageUtils
     function getCounters(address _trader) external view returns (Counter memory) {
         return TradingStorageUtils.getCounters(_trader);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function getCountersForTraders(
+        address[] calldata _traders
+    ) external view returns (Counter[] memory) {
+        return ArrayGetters.getCountersForTraders(_traders);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -260,6 +302,15 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
         address _trader
     ) external view returns (IPairsStorage.GroupLiquidationParams[] memory) {
         return ArrayGetters.getTradesLiquidationParams(_trader);
+    }
+
+    /// @inheritdoc ITradingStorageUtils
+    function getAllTradesLiquidationParamsForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (IPairsStorage.GroupLiquidationParams[] memory) {
+        return ArrayGetters.getAllTradesLiquidationParamsForTraders(_traders, _offset, _limit);
     }
 
     /// @inheritdoc ITradingStorageUtils

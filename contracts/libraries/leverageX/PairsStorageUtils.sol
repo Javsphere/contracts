@@ -14,8 +14,8 @@ import "./ConstantsUtils.sol";
  * @dev JavPairsStorage facet internal library
  */
 library PairsStorageUtils {
-    uint256 private constant MIN_LEVERAGE = 2;
-    uint256 private constant MAX_LEVERAGE = 1000;
+    uint256 private constant MIN_LEVERAGE = 1.1e3; // 1.1x (1e3 precision)
+    uint256 private constant MAX_LEVERAGE = 1000e3; // 1000x (1e3 precision)
 
     function initializeGroupLiquidationParams(
         IPairsStorage.GroupLiquidationParams[] memory _groupLiquidationParams
@@ -26,6 +26,40 @@ library PairsStorageUtils {
         for (uint256 i = 0; i < _groupLiquidationParams.length; ++i) {
             setGroupLiquidationParams(i, _groupLiquidationParams[i]);
         }
+    }
+
+    /**
+     * @dev Check IPairsStorageUtils interface for documentation
+     */
+    function initializeNewFees(IPairsStorage.GlobalTradeFeeParams memory _tradeFeeParams) internal {
+        IPairsStorage.PairsStorage storage s = _getStorage();
+
+        // 1. Copy existing fees to new mapping
+        uint256 existingFeesCount = s.feesCount;
+        s.feesCount = 0;
+
+        for (uint256 i = 0; i < existingFeesCount; ++i) {
+            IPairsStorage.Fee memory oldFeeGroup = s.fees[i];
+
+            _addFee(
+                IPairsStorage.FeeGroup(
+                    uint40(oldFeeGroup.openFeeP * 2 + oldFeeGroup.triggerOrderFeeP),
+                    uint40(10 * ConstantsUtils.P_10),
+                    uint32((oldFeeGroup.minPositionSizeUsd * 1e3) / 1e18),
+                    0
+                )
+            );
+        }
+
+        // 2. Multiply existing groups min/max lev by 1e3
+        for (uint256 i = 0; i < s.groupsCount; ++i) {
+            IPairsStorage.Group storage oldGroup = s.groups[i];
+            oldGroup.minLeverage *= 1e3;
+            oldGroup.maxLeverage *= 1e3;
+        }
+
+        // 3. Global trade fee params
+        setGlobalTradeFeeParams(_tradeFeeParams);
     }
 
     /**
@@ -86,7 +120,7 @@ library PairsStorageUtils {
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
-    function addFees(IPairsStorage.Fee[] calldata _fees) internal {
+    function addFees(IPairsStorage.FeeGroup[] memory _fees) internal {
         for (uint256 i = 0; i < _fees.length; ++i) {
             _addFee(_fees[i]);
         }
@@ -95,7 +129,7 @@ library PairsStorageUtils {
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
-    function updateFees(uint256[] calldata _ids, IPairsStorage.Fee[] calldata _fees) internal {
+    function updateFees(uint256[] calldata _ids, IPairsStorage.FeeGroup[] memory _fees) internal {
         if (_ids.length != _fees.length) revert IGeneralErrors.WrongLength();
 
         for (uint256 i = 0; i < _fees.length; ++i) {
@@ -150,14 +184,41 @@ library PairsStorageUtils {
 
         if (_params.startLeverage > _params.endLeverage)
             revert IPairsStorageUtils.WrongLiqParamsLeverages();
-        if (_params.startLeverage < groups(_groupIndex).minLeverage * 1e3)
+        if (_params.startLeverage < groups(_groupIndex).minLeverage)
             revert IPairsStorageUtils.StartLeverageTooLow();
-        if (_params.endLeverage > groups(_groupIndex).maxLeverage * 1e3)
+        if (_params.endLeverage > groups(_groupIndex).maxLeverage)
             revert IPairsStorageUtils.EndLeverageTooHigh();
 
         s.groupLiquidationParams[_groupIndex] = _params;
 
         emit IPairsStorageUtils.GroupLiquidationParamsUpdated(_groupIndex, _params);
+    }
+
+    /**
+     * @dev Check IPairsStorageUtils interface for documentation
+     */
+    function setGlobalTradeFeeParams(
+        IPairsStorage.GlobalTradeFeeParams memory _feeParams
+    ) internal {
+        if (
+            _feeParams.referralFeeP == 0 ||
+            _feeParams.govFeeP == 0 ||
+            _feeParams.llpTokenFeeP == 0 ||
+            _feeParams.triggerOrderFeeP == 0 ||
+            _feeParams.__placeholder != 0
+        ) revert IGeneralErrors.ZeroValue();
+
+        if (
+            _feeParams.referralFeeP +
+                _feeParams.govFeeP +
+                _feeParams.llpTokenFeeP +
+                _feeParams.triggerOrderFeeP !=
+            100 * 1e3
+        ) revert IGeneralErrors.WrongParams();
+
+        _getStorage().globalTradeFeeParams = _feeParams;
+
+        emit IPairsStorageUtils.GlobalTradeFeeParamsUpdated(_feeParams);
     }
 
     /**
@@ -218,38 +279,41 @@ library PairsStorageUtils {
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
-    function pairOpenFeeP(uint256 _pairIndex) internal view returns (uint256) {
-        return fees(pairs(_pairIndex).feeIndex).openFeeP;
+    function pairTotalPositionSizeFeeP(uint256 _pairIndex) internal view returns (uint256) {
+        return fees(pairs(_pairIndex).feeIndex).totalPositionSizeFeeP;
     }
 
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
-    function pairCloseFeeP(uint256 _pairIndex) internal view returns (uint256) {
-        return fees(pairs(_pairIndex).feeIndex).closeFeeP;
-    }
-
-    /**
-     * @dev Check IPairsStorageUtils interface for documentation
-     */
-    function pairTriggerOrderFeeP(uint256 _pairIndex) internal view returns (uint256) {
-        return fees(pairs(_pairIndex).feeIndex).triggerOrderFeeP;
+    function pairTotalLiqCollateralFeeP(uint256 _pairIndex) internal view returns (uint256) {
+        return fees(pairs(_pairIndex).feeIndex).totalLiqCollateralFeeP;
     }
 
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
     function pairMinPositionSizeUsd(uint256 _pairIndex) internal view returns (uint256) {
-        return fees(pairs(_pairIndex).feeIndex).minPositionSizeUsd;
+        return (uint256(fees(pairs(_pairIndex).feeIndex).minPositionSizeUsd) * 1e18) / 1e3;
+    }
+
+    /**
+     * @dev Check IPairsStorageUtils interface for documentation
+     */
+    function getGlobalTradeFeeParams()
+        internal
+        view
+        returns (IPairsStorage.GlobalTradeFeeParams memory)
+    {
+        return _getStorage().globalTradeFeeParams;
     }
 
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
     function pairMinFeeUsd(uint256 _pairIndex) internal view returns (uint256) {
-        IPairsStorage.Fee memory f = fees(pairs(_pairIndex).feeIndex);
         return
-            (f.minPositionSizeUsd * (f.openFeeP * 2 + f.triggerOrderFeeP)) /
+            (pairMinPositionSizeUsd(_pairIndex) * pairTotalPositionSizeFeeP(_pairIndex)) /
             ConstantsUtils.P_10 /
             100;
     }
@@ -278,8 +342,8 @@ library PairsStorageUtils {
     /**
      * @dev Check IPairsStorageUtils interface for documentation
      */
-    function fees(uint256 _index) internal view returns (IPairsStorage.Fee memory) {
-        return _getStorage().fees[_index];
+    function fees(uint256 _index) internal view returns (IPairsStorage.FeeGroup memory) {
+        return _getStorage().feeGroups[_index];
     }
 
     /**
@@ -287,20 +351,6 @@ library PairsStorageUtils {
      */
     function feesCount() internal view returns (uint256) {
         return _getStorage().feesCount;
-    }
-
-    /**
-     * @dev Check IPairsStorageUtils interface for documentation
-     */
-    function pairsBackend(
-        uint256 _index
-    )
-        internal
-        view
-        returns (IPairsStorage.Pair memory, IPairsStorage.Group memory, IPairsStorage.Fee memory)
-    {
-        IPairsStorage.Pair memory p = pairs(_index);
-        return (p, PairsStorageUtils.groups(p.groupIndex), PairsStorageUtils.fees(p.feeIndex));
     }
 
     /**
@@ -383,7 +433,8 @@ library PairsStorageUtils {
      * @param _feeIndex fee index to check
      */
     modifier feeListed(uint256 _feeIndex) {
-        if (_getStorage().fees[_feeIndex].openFeeP == 0) revert IPairsStorageUtils.FeeNotListed();
+        if (_getStorage().feeGroups[_feeIndex].totalPositionSizeFeeP == 0)
+            revert IPairsStorageUtils.FeeNotListed();
         _;
     }
 
@@ -404,12 +455,12 @@ library PairsStorageUtils {
      * @dev Reverts if fee is not valid
      * @param _fee fee to check
      */
-    modifier feeOk(IPairsStorage.Fee calldata _fee) {
+    modifier feeOk(IPairsStorage.FeeGroup memory _fee) {
         if (
-            _fee.openFeeP == 0 ||
-            _fee.closeFeeP == 0 ||
-            _fee.triggerOrderFeeP == 0 ||
-            _fee.minPositionSizeUsd == 0
+            _fee.totalPositionSizeFeeP == 0 ||
+            _fee.totalLiqCollateralFeeP == 0 ||
+            _fee.minPositionSizeUsd == 0 ||
+            _fee.__placeholder != 0
         ) revert IPairsStorageUtils.WrongFees();
         _;
     }
@@ -444,10 +495,17 @@ library PairsStorageUtils {
         IPairsStorage.Pair storage p = s.pairs[_pairIndex];
         if (!s.isPairListed[p.from][p.to]) revert IPairsStorageUtils.PairNotListed();
 
+        s.isPairListed[p.from][p.to] = false;
+
+        p.from = _pair.from;
+        p.to = _pair.to;
         p.spreadP = _pair.spreadP;
         p.groupIndex = _pair.groupIndex;
         p.feeIndex = _pair.feeIndex;
         p.feedId = _pair.feedId;
+        p.altPriceOracle = _pair.altPriceOracle;
+
+        s.isPairListed[p.from][p.to] = true;
 
         emit IPairsStorageUtils.PairUpdated(_pairIndex);
     }
@@ -497,11 +555,11 @@ library PairsStorageUtils {
      * @dev Adds a new pair fee group
      * @param _fee fee to add
      */
-    function _addFee(IPairsStorage.Fee calldata _fee) internal feeOk(_fee) {
+    function _addFee(IPairsStorage.FeeGroup memory _fee) internal feeOk(_fee) {
         IPairsStorage.PairsStorage storage s = _getStorage();
-        s.fees[s.feesCount] = _fee;
+        s.feeGroups[s.feesCount] = _fee;
 
-        emit IPairsStorageUtils.FeeAdded(s.feesCount++, _fee.name);
+        emit IPairsStorageUtils.FeeAdded(s.feesCount++, _fee);
     }
 
     /**
@@ -511,10 +569,10 @@ library PairsStorageUtils {
      */
     function _updateFee(
         uint256 _id,
-        IPairsStorage.Fee calldata _fee
+        IPairsStorage.FeeGroup memory _fee
     ) internal feeListed(_id) feeOk(_fee) {
-        _getStorage().fees[_id] = _fee;
+        _getStorage().feeGroups[_id] = _fee;
 
-        emit IPairsStorageUtils.FeeUpdated(_id);
+        emit IPairsStorageUtils.FeeUpdated(_id, _fee);
     }
 }

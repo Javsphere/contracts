@@ -19,6 +19,8 @@ library FeeTiersUtils {
     uint32 private constant FEE_MULTIPLIER_SCALE = 1e3;
     uint224 private constant POINTS_THRESHOLD_SCALE = 1e18;
     uint256 private constant GROUP_VOLUME_MULTIPLIER_SCALE = 1e3;
+    uint224 private constant MAX_CREDITED_POINTS_PER_DAY =
+        type(uint224).max / TRAILING_PERIOD_DAYS / 2;
 
     /**
      * @dev Check IFeeTiersUtils interface for documentation
@@ -83,8 +85,86 @@ library FeeTiersUtils {
     /**
      * @dev Check IFeeTiersUtils interface for documentation
      */
+    function setTradersFeeTiersEnrollment(
+        address[] calldata _traders,
+        IFeeTiers.TraderEnrollment[] calldata _values
+    ) internal {
+        if (_traders.length != _values.length) {
+            revert IGeneralErrors.WrongLength();
+        }
+
+        IFeeTiers.FeeTiersStorage storage s = _getStorage();
+
+        for (uint256 i; i < _traders.length; ++i) {
+            (address trader, IFeeTiers.TraderEnrollment memory enrollment) = (
+                _traders[i],
+                _values[i]
+            );
+
+            // Ensure __placeholder remains 0 for future compatibility
+            enrollment.__placeholder = 0;
+
+            // Update trader enrollment mapping
+            s.traderEnrollments[trader] = enrollment;
+
+            emit IFeeTiersUtils.TraderEnrollmentUpdated(trader, enrollment);
+        }
+    }
+
+    /**
+     * @dev Check IFeeTiersUtils interface for documentation
+     */
+    function addTradersUnclaimedPoints(
+        address[] calldata _traders,
+        IFeeTiers.CreditType[] calldata _creditTypes,
+        uint224[] calldata _points
+    ) internal {
+        if (_traders.length != _creditTypes.length || _traders.length != _points.length) {
+            revert IGeneralErrors.WrongLength();
+        }
+
+        IFeeTiers.FeeTiersStorage storage s = _getStorage();
+        uint32 currentDay = _getCurrentDay();
+
+        for (uint256 i; i < _traders.length; ++i) {
+            (address trader, IFeeTiers.CreditType creditType, uint224 points) = (
+                _traders[i],
+                _creditTypes[i],
+                _points[i]
+            );
+
+            // Calculate new total daily points for trader, including unclaimed ones.
+            // This ensures that the total daily points for a trader are capped at MAX_CREDITED_POINTS_PER_DAY to prevent trailingPoints
+            // from overflowing when points added through trading or other credit events.
+            uint224 totalDailyPoints = s.traderDailyInfos[trader][currentDay].points +
+                s.unclaimedPoints[trader] +
+                points;
+
+            // Check total available points are within the safe range
+            if (totalDailyPoints > MAX_CREDITED_POINTS_PER_DAY) {
+                revert IFeeTiersUtils.PointsOverflow();
+            }
+
+            // Add points to unclaimed points storage
+            s.unclaimedPoints[trader] += points;
+
+            // If points are to be credited immediately, trigger a points update
+            if (creditType == IFeeTiers.CreditType.IMMEDIATE) {
+                updateTraderPoints(trader, 0, 0);
+            }
+
+            emit IFeeTiersUtils.TraderPointsCredited(trader, currentDay, creditType, points);
+        }
+    }
+
+    /**
+     * @dev Check IFeeTiersUtils interface for documentation
+     */
     function updateTraderPoints(address _trader, uint256 _volumeUsd, uint256 _groupIndex) internal {
         IFeeTiers.FeeTiersStorage storage s = _getStorage();
+
+        // Claim any pending points before updating
+        _claimUnclaimedPoints(_trader);
 
         // Scale amount by group multiplier
         uint224 points = uint224(
@@ -182,10 +262,13 @@ library FeeTiersUtils {
         address _trader,
         uint256 _normalFeeAmountCollateral
     ) internal view returns (uint256) {
-        uint32 feeMultiplier = _getStorage()
-        .traderDailyInfos[_trader][_getCurrentDay()].feeMultiplierCache;
+        IFeeTiers.FeeTiersStorage storage s = _getStorage();
+        IFeeTiers.TraderEnrollment storage enrollment = s.traderEnrollments[_trader];
+        uint32 feeMultiplier = s.traderDailyInfos[_trader][_getCurrentDay()].feeMultiplierCache;
+
         return
-            feeMultiplier == 0
+            // If  fee multiplier is 0 or trader is excluded, return normal fee amount, otherwise apply multiplier
+            feeMultiplier == 0 || enrollment.status == IFeeTiers.TraderEnrollmentStatus.EXCLUDED
                 ? _normalFeeAmountCollateral
                 : (uint256(feeMultiplier) * _normalFeeAmountCollateral) /
                     uint256(FEE_MULTIPLIER_SCALE);
@@ -232,6 +315,22 @@ library FeeTiersUtils {
     /**
      * @dev Check IFeeTiersUtils interface for documentation
      */
+    function getTraderFeeTiersEnrollment(
+        address _trader
+    ) internal view returns (IFeeTiers.TraderEnrollment memory) {
+        return _getStorage().traderEnrollments[_trader];
+    }
+
+    /**
+     * @dev Check IFeeTiersUtils interface for documentation
+     */
+    function getTraderUnclaimedPoints(address _trader) internal view returns (uint224) {
+        return _getStorage().unclaimedPoints[_trader];
+    }
+
+    /**
+     * @dev Check IFeeTiersUtils interface for documentation
+     */
     function getFeeTiersTraderDailyInfo(
         address _trader,
         uint32 _day
@@ -270,11 +369,11 @@ library FeeTiersUtils {
         bool isDisabled = _feeTier.feeMultiplier == 0 && _feeTier.pointsThreshold == 0;
 
         // Either both feeMultiplier and pointsThreshold are 0 or none
-        // And make sure feeMultiplier < 1 otherwise useless
+        // And make sure feeMultiplier < 1 && feeMultiplier >= 0.5 to cap discount to 50%
         if (
             !isDisabled &&
             (_feeTier.feeMultiplier >= FEE_MULTIPLIER_SCALE ||
-                _feeTier.feeMultiplier == 0 ||
+                _feeTier.feeMultiplier < FEE_MULTIPLIER_SCALE / 2 ||
                 _feeTier.pointsThreshold == 0)
         ) {
             revert IFeeTiersUtils.WrongFeeTier();
@@ -318,5 +417,45 @@ library FeeTiersUtils {
      */
     function _getCurrentDay() internal view returns (uint32) {
         return uint32(block.timestamp / 1 days);
+    }
+
+    /**
+     * @dev Claims unclaimed points for a trader and adds them to the daily points for the current day.
+     * @dev In the event that it's the first points update for the trader, backdates points to yesterday so the tier discount becomes immediate.
+     * @param _trader trader address
+     */
+    function _claimUnclaimedPoints(address _trader) internal {
+        IFeeTiers.FeeTiersStorage storage s = _getStorage();
+
+        // Load unclaimed points for trader
+        uint224 unclaimedPoints = s.unclaimedPoints[_trader];
+
+        // Return early if no unclaimed points
+        if (unclaimedPoints == 0) {
+            return;
+        }
+
+        IFeeTiers.TraderInfo storage traderInfo = s.traderInfos[_trader];
+        uint32 currentDay = _getCurrentDay();
+
+        // Reset unclaimed points storage for trader
+        s.unclaimedPoints[_trader] = 0;
+
+        // If it's the first points update we can safely backdate points to yesterday so the tier discount becomes immediate
+        if (traderInfo.lastDayUpdated == 0) {
+            uint32 yesterday = currentDay - 1;
+
+            // Set trader's last day updated to yesterday (backdate)
+            traderInfo.lastDayUpdated = yesterday;
+            // Add unclaimed points to yesterday's points
+            s.traderDailyInfos[_trader][yesterday].points = unclaimedPoints;
+
+            emit IFeeTiersUtils.TraderInfoFirstUpdate(_trader, yesterday);
+        } else {
+            // Add unclaimed points to `currentDay`'s points
+            s.traderDailyInfos[_trader][currentDay].points += unclaimedPoints;
+        }
+
+        emit IFeeTiersUtils.TraderUnclaimedPointsClaimed(_trader, currentDay, unclaimedPoints);
     }
 }

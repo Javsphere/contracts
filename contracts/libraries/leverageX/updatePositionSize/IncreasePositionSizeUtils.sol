@@ -37,10 +37,8 @@ library IncreasePositionSizeUtils {
                 ? _trade.leverage + _input.leverageDelta
                 : _input.leverageDelta;
             if (
-                leverageToValidate >
-                _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) * 1e3 ||
-                leverageToValidate <
-                _getMultiCollatDiamond().pairMinLeverage(_trade.pairIndex) * 1e3
+                leverageToValidate > _getMultiCollatDiamond().pairMaxLeverage(_trade.pairIndex) ||
+                leverageToValidate < _getMultiCollatDiamond().pairMinLeverage(_trade.pairIndex)
             ) revert ITradingInteractionsUtils.WrongLeverage();
         }
 
@@ -62,18 +60,12 @@ library IncreasePositionSizeUtils {
             uint256 borrowingFeeCollateral = TradingCommonUtils.getTradeBorrowingFeeCollateral(
                 _trade
             );
-            uint256 openingFeesCollateral = ((_getMultiCollatDiamond().pairOpenFeeP(
-                _trade.pairIndex
-            ) *
-                2 +
-                _getMultiCollatDiamond().pairTriggerOrderFeeP(_trade.pairIndex)) *
-                TradingCommonUtils.getPositionSizeCollateralBasis(
-                    _trade.collateralIndex,
-                    _trade.pairIndex,
-                    positionSizeCollateralDelta
-                )) /
-                ConstantsUtils.P_10 /
-                100;
+            uint256 openingFeesCollateral = TradingCommonUtils.getTotalTradeFeesCollateral(
+                _trade.collateralIndex,
+                _trade.user,
+                _trade.pairIndex,
+                positionSizeCollateralDelta
+            );
 
             uint256 newPositionSizeCollateral = existingPositionSizeCollateral +
                 positionSizeCollateralDelta -
@@ -158,26 +150,12 @@ library IncreasePositionSizeUtils {
 
         // 6. Calculate partial trade opening fees
 
-        // 6.1 Apply fee tiers
-        uint256 pairOpenFeeP = _getMultiCollatDiamond().calculateFeeAmount(
+        values.openingFeesCollateral = TradingCommonUtils.getTotalTradeFeesCollateral(
+            _existingTrade.collateralIndex,
             _existingTrade.user,
-            _getMultiCollatDiamond().pairOpenFeeP(_existingTrade.pairIndex)
+            _existingTrade.pairIndex,
+            values.positionSizeCollateralDelta
         );
-        uint256 pairTriggerFeeP = _getMultiCollatDiamond().calculateFeeAmount(
-            _existingTrade.user,
-            _getMultiCollatDiamond().pairTriggerOrderFeeP(_existingTrade.pairIndex)
-        );
-
-        // 6.2 Calculate opening fees on on max(positionSizeCollateralDelta, minPositionSizeCollateral)
-        values.openingFeesCollateral =
-            ((pairOpenFeeP * 2 + pairTriggerFeeP) *
-                TradingCommonUtils.getPositionSizeCollateralBasis(
-                    _existingTrade.collateralIndex,
-                    _existingTrade.pairIndex,
-                    values.positionSizeCollateralDelta
-                )) /
-            100 /
-            ConstantsUtils.P_10;
 
         // 7. Charge opening fees and borrowing fees on new trade collateral amount
         values.newCollateralAmount -= values.borrowingFeeCollateral + values.openingFeesCollateral;
@@ -304,7 +282,8 @@ library IncreasePositionSizeUtils {
             uint120(_values.newCollateralAmount),
             uint24(_values.newLeverage),
             uint64(_values.newOpenPrice),
-            true // refresh liquidation params
+            true, // refresh liquidation params
+            false
         );
 
         // 3. Reset trade borrowing fees to zero

@@ -28,13 +28,11 @@ library ReferralsUtils {
     function initializeReferrals(
         uint256 _allyFeeP,
         uint256 _startReferrerFeeP,
-        uint256 _openFeeP,
         uint256 _targetVolumeUsd
     ) internal {
         if (
             _allyFeeP > MAX_ALLY_FEE_P ||
             _startReferrerFeeP > MAX_START_REFERRER_FEE_P ||
-            _openFeeP > MAX_OPEN_FEE_P ||
             _targetVolumeUsd == 0
         ) revert IGeneralErrors.WrongParams();
 
@@ -42,7 +40,6 @@ library ReferralsUtils {
 
         s.allyFeeP = _allyFeeP;
         s.startReferrerFeeP = _startReferrerFeeP;
-        s.openFeeP = _openFeeP;
         s.targetVolumeUsd = _targetVolumeUsd;
     }
 
@@ -66,17 +63,6 @@ library ReferralsUtils {
         _getStorage().startReferrerFeeP = _value;
 
         emit IReferralsUtils.UpdatedStartReferrerFeeP(_value);
-    }
-
-    /**
-     * @dev Check IReferralsUtils interface for documentation
-     */
-    function updateReferralsOpenFeeP(uint256 _value) internal {
-        if (_value > MAX_OPEN_FEE_P) revert IGeneralErrors.AboveMax();
-
-        _getStorage().openFeeP = _value;
-
-        emit IReferralsUtils.UpdatedOpenFeeP(_value);
     }
 
     /**
@@ -153,25 +139,20 @@ library ReferralsUtils {
      */
     function distributeReferralReward(
         address _trader,
-        uint256 _volumeUsd, // 1e18
-        uint256 _pairOpenFeeP,
+        uint256 _volumeUsd,
+        uint256 _referrerFeeUsd,
         uint256 _javPriceUsd // PRECISION (1e10)
-    ) internal returns (uint256) {
+    ) internal {
         IReferralsUtils.ReferralsStorage storage s = _getStorage();
 
         address referrer = s.referrerByTrader[_trader];
         IReferralsUtils.ReferrerDetails storage r = s.referrerDetails[referrer];
 
         if (!r.active) {
-            return 0;
+            return;
         }
 
-        uint256 referrerRewardValueUsd = (_volumeUsd *
-            getReferrerFeeP(_pairOpenFeeP, r.volumeReferredUsd)) /
-            PRECISION /
-            100;
-
-        uint256 referrerRewardJav = (referrerRewardValueUsd * PRECISION) / _javPriceUsd;
+        uint256 referrerRewardJav = (_referrerFeeUsd * PRECISION) / _javPriceUsd;
 
         IReferralsUtils.AllyDetails storage a = s.allyDetails[r.ally];
 
@@ -181,7 +162,7 @@ library ReferralsUtils {
         if (a.active) {
             uint256 allyFeeP = s.allyFeeP;
 
-            allyRewardValueUsd = (referrerRewardValueUsd * allyFeeP) / 100;
+            allyRewardValueUsd = (_referrerFeeUsd * allyFeeP) / 100;
             allyRewardJav = (referrerRewardJav * allyFeeP) / 100;
 
             a.volumeReferredUsd += _volumeUsd;
@@ -189,7 +170,7 @@ library ReferralsUtils {
             a.totalRewardsJav += allyRewardJav;
             a.totalRewardsValueUsd += allyRewardValueUsd;
 
-            referrerRewardValueUsd -= allyRewardValueUsd;
+            _referrerFeeUsd -= allyRewardValueUsd;
             referrerRewardJav -= allyRewardJav;
 
             emit IReferralsUtils.AllyRewardDistributed(
@@ -204,17 +185,15 @@ library ReferralsUtils {
         r.volumeReferredUsd += _volumeUsd;
         r.pendingRewardsJav += referrerRewardJav;
         r.totalRewardsJav += referrerRewardJav;
-        r.totalRewardsValueUsd += referrerRewardValueUsd;
+        r.totalRewardsValueUsd += _referrerFeeUsd;
 
         emit IReferralsUtils.ReferrerRewardDistributed(
             referrer,
             _trader,
             _volumeUsd,
             referrerRewardJav,
-            referrerRewardValueUsd
+            _referrerFeeUsd
         );
-
-        return referrerRewardValueUsd + allyRewardValueUsd;
     }
 
     /**
@@ -250,21 +229,20 @@ library ReferralsUtils {
     /**
      * @dev Check IReferralsUtils interface for documentation
      */
-    function getReferrerFeeP(
-        uint256 _pairOpenFeeP,
-        uint256 _volumeReferredUsd
-    ) internal view returns (uint256) {
+    function getReferrerFeeProgressP(address _referrer) internal view returns (uint256 progressP) {
         IReferralsUtils.ReferralsStorage storage s = _getStorage();
+        uint256 volumeReferredUsd = s.referrerDetails[_referrer].volumeReferredUsd;
+        uint256 targetVolumeUsd1e18 = s.targetVolumeUsd * 1e18;
 
-        uint256 maxReferrerFeeP = (_pairOpenFeeP * 2 * s.openFeeP) / 100;
-        uint256 minFeeP = (maxReferrerFeeP * s.startReferrerFeeP) / 100;
-
-        uint256 feeP = minFeeP +
-            ((maxReferrerFeeP - minFeeP) * _volumeReferredUsd) /
-            1e18 /
-            s.targetVolumeUsd;
-
-        return feeP > maxReferrerFeeP ? maxReferrerFeeP : feeP;
+        progressP = s.startReferrerFeeP * PRECISION;
+        progressP +=
+            ((100 * PRECISION - progressP) *
+                (
+                    volumeReferredUsd > targetVolumeUsd1e18
+                        ? targetVolumeUsd1e18
+                        : volumeReferredUsd
+                )) /
+            targetVolumeUsd1e18;
     }
 
     /**
@@ -308,13 +286,6 @@ library ReferralsUtils {
      */
     function getReferralsStartReferrerFeeP() internal view returns (uint256) {
         return _getStorage().startReferrerFeeP;
-    }
-
-    /**
-     * @dev Check IReferralsUtils interface for documentation
-     */
-    function getReferralsOpenFeeP() internal view returns (uint256) {
-        return _getStorage().openFeeP;
     }
 
     /**
