@@ -468,7 +468,10 @@ library TradingProcessingUtils {
                     t.long,
                     t.leverage
                 );
-
+                v.liqPrice = TradingCommonUtils.getTradeLiquidationPrice(
+                    t,
+                    true
+                );
                 v.amountSentToTrader = _unregisterTrade(
                     t,
                     v.profitP,
