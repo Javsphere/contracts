@@ -100,13 +100,15 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param _leverage new leverage value
      * @param _openPrice new open price value
      * @param _isPartialIncrease refreshes trade liquidation params if true
+     * @param _isPnlPositive whether the pnl is positive (only relevant when closing)
      */
     function updateTradePosition(
         Id memory _tradeId,
         uint120 _collateralAmount,
         uint24 _leverage,
         uint64 _openPrice,
-        bool _isPartialIncrease
+        bool _isPartialIncrease,
+        bool _isPnlPositive
     ) external;
 
     /**
@@ -142,8 +144,21 @@ interface ITradingStorageUtils is ITradingStorage {
     /**
      * @dev Marks an open trade/limit/stop as closed
      * @param _tradeId the trade id
+     * @param _isPnlPositive whether the pnl is positive
      */
-    function closeTrade(Id memory _tradeId) external;
+    function closeTrade(Id memory _tradeId, bool _isPnlPositive) external;
+
+    /**
+     * @dev Validation for trade struct (used by storeTrade and storePendingOrder for market open orders)
+     * @param _trade trade struct to validate
+     */
+    function validateTrade(ITradingStorage.Trade memory _trade) external view;
+
+    /**
+     * @dev Function for store trader address
+     * @param _trader trader address
+     */
+    function storeTrader(address _trader) external;
 
     /**
      * @dev Returns collateral data by index
@@ -191,6 +206,11 @@ interface ITradingStorageUtils is ITradingStorage {
     function getTraderStored(address _trader) external view returns (bool);
 
     /**
+     * @dev Returns the length of the traders array
+     */
+    function getTradersCount() external view returns (uint256);
+
+    /**
      * @dev Returns all traders that have open trades using a pagination system
      * @param _offset start index in the traders array
      * @param _limit end index in the traders array
@@ -209,6 +229,18 @@ interface ITradingStorageUtils is ITradingStorage {
      * @param _trader address of the trader
      */
     function getTrades(address _trader) external view returns (Trade[] memory);
+
+    /**
+     * @dev Returns all trade/limit/stop orders using a pagination system
+     * @param _traders list of traders to return trades for
+     * @param _offset index of first trade to return
+     * @param _limit index of last trade to return
+     */
+    function getAllTradesForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (Trade[] memory);
 
     /**
      * @dev Returns all trade/limit/stop orders using a pagination system
@@ -232,6 +264,18 @@ interface ITradingStorageUtils is ITradingStorage {
 
     /**
      * @dev Returns all trade infos of open trade/limit/stop orders using a pagination system
+     * @param _traders list of traders to return tradeInfo for
+     * @param _offset index of first tradeInfo to return
+     * @param _limit index of last tradeInfo to return
+     */
+    function getAllTradeInfosForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (TradeInfo[] memory);
+
+    /**
+     * @dev Returns all trade infos of open trade/limit/stop orders using a pagination system
      * @param _offset index of first tradeInfo to return
      * @param _limit index of last tradeInfo to return
      */
@@ -241,13 +285,18 @@ interface ITradingStorageUtils is ITradingStorage {
     ) external view returns (TradeInfo[] memory);
 
     /**
-
-
-    /**
      * @dev Returns the counters of a trader (currentIndex / open count for trades/tradeInfos and pendingOrders mappings)
      * @param _trader address of the trader
      */
     function getCounters(address _trader) external view returns (Counter memory);
+
+    /**
+     * @dev Returns the counters for a list of traders
+     * @param _traders the list of traders
+     */
+    function getCountersForTraders(
+        address[] calldata _traders
+    ) external view returns (Counter[] memory);
 
     /**
      * @dev Returns the liquidation params for a trade
@@ -265,6 +314,18 @@ interface ITradingStorageUtils is ITradingStorage {
      */
     function getTradesLiquidationParams(
         address _trader
+    ) external view returns (IPairsStorage.GroupLiquidationParams[] memory);
+
+    /**
+     * @dev Returns all trade liquidation params of open trade/limit/stop orders using a pagination system
+     * @param _traders list of traders to return liq params for
+     * @param _offset index of first liq param to return
+     * @param _limit index of last liq param to return
+     */
+    function getAllTradesLiquidationParamsForTraders(
+        address[] memory _traders,
+        uint256 _offset,
+        uint256 _limit
     ) external view returns (IPairsStorage.GroupLiquidationParams[] memory);
 
     /**

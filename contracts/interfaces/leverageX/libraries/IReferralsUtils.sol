@@ -13,13 +13,11 @@ interface IReferralsUtils is IReferrals {
      *
      * @param _allyFeeP % of total referral fee going to ally
      * @param _startReferrerFeeP initial % of total referral fee earned when zero volume referred
-     * @param _openFeeP % of open fee going to referral fee
      * @param _targetVolumeUsd usd opening volume to refer to reach 100% of referral fee
      */
     function initializeReferrals(
         uint256 _allyFeeP,
         uint256 _startReferrerFeeP,
-        uint256 _openFeeP,
         uint256 _targetVolumeUsd
     ) external;
 
@@ -34,12 +32,6 @@ interface IReferralsUtils is IReferrals {
      * @param _value new start referrer fee %
      */
     function updateStartReferrerFeeP(uint256 _value) external;
-
-    /**
-     * @dev Updates openFeeP
-     * @param _value new open fee %
-     */
-    function updateReferralsOpenFeeP(uint256 _value) external;
 
     /**
      * @dev Updates targetVolumeUsd
@@ -83,16 +75,15 @@ interface IReferralsUtils is IReferrals {
      * @dev Distributes ally and referrer rewards
      * @param _trader trader address
      * @param _volumeUsd trading volume in usd (1e18 precision)
-     * @param _pairOpenFeeP pair open fee in % (1e10 precision)
-     * @param _javPriceUsd token price in usd (1e10 precision)
-     * @return USD value of distributed reward (referrer + ally)
+     * @param _referrerFeeUsd referrer fee in USD (1e18 precision)
+     * @param _gnsPriceUsd token price in usd (1e10 precision)
      */
     function distributeReferralReward(
         address _trader,
         uint256 _volumeUsd, // 1e18
-        uint256 _pairOpenFeeP,
-        uint256 _javPriceUsd // 1e10
-    ) external returns (uint256);
+        uint256 _referrerFeeUsd,
+        uint256 _gnsPriceUsd // 1e10
+    ) external;
 
     /**
      * @dev Claims pending jav ally rewards of caller
@@ -105,14 +96,10 @@ interface IReferralsUtils is IReferrals {
     function claimReferrerRewards() external;
 
     /**
-     * @dev Returns referrer fee % of trade position size
-     * @param _pairOpenFeeP pair open fee in % (1e10 precision)
-     * @param _volumeReferredUsd referred trading volume in usd (1e18 precision)
+     * @dev Returns referrer fee % progress towards earning 100% based on his volume referred (1e10)
+     * @param _referrer referrer address
      */
-    function getReferrerFeeP(
-        uint256 _pairOpenFeeP,
-        uint256 _volumeReferredUsd
-    ) external view returns (uint256);
+    function getReferrerFeeProgressP(address _referrer) external view returns (uint256);
 
     /**
      * @dev Returns last referrer of trader (whether referrer active or not)
@@ -147,11 +134,6 @@ interface IReferralsUtils is IReferrals {
      * @dev Returns start referrer fee % of total referral fee when zero volume was referred
      */
     function getReferralsStartReferrerFeeP() external view returns (uint256);
-
-    /**
-     * @dev Returns % of opening fee going to referral fee
-     */
-    function getReferralsOpenFeeP() external view returns (uint256);
 
     /**
      * @dev Returns target volume in usd to reach 100% of referral fee

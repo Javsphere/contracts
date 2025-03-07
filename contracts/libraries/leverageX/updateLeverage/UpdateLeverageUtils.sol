@@ -128,21 +128,16 @@ library UpdateLeverageUtils {
             _input.newLeverage == trade.leverage ||
             (
                 isIncrease
-                    ? _input.newLeverage >
-                        _getMultiCollatDiamond().pairMaxLeverage(trade.pairIndex) * 1e3
-                    : _input.newLeverage <
-                        _getMultiCollatDiamond().pairMinLeverage(trade.pairIndex) * 1e3
+                    ? _input.newLeverage > _getMultiCollatDiamond().pairMaxLeverage(trade.pairIndex)
+                    : _input.newLeverage < _getMultiCollatDiamond().pairMinLeverage(trade.pairIndex)
             )
         ) revert ITradingInteractionsUtils.WrongLeverage();
 
         // 4. Check trade remaining collateral is enough to pay gov fee
-        uint256 govFeeCollateral = TradingCommonUtils.getGovFeeCollateral(
+        uint256 govFeeCollateral = TradingCommonUtils.getMinGovFeeCollateral(
+            trade.collateralIndex,
             trade.user,
-            trade.pairIndex,
-            TradingCommonUtils.getMinPositionSizeCollateral(
-                trade.collateralIndex,
-                trade.pairIndex
-            ) / 2
+            trade.pairIndex
         );
         uint256 newCollateralAmount = _getNewCollateralAmount(
             trade.collateralAmount,
@@ -173,13 +168,10 @@ library UpdateLeverageUtils {
         if (_trade.isOpen == false) return values;
 
         values.newLeverage = _newLeverage;
-        values.govFeeCollateral = TradingCommonUtils.getGovFeeCollateral(
+        values.govFeeCollateral = TradingCommonUtils.getMinGovFeeCollateral(
+            _trade.collateralIndex,
             _trade.user,
-            _trade.pairIndex,
-            TradingCommonUtils.getMinPositionSizeCollateral(
-                _trade.collateralIndex,
-                _trade.pairIndex
-            ) / 2 // use min fee / 2
+            _trade.pairIndex
         );
         values.newCollateralAmount =
             (
@@ -223,6 +215,7 @@ library UpdateLeverageUtils {
             uint120(_values.newCollateralAmount),
             uint24(_values.newLeverage),
             _trade.openPrice,
+            false,
             false
         );
 

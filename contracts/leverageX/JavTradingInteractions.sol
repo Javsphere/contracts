@@ -34,10 +34,9 @@ contract JavTradingInteractions is JavAddressStore, ITradingInteractionsUtils {
     function openTrade(
         ITradingStorage.Trade memory _trade,
         uint16 _maxSlippageP,
-        address _referrer,
-        bytes[][] calldata _priceUpdate
-    ) external payable {
-        TradingInteractionsUtils.openTrade(_trade, _maxSlippageP, _referrer, _priceUpdate);
+        address _referrer
+    ) external {
+        TradingInteractionsUtils.openTrade(_trade, _maxSlippageP, _referrer);
     }
 
     /// @inheritdoc ITradingInteractionsUtils
@@ -46,8 +45,8 @@ contract JavTradingInteractions is JavAddressStore, ITradingInteractionsUtils {
     }
 
     /// @inheritdoc ITradingInteractionsUtils
-    function closeTradeMarket(uint32 _index, bytes[][] calldata _priceUpdate) external payable {
-        TradingInteractionsUtils.closeTradeMarket(_index, _priceUpdate);
+    function closeTradeMarket(uint32 _index, uint64 _expectedPrice) external {
+        TradingInteractionsUtils.closeTradeMarket(_index, _expectedPrice);
     }
 
     /// @inheritdoc ITradingInteractionsUtils

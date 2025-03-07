@@ -22,15 +22,9 @@ contract JavReferrals is JavAddressStore, IReferralsUtils {
     function initializeReferrals(
         uint256 _allyFeeP,
         uint256 _startReferrerFeeP,
-        uint256 _openFeeP,
         uint256 _targetVolumeUsd
     ) external reinitializer(2) {
-        ReferralsUtils.initializeReferrals(
-            _allyFeeP,
-            _startReferrerFeeP,
-            _openFeeP,
-            _targetVolumeUsd
-        );
+        ReferralsUtils.initializeReferrals(_allyFeeP, _startReferrerFeeP, _targetVolumeUsd);
     }
 
     // Management Setters
@@ -43,11 +37,6 @@ contract JavReferrals is JavAddressStore, IReferralsUtils {
     /// @inheritdoc IReferralsUtils
     function updateStartReferrerFeeP(uint256 _value) external onlyRole(Role.GOV) {
         ReferralsUtils.updateStartReferrerFeeP(_value);
-    }
-
-    /// @inheritdoc IReferralsUtils
-    function updateReferralsOpenFeeP(uint256 _value) external onlyRole(Role.GOV) {
-        ReferralsUtils.updateReferralsOpenFeeP(_value);
     }
 
     /// @inheritdoc IReferralsUtils
@@ -92,14 +81,14 @@ contract JavReferrals is JavAddressStore, IReferralsUtils {
     function distributeReferralReward(
         address _trader,
         uint256 _volumeUsd,
-        uint256 _pairOpenFeeP,
+        uint256 _referrerFeeUsd,
         uint256 _javPriceUsd
-    ) external virtual onlySelf returns (uint256) {
+    ) external virtual onlySelf {
         return
             ReferralsUtils.distributeReferralReward(
                 _trader,
                 _volumeUsd,
-                _pairOpenFeeP,
+                _referrerFeeUsd,
                 _javPriceUsd
             );
     }
@@ -117,11 +106,8 @@ contract JavReferrals is JavAddressStore, IReferralsUtils {
     // Getters
 
     /// @inheritdoc IReferralsUtils
-    function getReferrerFeeP(
-        uint256 _pairOpenFeeP,
-        uint256 _volumeReferredUsd
-    ) external view returns (uint256) {
-        return ReferralsUtils.getReferrerFeeP(_pairOpenFeeP, _volumeReferredUsd);
+    function getReferrerFeeProgressP(address _referrer) external view returns (uint256) {
+        return ReferralsUtils.getReferrerFeeProgressP(_referrer);
     }
 
     /// @inheritdoc IReferralsUtils
@@ -152,11 +138,6 @@ contract JavReferrals is JavAddressStore, IReferralsUtils {
     /// @inheritdoc IReferralsUtils
     function getReferralsStartReferrerFeeP() external view returns (uint256) {
         return ReferralsUtils.getReferralsStartReferrerFeeP();
-    }
-
-    /// @inheritdoc IReferralsUtils
-    function getReferralsOpenFeeP() external view returns (uint256) {
-        return ReferralsUtils.getReferralsOpenFeeP();
     }
 
     /// @inheritdoc IReferralsUtils

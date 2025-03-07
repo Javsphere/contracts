@@ -26,6 +26,13 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
         PairsStorageUtils.initializeGroupLiquidationParams(_groupLiquidationParams);
     }
 
+    /// @inheritdoc IPairsStorageUtils
+    function initializeNewFees(
+        IPairsStorage.GlobalTradeFeeParams memory _tradeFeeParams
+    ) external reinitializer(9) {
+        PairsStorageUtils.initializeNewFees(_tradeFeeParams);
+    }
+
     // Management Setters
 
     /// @inheritdoc IPairsStorageUtils
@@ -60,12 +67,15 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     }
 
     /// @inheritdoc IPairsStorageUtils
-    function addFees(Fee[] calldata _fees) external onlyRole(Role.GOV) {
+    function addFees(FeeGroup[] calldata _fees) external onlyRole(Role.GOV) {
         PairsStorageUtils.addFees(_fees);
     }
 
     /// @inheritdoc IPairsStorageUtils
-    function updateFees(uint256[] calldata _ids, Fee[] calldata _fees) external onlyRole(Role.GOV) {
+    function updateFees(
+        uint256[] calldata _ids,
+        FeeGroup[] calldata _fees
+    ) external onlyRole(Role.GOV) {
         PairsStorageUtils.updateFees(_ids, _fees);
     }
 
@@ -83,6 +93,13 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
         IPairsStorage.GroupLiquidationParams memory _params
     ) external onlyRole(Role.GOV) {
         PairsStorageUtils.setGroupLiquidationParams(_groupIndex, _params);
+    }
+
+    /// @inheritdoc IPairsStorageUtils
+    function setGlobalTradeFeeParams(
+        IPairsStorage.GlobalTradeFeeParams memory _feeParams
+    ) external onlyRole(Role.GOV) {
+        PairsStorageUtils.setGlobalTradeFeeParams(_feeParams);
     }
 
     // Getters
@@ -123,23 +140,27 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     }
 
     /// @inheritdoc IPairsStorageUtils
-    function pairOpenFeeP(uint256 _pairIndex) external view returns (uint256) {
-        return PairsStorageUtils.pairOpenFeeP(_pairIndex);
+    function pairTotalPositionSizeFeeP(uint256 _pairIndex) external view returns (uint256) {
+        return PairsStorageUtils.pairTotalPositionSizeFeeP(_pairIndex);
     }
 
     /// @inheritdoc IPairsStorageUtils
-    function pairCloseFeeP(uint256 _pairIndex) external view returns (uint256) {
-        return PairsStorageUtils.pairCloseFeeP(_pairIndex);
-    }
-
-    /// @inheritdoc IPairsStorageUtils
-    function pairTriggerOrderFeeP(uint256 _pairIndex) external view returns (uint256) {
-        return PairsStorageUtils.pairTriggerOrderFeeP(_pairIndex);
+    function pairTotalLiqCollateralFeeP(uint256 _pairIndex) external view returns (uint256) {
+        return PairsStorageUtils.pairTotalLiqCollateralFeeP(_pairIndex);
     }
 
     /// @inheritdoc IPairsStorageUtils
     function pairMinPositionSizeUsd(uint256 _pairIndex) external view returns (uint256) {
         return PairsStorageUtils.pairMinPositionSizeUsd(_pairIndex);
+    }
+
+    /// @inheritdoc IPairsStorageUtils
+    function getGlobalTradeFeeParams()
+        external
+        view
+        returns (IPairsStorage.GlobalTradeFeeParams memory)
+    {
+        return PairsStorageUtils.getGlobalTradeFeeParams();
     }
 
     /// @inheritdoc IPairsStorageUtils
@@ -158,20 +179,13 @@ contract JavPairsStorage is JavAddressStore, IPairsStorageUtils {
     }
 
     /// @inheritdoc IPairsStorageUtils
-    function fees(uint256 _index) external view returns (Fee memory) {
+    function fees(uint256 _index) external view returns (FeeGroup memory) {
         return PairsStorageUtils.fees(_index);
     }
 
     /// @inheritdoc IPairsStorageUtils
     function feesCount() external view returns (uint256) {
         return PairsStorageUtils.feesCount();
-    }
-
-    /// @inheritdoc IPairsStorageUtils
-    function pairsBackend(
-        uint256 _index
-    ) external view returns (Pair memory, Group memory, Fee memory) {
-        return PairsStorageUtils.pairsBackend(_index);
     }
 
     /// @inheritdoc IPairsStorageUtils

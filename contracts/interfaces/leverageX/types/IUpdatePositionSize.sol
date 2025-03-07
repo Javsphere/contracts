@@ -30,10 +30,10 @@ interface IUpdatePositionSize {
         uint256 positionSizeCollateralDelta;
         uint256 existingPositionSizeCollateral;
         uint256 existingLiqPrice;
+        uint256 priceAfterImpact;
         int256 existingPnlCollateral;
         uint256 borrowingFeeCollateral;
-        uint256 vaultFeeCollateral;
-        uint256 gnsStakingFeeCollateral;
+        uint256 closingFeeCollateral;
         int256 availableCollateralInDiamond;
         int256 collateralSentToTrader;
         uint120 newCollateralAmount;

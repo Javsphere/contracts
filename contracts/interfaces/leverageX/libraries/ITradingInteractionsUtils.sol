@@ -15,14 +15,12 @@ interface ITradingInteractionsUtils is ITradingInteractions {
      * @param _trade the trade to be opened
      * @param _maxSlippageP the maximum allowed slippage % when open the trade (1e3 precision)
      * @param _referrer the address of the referrer (can only be set once for a trader)
-     * @param _priceUpdate Array of price update data.
      */
     function openTrade(
         ITradingStorage.Trade memory _trade,
         uint16 _maxSlippageP,
-        address _referrer,
-        bytes[][] calldata _priceUpdate
-    ) external payable;
+        address _referrer
+    ) external;
 
     /**
      * @dev Update termsAndConditionsAddress address
@@ -40,9 +38,9 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     /**
      * @dev Closes an open trade (market order) for caller
      * @param _index the index of the trade of caller
-     * @param _priceUpdate Array of price update data.
+     * @param _expectedPrice expected closing price, used to check max slippage (1e10 precision)
      */
-    function closeTradeMarket(uint32 _index, bytes[][] calldata _priceUpdate) external payable;
+    function closeTradeMarket(uint32 _index, uint64 _expectedPrice) external;
 
     /**
      * @dev Updates an existing limit/stop order for caller
@@ -143,11 +141,19 @@ interface ITradingInteractionsUtils is ITradingInteractions {
 
     /**
      * @dev Emitted when a market order is initiated
+     * @param orderId price aggregator order id of the pending market order
      * @param trader address of the trader
      * @param pairIndex index of the trading pair
      * @param open whether the market order is for opening or closing a trade
+     * @param _trade the trade
      */
-    event MarketOrderInitiated(address indexed trader, uint16 indexed pairIndex, bool open);
+    event MarketOrderInitiated(
+        ITradingStorage.Id orderId,
+        address indexed trader,
+        uint16 indexed pairIndex,
+        bool open,
+        ITradingStorage.Trade _trade
+    );
 
     /**
      * @dev Emitted when a new limit/stop order is placed

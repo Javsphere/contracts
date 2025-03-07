@@ -42,7 +42,7 @@ contract LLPToken is ERC20BurnableUpgradeable, BaseUpgradable {
     }
 
     function burn(uint256 amount) public virtual override {
-        revert("LLPToken: direct burning not allowed");
+        super.burn(amount);
     }
 
     function burnFrom(

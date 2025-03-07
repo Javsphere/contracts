@@ -13,7 +13,7 @@ interface IReferrals {
         mapping(address => address) referrerByTrader;
         uint256 allyFeeP; // % (of referrer fees going to allies, eg. 10)
         uint256 startReferrerFeeP; // % (of referrer fee when 0 volume referred, eg. 75)
-        uint256 openFeeP; // % (of opening fee used for referral system, eg. 33)
+        uint256 openFeeP; /// @custom:deprecated
         uint256 targetVolumeUsd; // USD (to reach maximum referral system fee, eg. 1e8)
         uint256[43] __gap;
     }

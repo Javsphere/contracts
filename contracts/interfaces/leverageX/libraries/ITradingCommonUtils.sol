@@ -62,4 +62,16 @@ interface ITradingCommonUtils {
         uint8 indexed collateralIndex,
         uint256 amountCollateral
     );
+
+    /**
+     *
+     * @param trader address of the trader
+     * @param collateralIndex index of the collateral
+     * @param amountCollateral amount charged (collateral precision)
+     */
+    event TriggerFeeCharged(
+        address indexed trader,
+        uint8 indexed collateralIndex,
+        uint256 amountCollateral
+    );
 }

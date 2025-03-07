@@ -18,6 +18,12 @@ interface IPairsStorageUtils is IPairsStorage {
     ) external;
 
     /**
+     * @dev Copies all existing fee groups to new mapping, multiplies existing groups min/max lev by 1e3, initializes new global trade fee params
+     * @param _tradeFeeParams global trade fee params
+     */
+    function initializeNewFees(IPairsStorage.GlobalTradeFeeParams memory _tradeFeeParams) external;
+
+    /**
      * @dev Adds new trading pairs
      * @param _pairs pairs to add
      */
@@ -53,14 +59,14 @@ interface IPairsStorageUtils is IPairsStorage {
      * @dev Adds new pair fees groups
      * @param _fees fees to add
      */
-    function addFees(Fee[] calldata _fees) external;
+    function addFees(FeeGroup[] calldata _fees) external;
 
     /**
      * @dev Updates pair fees groups
      * @param _ids indices of fees
      * @param _fees new fees values
      */
-    function updateFees(uint256[] calldata _ids, Fee[] calldata _fees) external;
+    function updateFees(uint256[] calldata _ids, FeeGroup[] calldata _fees) external;
 
     /**
      * @dev Updates pair custom max leverages (if unset group default is used)
@@ -81,6 +87,12 @@ interface IPairsStorageUtils is IPairsStorage {
         uint256 _groupIndex,
         IPairsStorage.GroupLiquidationParams memory _params
     ) external;
+
+    /**
+     * @dev Updates global trade fee params
+     * @param _feeParams new fee params
+     */
+    function setGlobalTradeFeeParams(IPairsStorage.GlobalTradeFeeParams memory _feeParams) external;
 
     /**
      * @dev Returns pair feed fot get price
@@ -125,28 +137,30 @@ interface IPairsStorageUtils is IPairsStorage {
     function pairMinLeverage(uint256 _pairIndex) external view returns (uint256);
 
     /**
-     * @dev Returns a pair's open fee % (1e10 precision)
+     * @dev Returns a pair's total position size fee % (1e10 precision)
      * @param _pairIndex index of pair
      */
-    function pairOpenFeeP(uint256 _pairIndex) external view returns (uint256);
+    function pairTotalPositionSizeFeeP(uint256 _pairIndex) external view returns (uint256);
 
     /**
-     * @dev Returns a pair's close fee % (1e10 precision)
+     * @dev Returns a pair's total liquidation collateral fee % (1e10 precision)
      * @param _pairIndex index of pair
      */
-    function pairCloseFeeP(uint256 _pairIndex) external view returns (uint256);
-
-    /**
-     * @dev Returns a pair's trigger order fee % (1e10 precision)
-     * @param _pairIndex index of pair
-     */
-    function pairTriggerOrderFeeP(uint256 _pairIndex) external view returns (uint256);
+    function pairTotalLiqCollateralFeeP(uint256 _pairIndex) external view returns (uint256);
 
     /**
      * @dev Returns a pair's min leverage position in USD (1e18 precision)
      * @param _pairIndex index of pair
      */
     function pairMinPositionSizeUsd(uint256 _pairIndex) external view returns (uint256);
+
+    /**
+     * @dev Returns global trade fee params
+     */
+    function getGlobalTradeFeeParams()
+        external
+        view
+        returns (IPairsStorage.GlobalTradeFeeParams memory);
 
     /**
      * @dev Returns a pair's minimum trading fee in USD (1e18 precision)
@@ -169,7 +183,7 @@ interface IPairsStorageUtils is IPairsStorage {
      * @dev Returns a fee group details
      * @param _index index of fee group
      */
-    function fees(uint256 _index) external view returns (Fee memory);
+    function fees(uint256 _index) external view returns (FeeGroup memory);
 
     /**
      * @dev Returns number of listed fee groups
@@ -177,21 +191,13 @@ interface IPairsStorageUtils is IPairsStorage {
     function feesCount() external view returns (uint256);
 
     /**
-     * @dev Returns a pair's details, group and fee group
-     * @param _index index of pair
-     */
-    function pairsBackend(
-        uint256 _index
-    ) external view returns (Pair memory, Group memory, Fee memory);
-
-    /**
-     * @dev Returns a pair's active max leverage (custom if set, otherwise group default)
+     * @dev Returns a pair's active max leverage; custom if set, otherwise group default (1e3 precision)
      * @param _pairIndex index of pair
      */
     function pairMaxLeverage(uint256 _pairIndex) external view returns (uint256);
 
     /**
-     * @dev Returns a pair's custom max leverage (0 if not set)
+     * @dev Returns a pair's custom max leverage; 0 if not set (1e3 precision)
      * @param _pairIndex index of pair
      */
     function pairCustomMaxLeverage(uint256 _pairIndex) external view returns (uint256);
@@ -259,15 +265,16 @@ interface IPairsStorageUtils is IPairsStorage {
     /**
      * @dev Emitted when a new fee group is added
      * @param index index of fee group
-     * @param name name of fee group
+     * @param feeGroup fee group
      */
-    event FeeAdded(uint256 index, string name);
+    event FeeAdded(uint256 index, FeeGroup feeGroup);
 
     /**
      * @dev Emitted when a fee group is updated
      * @param index index of fee group
+     * @param feeGroup updated fee group
      */
-    event FeeUpdated(uint256 index);
+    event FeeUpdated(uint256 index, FeeGroup feeGroup);
 
     /**
      * @dev Emitted when a group liquidation params are updated
@@ -275,6 +282,12 @@ interface IPairsStorageUtils is IPairsStorage {
      * @param params new group liquidation params
      */
     event GroupLiquidationParamsUpdated(uint256 index, IPairsStorage.GroupLiquidationParams params);
+
+    /**
+     * @dev Emitted when global trade fee params are updated
+     * @param feeParams new fee params
+     */
+    event GlobalTradeFeeParamsUpdated(IPairsStorage.GlobalTradeFeeParams feeParams);
 
     error PairNotListed();
     error GroupNotListed();

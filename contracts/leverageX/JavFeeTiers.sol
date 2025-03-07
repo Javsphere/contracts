@@ -52,6 +52,23 @@ contract JavFeeTiers is JavAddressStore, IFeeTiersUtils {
         FeeTiersUtils.setFeeTiers(_feeTiersIndices, _feeTiers);
     }
 
+    /// @inheritdoc IFeeTiersUtils
+    function setTradersFeeTiersEnrollment(
+        address[] calldata _traders,
+        IFeeTiersUtils.TraderEnrollment[] calldata _values
+    ) external onlyRole(Role.GOV) {
+        FeeTiersUtils.setTradersFeeTiersEnrollment(_traders, _values);
+    }
+
+    /// @inheritdoc IFeeTiersUtils
+    function addTradersUnclaimedPoints(
+        address[] calldata _traders,
+        IFeeTiersUtils.CreditType[] calldata _creditTypes,
+        uint224[] calldata _points
+    ) external onlyRole(Role.GOV) {
+        FeeTiersUtils.addTradersUnclaimedPoints(_traders, _creditTypes, _points);
+    }
+
     // Interactions
 
     /// @inheritdoc IFeeTiersUtils
@@ -107,5 +124,17 @@ contract JavFeeTiers is JavAddressStore, IFeeTiersUtils {
         uint32 _day
     ) external view returns (IFeeTiersUtils.TraderDailyInfo memory) {
         return FeeTiersUtils.getFeeTiersTraderDailyInfo(_trader, _day);
+    }
+
+    /// @inheritdoc IFeeTiersUtils
+    function getTraderFeeTiersEnrollment(
+        address _trader
+    ) external view returns (IFeeTiersUtils.TraderEnrollment memory) {
+        return FeeTiersUtils.getTraderFeeTiersEnrollment(_trader);
+    }
+
+    /// @inheritdoc IFeeTiersUtils
+    function getTraderUnclaimedPoints(address _trader) external view returns (uint224) {
+        return FeeTiersUtils.getTraderUnclaimedPoints(_trader);
     }
 }

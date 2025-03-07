@@ -286,8 +286,9 @@ library BorrowingFeesUtils {
     function getTradeLiquidationPrice(
         IBorrowingFees.LiqPriceInput calldata _input
     ) internal view returns (uint256) {
-        uint256 closingFeesCollateral = TradingCommonUtils.getTotalClosingFeesCollateral(
+        uint256 closingFeesCollateral = TradingCommonUtils.getTotalTradeFeesCollateral(
             _input.collateralIndex,
+            address(0), // never apply fee tiers
             _input.pairIndex,
             (_input.collateral * _input.leverage) / 1e3
         );
@@ -458,10 +459,20 @@ library BorrowingFeesUtils {
         IBorrowingFees.BorrowingPairGroup[][]
             memory pairGroups = new IBorrowingFees.BorrowingPairGroup[][](len);
 
+        uint256 lastPairGroupsIndex;
+
         for (uint16 i; i < len; ++i) {
+            lastPairGroupsIndex = s.pairGroups[_collateralIndex][i].length > 1
+                ? s.pairGroups[_collateralIndex][i].length - 1
+                : 0;
+
+            IBorrowingFees.BorrowingPairGroup[]
+                memory _pairGroups = new IBorrowingFees.BorrowingPairGroup[](1);
+            _pairGroups[0] = s.pairGroups[_collateralIndex][i][lastPairGroupsIndex];
+
             pairs[i] = s.pairs[_collateralIndex][i];
             pairOi[i] = s.pairOis[_collateralIndex][i];
-            pairGroups[i] = s.pairGroups[_collateralIndex][i];
+            pairGroups[i] = _pairGroups;
         }
 
         return (pairs, pairOi, pairGroups);
