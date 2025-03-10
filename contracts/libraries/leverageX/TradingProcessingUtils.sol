@@ -468,10 +468,7 @@ library TradingProcessingUtils {
                     t.long,
                     t.leverage
                 );
-                v.liqPrice = TradingCommonUtils.getTradeLiquidationPrice(
-                    t,
-                    true
-                );
+                v.liqPrice = TradingCommonUtils.getTradeLiquidationPrice(t, true);
                 v.amountSentToTrader = _unregisterTrade(
                     t,
                     v.profitP,
@@ -521,9 +518,11 @@ library TradingProcessingUtils {
                 cancelReason
             );
         }
-        _getMultiCollatDiamond().closePendingOrder(
-            ITradingStorage.Id({user: _pendingOrder.user, index: _pendingOrder.index})
-        );
+        if (_pendingOrder.isOpen) {
+            _getMultiCollatDiamond().closePendingOrder(
+                ITradingStorage.Id({user: _pendingOrder.user, index: _pendingOrder.index})
+            );
+        }
     }
 
     /**
