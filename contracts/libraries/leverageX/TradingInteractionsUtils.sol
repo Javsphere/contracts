@@ -117,7 +117,9 @@ library TradingInteractionsUtils {
         pendingOrder.trade = t;
         pendingOrder.trade.openPrice = _expectedPrice;
         pendingOrder.user = sender;
-        pendingOrder.maxSlippageP = _getMultiCollatDiamond().getTradeInfo(sender, _index).maxSlippageP;
+        pendingOrder.maxSlippageP = _getMultiCollatDiamond()
+            .getTradeInfo(sender, _index)
+            .maxSlippageP;
         pendingOrder.orderType = ITradingStorage.PendingOrderType.MARKET_CLOSE;
 
         pendingOrder = _getMultiCollatDiamond().storePendingOrder(pendingOrder);
@@ -354,7 +356,9 @@ library TradingInteractionsUtils {
         pendingOrder.orderType = orderType;
         pendingOrder.isOpen = t.isOpen;
         pendingOrder.price = uint64(_getMultiCollatDiamond().getPrice(t.pairIndex));
-
+        pendingOrder.maxSlippageP = _getMultiCollatDiamond()
+            .getTradeInfo(t.user, _index)
+            .maxSlippageP;
         if (
             orderType == ITradingStorage.PendingOrderType.LIMIT_OPEN ||
             orderType == ITradingStorage.PendingOrderType.STOP_OPEN
@@ -389,6 +393,7 @@ library TradingInteractionsUtils {
                 pendingOrder.user = tradeId.user;
                 pendingOrder.orderType = ITradingStorage.PendingOrderType.MARKET_CLOSE;
                 pendingOrder.price = uint64(_getMultiCollatDiamond().getPrice(t.pairIndex));
+                pendingOrder.isOpen = false;
 
                 _getMultiCollatDiamond().closeTradeMarketOrder(pendingOrder);
             } else {
