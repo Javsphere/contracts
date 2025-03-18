@@ -15,7 +15,7 @@ import "./StorageUtils.sol";
  * @dev JavReferrals facet internal library
  */
 library ReferralsUtils {
-    using SafeERC20 for IERC20;
+    using SafeERC20 for IERC20Extended;
 
     uint256 private constant PRECISION = 1e10;
     uint256 private constant MAX_ALLY_FEE_P = 50;
@@ -141,7 +141,7 @@ library ReferralsUtils {
         address _trader,
         uint256 _volumeUsd,
         uint256 _referrerFeeUsd,
-        uint256 _javPriceUsd // PRECISION (1e10)
+        uint256 _javPriceUsd // PRECISION (1e8)
     ) internal {
         IReferralsUtils.ReferralsStorage storage s = _getStorage();
 
@@ -152,7 +152,7 @@ library ReferralsUtils {
             return;
         }
 
-        uint256 referrerRewardJav = (_referrerFeeUsd * PRECISION) / _javPriceUsd;
+        uint256 referrerRewardJav = (_referrerFeeUsd * 1e8) / _javPriceUsd;
 
         IReferralsUtils.AllyDetails storage a = s.allyDetails[r.ally];
 
@@ -201,12 +201,13 @@ library ReferralsUtils {
      */
     function claimAllyRewards() internal {
         IReferralsUtils.AllyDetails storage a = _getStorage().allyDetails[msg.sender];
-        uint256 rewardsJav = a.pendingRewardsJav;
+        IERC20Extended token = IERC20Extended(AddressStoreUtils.getAddresses().rewardsToken);
+        uint256 rewardsJav = (a.pendingRewardsJav * (10 ** token.decimals())) / 1e18;
 
         if (rewardsJav == 0) revert IReferralsUtils.NoPendingRewards();
 
         a.pendingRewardsJav = 0;
-        IERC20(AddressStoreUtils.getAddresses().rewardsToken).safeTransfer(msg.sender, rewardsJav);
+        token.safeTransfer(msg.sender, rewardsJav);
 
         emit IReferralsUtils.AllyRewardsClaimed(msg.sender, rewardsJav);
     }
@@ -216,12 +217,13 @@ library ReferralsUtils {
      */
     function claimReferrerRewards() internal {
         IReferralsUtils.ReferrerDetails storage r = _getStorage().referrerDetails[msg.sender];
-        uint256 rewardsJav = r.pendingRewardsJav;
+        IERC20Extended token = IERC20Extended(AddressStoreUtils.getAddresses().rewardsToken);
+        uint256 rewardsJav = (r.pendingRewardsJav * (10 ** token.decimals())) / 1e18;
 
         if (rewardsJav == 0) revert IReferralsUtils.NoPendingRewards();
 
         r.pendingRewardsJav = 0;
-        IERC20(AddressStoreUtils.getAddresses().rewardsToken).safeTransfer(msg.sender, rewardsJav);
+        token.safeTransfer(msg.sender, rewardsJav);
 
         emit IReferralsUtils.ReferrerRewardsClaimed(msg.sender, rewardsJav);
     }
