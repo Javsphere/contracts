@@ -17,8 +17,8 @@ interface ITradingStorageUtils is ITradingStorage {
     function initializeTradingStorage(
         address _rewardsToken,
         address _rewardsDistributor,
-        address _borrowingProvider,
         uint256 _max_pnl_p,
+        address[] memory _borrowingProvider,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) external;
@@ -33,8 +33,9 @@ interface ITradingStorageUtils is ITradingStorage {
      * @dev Adds a new supported collateral
      * @param _collateral the address of the collateral
      * @param _index index of the collateral
+     * @param _borrowingProvider borrowing provider address
      */
-    function addCollateral(address _collateral, uint8 _index) external;
+    function addCollateral(address _collateral, uint8 _index, address _borrowingProvider) external;
 
     /**
      * @dev Toggles the active state of a supported collateral
@@ -45,8 +46,9 @@ interface ITradingStorageUtils is ITradingStorage {
     /**
      * @dev Update borrowing provider address
      * @param _borrowingProvider borrowing provider address
+     * @param _collateralIndex collateral index
      */
-    function updateBorrowingProvider(address _borrowingProvider) external;
+    function updateBorrowingProvider(address _borrowingProvider, uint8 _collateralIndex) external;
 
     /**
      * @dev Update max_pnl_p
@@ -340,8 +342,9 @@ interface ITradingStorageUtils is ITradingStorage {
 
     /**
      * @dev Returns the address of the liquidityProvider
+     * @param _collateralIndex collateral index
      */
-    function getBorrowingProvider() external view returns (address);
+    function getBorrowingProvider(uint8 _collateralIndex) external view returns (address);
 
     /**
      * @dev Returns the number of the max pnl percent

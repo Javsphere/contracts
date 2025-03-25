@@ -14,7 +14,7 @@ interface ITradingStorage {
         TradingActivated tradingActivated; // 8 bits
         uint8 lastCollateralIndex; // 8 bits
         uint240 __placeholder; // 240 bits
-        address borrowingProvider;
+        address borrowingProvider; // @custom:deprecated
         mapping(uint8 => Collateral) collaterals;
         mapping(address => uint8) collateralIndex;
         mapping(address => mapping(uint32 => Trade)) trades;
@@ -25,7 +25,8 @@ interface ITradingStorage {
         mapping(address => mapping(uint32 => IPairsStorage.GroupLiquidationParams)) tradeLiquidationParams;
         uint256 max_pnl_p;
         uint256 minCollateralAmountUsd;
-        uint256[36] __gap;
+        mapping(uint8 => address) borrowingProviders;
+        uint256[35] __gap;
     }
 
     enum PendingOrderType {

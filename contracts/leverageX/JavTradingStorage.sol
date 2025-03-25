@@ -24,16 +24,16 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     function initializeTradingStorage(
         address _rewardsToken,
         address _rewardsDistributor,
-        address _borrowingProvider,
         uint256 _max_pnl_p,
+        address[] memory _borrowingProvider,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) external reinitializer(7) {
         TradingStorageUtils.initializeTradingStorage(
             _rewardsToken,
             _rewardsDistributor,
-            _borrowingProvider,
             _max_pnl_p,
+            _borrowingProvider,
             _collaterals,
             _collateralsIndexes
         );
@@ -47,8 +47,12 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function addCollateral(address _collateral, uint8 _index) external onlyRole(Role.GOV) {
-        TradingStorageUtils.addCollateral(_collateral, _index);
+    function addCollateral(
+        address _collateral,
+        uint8 _index,
+        address _borrowingProvider
+    ) external onlyRole(Role.GOV) {
+        TradingStorageUtils.addCollateral(_collateral, _index, _borrowingProvider);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -57,8 +61,11 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function updateBorrowingProvider(address _borrowingProvider) external onlyRole(Role.GOV) {
-        TradingStorageUtils.updateBorrowingProvider(_borrowingProvider);
+    function updateBorrowingProvider(
+        address _borrowingProvider,
+        uint8 _collateralIndex
+    ) external onlyRole(Role.GOV) {
+        TradingStorageUtils.updateBorrowingProvider(_borrowingProvider, _collateralIndex);
     }
 
     /// @inheritdoc ITradingStorageUtils
@@ -275,8 +282,8 @@ contract JavTradingStorage is JavAddressStore, ITradingStorageUtils {
     }
 
     /// @inheritdoc ITradingStorageUtils
-    function getBorrowingProvider() external view returns (address) {
-        return TradingStorageUtils.getBorrowingProvider();
+    function getBorrowingProvider(uint8 _collateralIndex) external view returns (address) {
+        return TradingStorageUtils.getBorrowingProvider(_collateralIndex);
     }
 
     /// @inheritdoc ITradingStorageUtils

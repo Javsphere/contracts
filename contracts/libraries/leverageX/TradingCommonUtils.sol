@@ -510,8 +510,11 @@ library TradingCommonUtils {
     /**
      * @dev Returns borrowingProvider contract
      */
-    function getBorrowingProvider() public view returns (IJavBorrowingProvider) {
-        return IJavBorrowingProvider(_getMultiCollatDiamond().getBorrowingProvider());
+    function getBorrowingProvider(
+        uint8 _collateralIndex
+    ) public view returns (IJavBorrowingProvider) {
+        return
+            IJavBorrowingProvider(_getMultiCollatDiamond().getBorrowingProvider(_collateralIndex));
     }
 
     // Transfers
@@ -561,7 +564,11 @@ library TradingCommonUtils {
         uint256 _amountCollateral,
         address _trader
     ) private {
-        getBorrowingProvider().receiveAssets(_collateralIndex, _amountCollateral, _trader);
+        getBorrowingProvider(_collateralIndex).receiveAssets(
+            _collateralIndex,
+            _amountCollateral,
+            _trader
+        );
     }
 
     /**
@@ -577,7 +584,7 @@ library TradingCommonUtils {
         uint256 _borrowingFeeCollateral
     ) external returns (uint256 traderDebt) {
         if (_collateralSentToTrader > _availableCollateralInDiamond) {
-            getBorrowingProvider().sendAssets(
+            getBorrowingProvider(_trade.collateralIndex).sendAssets(
                 _trade.collateralIndex,
                 uint256(_collateralSentToTrader - _availableCollateralInDiamond),
                 _trade.user
@@ -592,7 +599,7 @@ library TradingCommonUtils {
                 traderDebt = uint256(-_availableCollateralInDiamond);
             }
         } else {
-            getBorrowingProvider().receiveAssets(
+            getBorrowingProvider(_trade.collateralIndex).receiveAssets(
                 _trade.collateralIndex,
                 uint256(_availableCollateralInDiamond - _collateralSentToTrader),
                 _trade.user
@@ -648,7 +655,7 @@ library TradingCommonUtils {
         address _trader,
         uint256 _valueCollateral
     ) internal {
-        getBorrowingProvider().distributeReward(_collateralIndex, _valueCollateral);
+        getBorrowingProvider(_collateralIndex).distributeReward(_collateralIndex, _valueCollateral);
         emit ITradingCommonUtils.BorrowingProviderFeeCharged(
             _trader,
             _collateralIndex,
