@@ -68,6 +68,18 @@ library PriceAggregatorUtils {
     /**
      * @dev Check IPriceAggregatorUtils interface for documentation
      */
+    function updateCollateralAlternativeOracle(
+        uint8 _collateralIndex,
+        bool _value
+    ) internal validCollateralIndex(_collateralIndex) {
+        _getStorage().isCollateralAlternativeOracle[_collateralIndex] = _value;
+
+        emit IPriceAggregatorUtils.UpdateCollateralAlternativeOracle(_collateralIndex, _value);
+    }
+
+    /**
+     * @dev Check IPriceAggregatorUtils interface for documentation
+     */
     function setPriceLifetime(uint48 _lifetime) internal {
         _getStorage().priceLifetime = _lifetime;
 
@@ -133,7 +145,10 @@ library PriceAggregatorUtils {
      */
     function getCollateralPriceUsd(uint8 _collateralIndex) internal view returns (uint256) {
         IPriceAggregator.PriceAggregatorStorage storage s = _getStorage();
-        IJavPriceAggregator.Price memory price = s.oracle.getPriceUnsafe(
+        IJavPriceAggregator oracle = s.isCollateralAlternativeOracle[_collateralIndex]
+            ? s.alternativeOracle
+            : s.oracle;
+        IJavPriceAggregator.Price memory price = oracle.getPriceUnsafe(
             s.collateralUsdPriceFeed[_collateralIndex]
         );
         return PriceUtils.convertToUint(price.price, price.expo, 8);
