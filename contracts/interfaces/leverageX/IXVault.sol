@@ -6,7 +6,6 @@ interface IXVault {
     struct ContractAddresses {
         address asset;
         address pnlHandler;
-        address openTradesPnlFeed;
     }
 
     struct Meta {
@@ -23,7 +22,6 @@ interface IXVault {
     function tvl() external view returns (uint256);
 
     event PnlHandlerUpdated(address newValue);
-    event OpenTradesPnlFeedUpdated(address newValue);
     event MaxDailyAccPnlDeltaUpdated(uint256 newValue);
     event MaxSupplyIncreaseDailyPUpdated(uint256 newValue);
     event MaxDiscountThresholdPUpdated(uint256 newValue);
@@ -32,7 +30,6 @@ interface IXVault {
     event DailyAccPnlDeltaReset();
     event ShareToAssetsPriceUpdated(uint256 newValue);
     event UpdateWithdrawEpochsLock(uint256 newValue);
-    event OpenTradesPnlFeedCallFailed();
     event WithdrawRequested(
         address indexed sender,
         address indexed owner,

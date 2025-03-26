@@ -23,7 +23,8 @@ interface IPriceAggregator {
         bytes32 rewardsTokenUsdFeed;
         uint96 __placeholder; // 96 bits
         uint48 priceLifetime;
-        uint256[40] __gap;
+        mapping(uint8 => bool) isCollateralAlternativeOracle;
+        uint256[39] __gap;
     }
 
 

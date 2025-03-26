@@ -113,9 +113,7 @@ library TradingStorageUtils {
         ITradingStorage.TradingStorage storage s = _getStorage();
         s.borrowingProviders[_collateralIndex] = _borrowingProvider;
 
-        for (uint8 i = 0; i < s.lastCollateralIndex; ++i) {
-            updateCollateralApprove(i);
-        }
+        updateCollateralApprove(_collateralIndex);
 
         emit ITradingStorageUtils.BorrowingProviderUpdated(_borrowingProvider);
     }

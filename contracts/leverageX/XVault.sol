@@ -3,13 +3,12 @@
 pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../libraries/leverageX/CollateralUtils.sol";
 import "../interfaces/leverageX/IXVault.sol";
 import "../base/BaseUpgradable.sol";
 
-contract XVault is ERC20Upgradeable, ERC4626Upgradeable, BaseUpgradable, IXVault {
+contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -85,7 +84,7 @@ contract XVault is ERC20Upgradeable, ERC4626Upgradeable, BaseUpgradable, IXVault
 
         shareToAssetsPrice = PRECISION_18;
         withdrawEpochsLock = _withdrawEpochsLock;
-        collateralConfig = CollateralUtils.getCollateralConfig(asset());
+        collateralConfig = CollateralUtils.getCollateralConfig(_contractAddresses.asset);
 
         __ERC20_init(_meta.name, _meta.symbol); // xToken
         __ERC4626_init(IERC20Metadata(_contractAddresses.asset)); // Token
@@ -197,7 +196,7 @@ contract XVault is ERC20Upgradeable, ERC4626Upgradeable, BaseUpgradable, IXVault
     }
 
     // Override ERC-4626 view functions
-    function decimals() public view override(ERC20Upgradeable, ERC4626Upgradeable) returns (uint8) {
+    function decimals() public view override(ERC4626Upgradeable) returns (uint8) {
         return ERC4626Upgradeable.decimals();
     }
 
