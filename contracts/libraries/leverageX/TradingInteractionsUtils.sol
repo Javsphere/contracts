@@ -104,6 +104,17 @@ library TradingInteractionsUtils {
     /**
      * @dev Check ITradingInteractionsUtils interface for documentation
      */
+    function updateMarketOrdersTimeoutBlocks(uint16 _valueBlocks) internal {
+        if (_valueBlocks == 0) revert IGeneralErrors.ZeroValue();
+
+        _getStorage().marketOrdersTimeoutBlocks = _valueBlocks;
+
+        emit ITradingInteractionsUtils.MarketOrdersTimeoutBlocksUpdated(_valueBlocks);
+    }
+
+    /**
+     * @dev Check ITradingInteractionsUtils interface for documentation
+     */
     function closeTradeMarket(
         uint32 _index,
         uint64 _expectedPrice
@@ -372,6 +383,47 @@ library TradingInteractionsUtils {
     /**
      * @dev Check ITradingInteractionsUtils interface for documentation
      */
+    function cancelOrderAfterTimeout(uint32 _orderIndex) internal tradingActivatedOrCloseOnly {
+        ITradingStorage.Id memory orderId = ITradingStorage.Id({
+            user: msg.sender,
+            index: _orderIndex
+        });
+        ITradingStorage.PendingOrder memory order = _getMultiCollatDiamond().getPendingOrder(
+            orderId
+        );
+        ITradingStorage.Trade memory pendingTrade = order.trade;
+        ITradingStorage.Trade memory trade = _getMultiCollatDiamond().getTrade(
+            pendingTrade.user,
+            pendingTrade.index
+        );
+
+        if (!order.isOpen) revert ITradingInteractionsUtils.NoOrder();
+
+        if (order.orderType != ITradingStorage.PendingOrderType.MARKET_OPEN)
+            revert IGeneralErrors.WrongOrderType();
+
+        if (block.number < order.createdBlock + _getStorage().marketOrdersTimeoutBlocks)
+            revert ITradingInteractionsUtils.WaitTimeout();
+
+        _getMultiCollatDiamond().closePendingOrder(orderId);
+
+        TradingCommonUtils.transferCollateralTo(
+            pendingTrade.collateralIndex,
+            pendingTrade.user,
+            pendingTrade.collateralAmount
+        ); // send back collateral amount to user when cancelling market open
+
+        emit ITradingInteractionsUtils.OpenOrderTimeout(
+            orderId,
+            order.orderType == ITradingStorage.PendingOrderType.MARKET_OPEN
+                ? pendingTrade.pairIndex
+                : trade.pairIndex
+        );
+    }
+
+    /**
+     * @dev Check ITradingInteractionsUtils interface for documentation
+     */
     function closeTrades(
         ITradingStorage.Id[] memory _trades,
         bytes[][] calldata _priceUpdate
@@ -408,6 +460,13 @@ library TradingInteractionsUtils {
                 );
             }
         }
+    }
+
+    /**
+     * @dev Check ITradingInteractionsUtils interface for documentation
+     */
+    function getMarketOrdersTimeoutBlocks() internal view returns (uint16) {
+        return _getStorage().marketOrdersTimeoutBlocks;
     }
 
     /**

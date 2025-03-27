@@ -45,6 +45,11 @@ contract JavTradingInteractions is JavAddressStore, ITradingInteractionsUtils {
     }
 
     /// @inheritdoc ITradingInteractionsUtils
+    function updateMarketOrdersTimeoutBlocks(uint16 _valueBlocks) external onlyRole(Role.GOV) {
+        TradingInteractionsUtils.updateMarketOrdersTimeoutBlocks(_valueBlocks);
+    }
+
+    /// @inheritdoc ITradingInteractionsUtils
     function closeTradeMarket(uint32 _index, uint64 _expectedPrice) external {
         TradingInteractionsUtils.closeTradeMarket(_index, _expectedPrice);
     }
@@ -121,6 +126,16 @@ contract JavTradingInteractions is JavAddressStore, ITradingInteractionsUtils {
     /// @inheritdoc ITradingInteractionsUtils
     function triggerOrder(uint256 _packed, bytes[][] calldata _priceUpdate) external payable {
         TradingInteractionsUtils.triggerOrder(_packed, _priceUpdate);
+    }
+
+    /// @inheritdoc ITradingInteractionsUtils
+    function cancelOrderAfterTimeout(uint32 _orderIndex) external {
+        TradingInteractionsUtils.cancelOrderAfterTimeout(_orderIndex);
+    }
+
+    /// @inheritdoc ITradingInteractionsUtils
+    function getMarketOrdersTimeoutBlocks() external view returns (uint16) {
+        return TradingInteractionsUtils.getMarketOrdersTimeoutBlocks();
     }
 
     /// @inheritdoc ITradingInteractionsUtils
