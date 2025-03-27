@@ -13,7 +13,8 @@ interface ITradingInteractions {
     struct TradingInteractionsStorage {
         uint80 __placeholder;
         address termsAndConditionsAddress;
-        uint256[46] __gap;
+        uint16 marketOrdersTimeoutBlocks; // 16 bits
+        uint256[45] __gap;
     }
 
 }
