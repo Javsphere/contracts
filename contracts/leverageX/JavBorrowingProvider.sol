@@ -115,6 +115,7 @@ contract JavBorrowingProvider is
         uint256 targetWeightage,
         bool isActive
     );
+    event AddLiquidity(uint256 indexed tokenId, uint256 amount);
 
     modifier validToken(uint256 _tokenId) {
         require(_tokenId < tokens.length, "JavBorrowingProvider: Invalid token");
@@ -419,6 +420,21 @@ contract JavBorrowingProvider is
         accPnlPerToken[_collateralIndex] -= accPnlDelta;
 
         emit AssetsReceived(sender, user, assets, assetsLessDeplete);
+    }
+
+    function addLiquidity(
+        uint256 _inputToken,
+        uint256 _amount
+    ) external onlyAdmin validToken(_inputToken) {
+        TokenInfo memory _token = tokens[_inputToken];
+        require(
+            IERC20(_token.asset).balanceOf(_msgSender()) >= _amount,
+            "JavBorrowingProvider: invalid balance add liquidity"
+        );
+        IERC20(_token.asset).safeTransferFrom(_msgSender(), address(this), _amount);
+        tokenAmount[_inputToken] += _amount;
+
+        emit AddLiquidity(_inputToken, _amount);
     }
 
     // View helper functions
