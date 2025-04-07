@@ -66,8 +66,6 @@ library TriggerRewardsUtils {
         uint256 pendingRewards = s.pendingRewards[_triggerAddress][_collateralIndex];
         require(pendingRewards != 0, ITriggerRewardsUtils.NoPendingTriggerRewards());
 
-        s.pendingRewards[_triggerAddress][_collateralIndex];
-
         IERC20(_getMultiCollatDiamond().getCollateral(_collateralIndex).collateral).safeTransfer(
             _triggerAddress,
             pendingRewards

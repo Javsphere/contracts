@@ -15,12 +15,14 @@ interface ITradingInteractionsUtils is ITradingInteractions {
      * @param _trade the trade to be opened
      * @param _maxSlippageP the maximum allowed slippage % when open the trade (1e3 precision)
      * @param _referrer the address of the referrer (can only be set once for a trader)
+     * @param _priceUpdate Array of price update data.
      */
     function openTrade(
         ITradingStorage.Trade memory _trade,
         uint16 _maxSlippageP,
-        address _referrer
-    ) external;
+        address _referrer,
+        bytes[][] calldata _priceUpdate
+    ) external payable;
 
     /**
      * @dev Update termsAndConditionsAddress address
@@ -44,9 +46,9 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     /**
      * @dev Closes an open trade (market order) for caller
      * @param _index the index of the trade of caller
-     * @param _expectedPrice expected closing price, used to check max slippage (1e10 precision)
+     * @param _priceUpdate Array of price update data.
      */
-    function closeTradeMarket(uint32 _index, uint64 _expectedPrice) external;
+    function closeTradeMarket(uint32 _index, bytes[][] calldata _priceUpdate) external payable;
 
     /**
      * @dev Updates an existing limit/stop order for caller
