@@ -488,6 +488,11 @@ library TradingCommonUtils {
             (tradeFees.totalFeeCollateral * feeParams.llpTokenFeeP) /
             1e3 /
             100;
+
+        tradeFees.rewardsCollectorFeeCollateral =
+            (tradeFees.totalFeeCollateral * feeParams.rewardsCollectorFeeP) /
+            1e3 /
+            100;
     }
 
     function getMinGovFeeCollateral(
@@ -679,12 +684,12 @@ library TradingCommonUtils {
     }
 
     /**
-     * @dev Distribute staking rewards
+     * @dev Distribute rewards collector fees
      * @param _collateralIndex collateral index
      * @param _trader trader address
      * @param _amountCollateral amount of collateral tokens to distribute (collateral precision)
      */
-    function distributeStakingReward(
+    function distributeRewardsCollector(
         uint8 _collateralIndex,
         address _trader,
         uint256 _amountCollateral
@@ -777,11 +782,18 @@ library TradingCommonUtils {
                 );
             }
 
-            // 3.3 Distribute GToken fees
+            // 3.4 Distribute GToken fees
             distributeVaultFeeCollateral(
                 _trade.collateralIndex,
                 _trade.user,
                 tradeFees.llpTokenFeeCollateral
+            );
+
+            // 3.5 Distribute GToken fees
+            distributeRewardsCollector(
+                _trade.collateralIndex,
+                _trade.user,
+                tradeFees.rewardsCollectorFeeCollateral
             );
         }
 
