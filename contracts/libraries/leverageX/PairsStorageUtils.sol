@@ -205,6 +205,7 @@ library PairsStorageUtils {
             _feeParams.govFeeP == 0 ||
             _feeParams.llpTokenFeeP == 0 ||
             _feeParams.triggerOrderFeeP == 0 ||
+            _feeParams.rewardsCollectorFeeP == 0 ||
             _feeParams.__placeholder != 0
         ) revert IGeneralErrors.ZeroValue();
 
@@ -212,6 +213,7 @@ library PairsStorageUtils {
             _feeParams.referralFeeP +
                 _feeParams.govFeeP +
                 _feeParams.llpTokenFeeP +
+                _feeParams.rewardsCollectorFeeP +
                 _feeParams.triggerOrderFeeP !=
             100 * 1e3
         ) revert IGeneralErrors.WrongParams();
