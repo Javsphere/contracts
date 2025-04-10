@@ -244,13 +244,15 @@ library TradingProcessingUtils {
         t = _getTrade(_tradeId.user, _tradeId.index);
         ITradingStorage.TradeInfo memory i = _getTradeInfo(_tradeId.user, _tradeId.index);
 
+        cancelReason = !t.isOpen
+            ? ITradingProcessing.CancelReason.NO_TRADE
+            : ITradingProcessing.CancelReason.NONE;
+
         // Return early if trade is not open or market is closed
         if (cancelReason != ITradingProcessing.CancelReason.NONE)
             return (t, cancelReason, v, priceImpactP);
 
-        if (_pendingOrder.orderType == ITradingStorage.PendingOrderType.LIQ_CLOSE) {
-            v.liqPrice = TradingCommonUtils.getTradeLiquidationPrice(t, true);
-        }
+        v.liqPrice = TradingCommonUtils.getTradeLiquidationPrice(t, true);
 
         uint256 triggerPrice = _pendingOrder.orderType == ITradingStorage.PendingOrderType.TP_CLOSE
             ? t.tp
