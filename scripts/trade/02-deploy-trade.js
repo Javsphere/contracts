@@ -147,6 +147,26 @@ async function main() {
 
     logDeploy("JavPriceAggregator", await priceAggregator.getAddress());
 
+    const triggerRewardsFactory = await ethers.getContractFactory(
+        "JavTriggerRewards",
+    );
+    const triggerRewards = await triggerRewardsFactory.deploy()
+    await triggerRewards.waitForDeployment();
+
+    logDeploy("JavTriggerRewards", await triggerRewards.getAddress());
+
+    const tradingOrdersFactory = await ethers.getContractFactory(
+        "JavTradingOrders", {
+            libraries: {
+                "contracts/libraries/leverageX/ArrayGetters.sol:ArrayGetters": arrayGetters.target,
+            },
+        }
+    );
+    const tradingOrders = await tradingOrdersFactory.deploy()
+    await tradingOrders.waitForDeployment();
+
+    logDeploy("JavTradingOrders", await tradingOrders.getAddress());
+
     // // localhost
     // const tokenFactory = await ethers.getContractFactory("TestToken");
     // const token1 = await tokenFactory.deploy(["Test USDT", "USDT"]);

@@ -46,6 +46,14 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
     }
 
     /// @inheritdoc IPriceAggregatorUtils
+    function updateCollateralAlternativeOracle(
+        uint8 _collateralIndex,
+        bool _value
+    ) external onlyRole(Role.GOV) {
+        PriceAggregatorUtils.updateCollateralAlternativeOracle(_collateralIndex, _value);
+    }
+
+    /// @inheritdoc IPriceAggregatorUtils
     function setPriceLifetime(uint48 _lifetime) external onlyRole(Role.GOV) {
         PriceAggregatorUtils.setPriceLifetime(_lifetime);
     }

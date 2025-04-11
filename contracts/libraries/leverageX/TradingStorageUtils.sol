@@ -22,23 +22,19 @@ library TradingStorageUtils {
     function initializeTradingStorage(
         address _rewardsToken,
         address _rewardsDistributor,
-        address _borrowingProvider,
         uint256 _max_pnl_p,
+        address[] memory _borrowingProviders,
         address[] memory _collaterals,
         uint8[] memory _collateralsIndexes
     ) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
-        if (
-            _rewardsToken == address(0) ||
-            _rewardsDistributor == address(0) ||
-            _borrowingProvider == address(0)
-        ) revert IGeneralErrors.ZeroAddress();
+        if (_rewardsToken == address(0) || _rewardsDistributor == address(0))
+            revert IGeneralErrors.ZeroAddress();
 
         if (_collaterals.length < 2) revert ITradingStorageUtils.MissingCollaterals();
         if (_collaterals.length != _collateralsIndexes.length) revert IGeneralErrors.WrongLength();
         s.max_pnl_p = _max_pnl_p;
         // Set addresses
-        s.borrowingProvider = _borrowingProvider;
         IJavAddressStore.Addresses storage addresses = AddressStoreUtils.getAddresses();
         addresses.rewardsToken = _rewardsToken;
         addresses.rewardsDistributor = _rewardsDistributor;
@@ -47,7 +43,7 @@ library TradingStorageUtils {
 
         // Add collaterals
         for (uint256 i; i < _collaterals.length; ++i) {
-            addCollateral(_collaterals[i], _collateralsIndexes[i]);
+            addCollateral(_collaterals[i], _collateralsIndexes[i], _borrowingProviders[i]);
         }
 
         // Trading is paused by default for state copy
@@ -66,11 +62,12 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function addCollateral(address _collateral, uint8 _index) internal {
+    function addCollateral(address _collateral, uint8 _index, address _borrowingProvider) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
 
         if (s.collateralIndex[_collateral] != 0) revert IGeneralErrors.AlreadyExists();
         if (_collateral == address(0)) revert IGeneralErrors.ZeroAddress();
+        if (_borrowingProvider == address(0)) revert IGeneralErrors.ZeroAddress();
 
         CollateralUtils.CollateralConfig memory collateralConfig = CollateralUtils
             .getCollateralConfig(_collateral);
@@ -85,10 +82,11 @@ library TradingStorageUtils {
 
         s.collateralIndex[_collateral] = _index;
         s.lastCollateralIndex = _index;
+        s.borrowingProviders[_index] = _borrowingProvider;
 
         // Setup collateral approvals
         IERC20 collateral = IERC20(_collateral);
-        collateral.approve(_getMultiCollatDiamond().getBorrowingProvider(), type(uint256).max);
+        collateral.approve(_borrowingProvider, type(uint256).max);
 
         emit ITradingStorageUtils.CollateralAdded(_collateral, _index);
     }
@@ -111,13 +109,11 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function updateBorrowingProvider(address _borrowingProvider) internal {
+    function updateBorrowingProvider(address _borrowingProvider, uint8 _collateralIndex) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
-        s.borrowingProvider = _borrowingProvider;
+        s.borrowingProviders[_collateralIndex] = _borrowingProvider;
 
-        for (uint8 i = 0; i < s.lastCollateralIndex; ++i) {
-            updateCollateralApprove(i);
-        }
+        updateCollateralApprove(_collateralIndex);
 
         emit ITradingStorageUtils.BorrowingProviderUpdated(_borrowingProvider);
     }
@@ -148,7 +144,7 @@ library TradingStorageUtils {
     function updateCollateralApprove(uint8 _collateralIndex) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         IERC20 collateral = IERC20(s.collaterals[_collateralIndex].collateral);
-        collateral.approve(_getMultiCollatDiamond().getBorrowingProvider(), type(uint256).max);
+        collateral.approve(s.borrowingProviders[_collateralIndex], type(uint256).max);
     }
 
     /**
@@ -160,7 +156,7 @@ library TradingStorageUtils {
     ) internal returns (ITradingStorage.Trade memory) {
         ITradingStorage.TradingStorage storage s = _getStorage();
 
-        _validateTrade(_trade);
+        validateTrade(_trade);
 
         if (_trade.tradeType != ITradingStorage.TradeType.TRADE && _tradeInfo.maxSlippageP == 0)
             revert ITradingStorageUtils.MaxSlippageZero();
@@ -189,13 +185,10 @@ library TradingStorageUtils {
         s.tradeInfos[_trade.user][_trade.index] = _tradeInfo;
         s.userCounters[_trade.user] = counter;
 
-        if (!s.traderStored[_trade.user]) {
-            s.traders.push(_trade.user);
-            s.traderStored[_trade.user] = true;
-        }
+        storeTrader(_trade.user);
 
         if (_trade.tradeType == ITradingStorage.TradeType.TRADE)
-            TradingCommonUtils.updateOiTrade(_trade, true);
+            TradingCommonUtils.updateOiTrade(_trade, true, false);
 
         emit ITradingStorageUtils.TradeStored(_trade, _tradeInfo, liquidationParams);
 
@@ -227,12 +220,20 @@ library TradingStorageUtils {
     ) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
+        ITradingStorage.TradeInfo storage i = s.tradeInfos[_tradeId.user][_tradeId.index];
 
         if (!t.isOpen) revert IGeneralErrors.DoesntExist();
         if (t.tradeType != ITradingStorage.TradeType.TRADE) revert IGeneralErrors.WrongTradeType();
         if (_collateralAmount == 0) revert ITradingStorageUtils.TradePositionSizeZero();
 
+        TradingCommonUtils.handleOiDelta(
+            t,
+            TradingCommonUtils.getPositionSizeCollateral(_collateralAmount, t.leverage),
+            false
+        );
+
         t.collateralAmount = _collateralAmount;
+        i.createdBlock = uint32(block.number);
 
         emit ITradingStorageUtils.TradeCollateralUpdated(_tradeId, _collateralAmount);
     }
@@ -245,7 +246,8 @@ library TradingStorageUtils {
         uint120 _collateralAmount,
         uint24 _leverage,
         uint64 _openPrice,
-        bool _isPartialIncrease
+        bool _isPartialIncrease,
+        bool _isPnlPositive
     ) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
@@ -258,7 +260,8 @@ library TradingStorageUtils {
 
         TradingCommonUtils.handleOiDelta(
             t,
-            TradingCommonUtils.getPositionSizeCollateral(_collateralAmount, _leverage)
+            TradingCommonUtils.getPositionSizeCollateral(_collateralAmount, _leverage),
+            _isPnlPositive
         );
 
         uint32 blockNumber = uint32(block.number);
@@ -381,7 +384,7 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function closeTrade(ITradingStorage.Id memory _tradeId) internal {
+    function closeTrade(ITradingStorage.Id memory _tradeId, bool _isPnlPositive) internal {
         ITradingStorage.TradingStorage storage s = _getStorage();
         ITradingStorage.Trade storage t = s.trades[_tradeId.user][_tradeId.index];
 
@@ -391,7 +394,7 @@ library TradingStorageUtils {
         s.userCounters[_tradeId.user].openCount--;
 
         if (t.tradeType == ITradingStorage.TradeType.TRADE)
-            TradingCommonUtils.updateOiTrade(t, false);
+            TradingCommonUtils.updateOiTrade(t, false, _isPnlPositive);
 
         emit ITradingStorageUtils.TradeClosed(_tradeId);
     }
@@ -485,8 +488,8 @@ library TradingStorageUtils {
     /**
      * @dev Check ITradingStorageUtils interface for documentation
      */
-    function getBorrowingProvider() internal view returns (address) {
-        return _getStorage().borrowingProvider;
+    function getBorrowingProvider(uint8 _collateralIndex) internal view returns (address) {
+        return _getStorage().borrowingProviders[_collateralIndex];
     }
 
     /**
@@ -501,6 +504,13 @@ library TradingStorageUtils {
      */
     function getMinCollateralAmountUsd() internal view returns (uint256) {
         return _getStorage().minCollateralAmountUsd;
+    }
+
+    /**
+     * @dev Check ITradingStorageUtils interface for documentation
+     */
+    function getTradersCount() internal view returns (uint256) {
+        return _getStorage().traders.length;
     }
 
     /**
@@ -615,7 +625,7 @@ library TradingStorageUtils {
      * @dev Validation for trade struct (used by storeTrade and storePendingOrder for market open orders)
      * @param _trade trade struct to validate
      */
-    function _validateTrade(ITradingStorage.Trade memory _trade) internal view {
+    function validateTrade(ITradingStorage.Trade memory _trade) internal view {
         if (_trade.user == address(0)) revert IGeneralErrors.ZeroAddress();
 
         if (!_getMultiCollatDiamond().isPairIndexListed(_trade.pairIndex))
@@ -642,5 +652,17 @@ library TradingStorageUtils {
             _trade.sl != 0 &&
             (_trade.long ? _trade.sl >= _trade.openPrice : _trade.sl <= _trade.openPrice)
         ) revert ITradingStorageUtils.TradeSlInvalid();
+    }
+
+    /**
+     * @dev Function for store trader address
+     * @param _trader trader address
+     */
+    function storeTrader(address _trader) internal {
+        ITradingStorage.TradingStorage storage s = _getStorage();
+        if (!s.traderStored[_trader]) {
+            s.traders.push(_trader);
+            s.traderStored[_trader] = true;
+        }
     }
 }

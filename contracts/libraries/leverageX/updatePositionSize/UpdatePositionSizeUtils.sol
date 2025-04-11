@@ -67,7 +67,7 @@ library UpdatePositionSizeUtils {
         IncreasePositionSizeUtils.updateTradeSuccess(trade, values);
 
         // 7.2 Distribute opening fees and store fee tier points for position size delta
-        TradingCommonUtils.processOpeningFees(
+        TradingCommonUtils.processFees(
             trade,
             values.positionSizeCollateralDelta,
             ITradingStorage.PendingOrderType.MARKET_PARTIAL_OPEN
@@ -129,23 +129,10 @@ library UpdatePositionSizeUtils {
         DecreasePositionSizeUtils.updateTradeSuccess(trade, values);
 
         // 5.2 Distribute closing fees
-        TradingCommonUtils.distributeStakingReward(
-            trade.collateralIndex,
-            trade.user,
-            values.gnsStakingFeeCollateral
-        );
-        TradingCommonUtils.distributeVaultFeeCollateral(
-            trade.collateralIndex,
-            trade.user,
-            values.vaultFeeCollateral
-        );
-
-        // 5.3 Store trader fee tier points for position size delta
-        TradingCommonUtils.updateFeeTierPoints(
-            trade.collateralIndex,
-            trade.user,
-            trade.pairIndex,
-            values.positionSizeCollateralDelta
+        TradingCommonUtils.processFees(
+            trade,
+            values.positionSizeCollateralDelta,
+            ITradingStorage.PendingOrderType.MARKET_PARTIAL_CLOSE
         );
 
         emit IUpdatePositionSizeUtils.PositionSizeDecreaseExecuted(

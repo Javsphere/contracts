@@ -6,7 +6,7 @@
     "avoid-throw": "off",
     "avoid-suicide": "error",
     "avoid-sha3": "warn",
-    "compiler-version": ["error", "0.8.16"],
+    "compiler-version": ["error", "^0.8.23"],
     "reason-string": "off",
     "no-empty-blocks": "off",
     "custom-errors": "off",

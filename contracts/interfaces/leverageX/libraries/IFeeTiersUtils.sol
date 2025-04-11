@@ -44,6 +44,28 @@ interface IFeeTiersUtils is IFeeTiers {
     ) external;
 
     /**
+     * @dev Updates traders enrollment status in fee tiers
+     * @param _traders group of traders
+     * @param _values corresponding enrollment values
+     */
+    function setTradersFeeTiersEnrollment(
+        address[] calldata _traders,
+        IFeeTiersUtils.TraderEnrollment[] calldata _values
+    ) external;
+
+    /**
+     * @dev Credits points to traders
+     * @param _traders traders addresses
+     * @param _creditTypes types of credit (IMMEDIATE, CLAIMABLE)
+     * @param _points points to credit (1e18)
+     */
+    function addTradersUnclaimedPoints(
+        address[] calldata _traders,
+        IFeeTiersUtils.CreditType[] calldata _creditTypes,
+        uint224[] calldata _points
+    ) external;
+
+    /**
      * @dev Increases daily points from a new trade, re-calculate trailing points, and cache daily fee tier for a trader.
      * @param _trader trader address
      * @param _volumeUsd trading volume in USD (1e18)
@@ -97,6 +119,20 @@ interface IFeeTiersUtils is IFeeTiers {
         address _trader,
         uint32 _day
     ) external view returns (IFeeTiersUtils.TraderDailyInfo memory);
+
+    /**
+     * @dev Returns a trader's fee tiers enrollment status
+     * @param _trader trader address
+     */
+    function getTraderFeeTiersEnrollment(
+        address _trader
+    ) external view returns (IFeeTiersUtils.TraderEnrollment memory);
+
+    /**
+     * @dev Returns a trader's unclaimed points, credited by Governance
+     * @param _trader trader address
+     */
+    function getTraderUnclaimedPoints(address _trader) external view returns (uint224);
 
     /**
      * @dev Emitted when group volume multipliers are updated
@@ -160,5 +196,38 @@ interface IFeeTiersUtils is IFeeTiers {
         uint32 feeMultiplier
     );
 
+    /**
+     * @dev Emitted when a trader's enrollment status is updated
+     * @param trader address of trader
+     * @param enrollment trader's new enrollment status
+     */
+    event TraderEnrollmentUpdated(
+        address indexed trader,
+        IFeeTiersUtils.TraderEnrollment enrollment
+    );
+
+    /**
+     * @dev Emitted when a trader is credited points by governance
+     * @param trader trader address
+     * @param day day the points were credited on, may be different from the day the points were claimed
+     * @param creditType credit type (IMMEDIATE, CLAIMABLE)
+     * @param points points added (1e18 precision)
+     */
+    event TraderPointsCredited(
+        address indexed trader,
+        uint32 indexed day,
+        IFeeTiers.CreditType creditType,
+        uint224 points
+    );
+
+    /**
+     * @dev Emitted when a trader's unclaimed points are claimed
+     * @param trader trader address
+     * @param day day of claim
+     * @param points points added (1e18 precision)
+     */
+    event TraderUnclaimedPointsClaimed(address indexed trader, uint32 indexed day, uint224 points);
+
     error WrongFeeTier();
+    error PointsOverflow();
 }

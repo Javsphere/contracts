@@ -38,6 +38,12 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     function updateMaxClosingSlippageP(uint32 _index, uint16 _maxSlippageP) external;
 
     /**
+     * @dev Updates marketOrdersTimeoutBlocks
+     * @param _valueBlocks blocks after which a market order times out
+     */
+    function updateMarketOrdersTimeoutBlocks(uint16 _valueBlocks) external;
+
+    /**
      * @dev Closes an open trade (market order) for caller
      * @param _index the index of the trade of caller
      * @param _priceUpdate Array of price update data.
@@ -132,12 +138,48 @@ interface ITradingInteractionsUtils is ITradingInteractions {
     function triggerOrder(uint256 _packed, bytes[][] calldata _priceUpdate) external payable;
 
     /**
+     * @dev Safety function in case oracles don't answer in time, allows caller to cancel a pending order and if relevant claim back any stuck collateral
+     * @dev Only allowed for MARKET_OPEN, MARKET_CLOSE, UPDATE_LEVERAGE, MARKET_PARTIAL_OPEN, and MARKET_PARTIAL_CLOSE orders
+     * @param _orderIndex the id of the pending order to cancel
+     */
+    function cancelOrderAfterTimeout(uint32 _orderIndex) external;
+
+    /**
+     * @dev Allows admin to close trade when deactivate pair from pyth oracle
+     * @param _trades array of ITradingStorage.Id for close
+     * @param _priceUpdate Array of price update data.
+     */
+    function closeTrades(
+        ITradingStorage.Id[] memory _trades,
+        bytes[][] calldata _priceUpdate
+    ) external payable;
+
+    /**
+     * @dev Returns the current marketOrdersTimeoutBlocks value
+     */
+    function getMarketOrdersTimeoutBlocks() external view returns (uint16);
+
+    /**
+     * @dev Emitted when marketOrdersTimeoutBlocks is updated
+     * @param newValueBlocks the new value of marketOrdersTimeoutBlocks
+     */
+    event MarketOrdersTimeoutBlocksUpdated(uint256 newValueBlocks);
+
+    /**
      * @dev Emitted when a market order is initiated
+     * @param orderId price aggregator order id of the pending market order
      * @param trader address of the trader
      * @param pairIndex index of the trading pair
      * @param open whether the market order is for opening or closing a trade
+     * @param _trade the trade
      */
-    event MarketOrderInitiated(address indexed trader, uint16 indexed pairIndex, bool open);
+    event MarketOrderInitiated(
+        ITradingStorage.Id orderId,
+        address indexed trader,
+        uint16 indexed pairIndex,
+        bool open,
+        ITradingStorage.Trade _trade
+    );
 
     /**
      * @dev Emitted when a new limit/stop order is placed
@@ -182,6 +224,13 @@ interface ITradingInteractionsUtils is ITradingInteractions {
      * @param index index of the open trade for caller
      */
     event CouldNotCloseTrade(address indexed trader, uint16 indexed pairIndex, uint32 index);
+
+    /**
+     * @dev Emitted when a pending market order is canceled due to timeout
+     * @param pendingOrderId id of the pending order
+     * @param pairIndex index of the trading pair
+     */
+    event OpenOrderTimeout(ITradingStorage.Id pendingOrderId, uint256 indexed pairIndex);
 
     /**
      * @dev Emitted when an existing termsAndConditionsAddress is updated
