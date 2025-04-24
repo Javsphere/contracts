@@ -55,6 +55,11 @@ interface IXVault {
         uint256 assetsLessDeplete
     );
 
+    event SetJavInfoAggregator(address indexed _address);
+    event SetSellFees(uint32[] sellFees);
+    event SetBuyConfiguration(uint32[] baseFees, uint32[] usdThresholds);
+    event SetJavAmountConfiguration(uint32[] javThresholds, uint32[] reductionFactors);
+
     error OnlyTradingPnlHandler();
     error PriceZero();
     error ValueZero();
@@ -63,7 +68,6 @@ interface IXVault {
     error WrongValues();
     error PendingWithdrawal();
     error EndOfEpoch();
-    error NotAllowed();
     error NotEnoughAssets();
     error MaxDailyPnl();
 }
