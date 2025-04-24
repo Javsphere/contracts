@@ -8,7 +8,11 @@ import "../libraries/leverageX/CollateralUtils.sol";
 import "../interfaces/leverageX/IXVault.sol";
 import "../base/BaseUpgradable.sol";
 
-contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault {
+import "../abstract/TearmsAndCondUtils.sol";
+import "../interfaces/helpers/IJavInfoAggregator.sol";
+import "../interfaces/helpers/IGeneralErrors.sol";
+
+contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtils, IGeneralErrors {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -49,6 +53,20 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault {
     int256 public totalClosedPnl; // collateralConfig.precision (assets)
     uint256 public totalRewards; // collateralConfig.precision (assets)
     int256 public totalLiability; // collateralConfig.precision (assets)
+
+    address public termsAndConditionsAddress;
+    address public javInfoAggregator;
+
+    uint32[] public baseFees; //1e4
+    uint32[] public usdThresholds; // clear
+    uint32[] public javThresholds; // clear
+    uint32[] public reductionFactors; //1e4
+    uint32[] public sellFees; //1e4
+
+    modifier checks(uint256 assetsOrShares) {
+        _checks(assetsOrShares);
+        _;
+    }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -91,23 +109,12 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault {
         __Base_init();
     }
 
-    modifier checks(uint256 assetsOrShares) {
-        _checks(assetsOrShares);
-        _;
-    }
-
-    function _checks(uint256 assetsOrShares) private view {
-        if (shareToAssetsPrice == 0) revert PriceZero();
-        if (assetsOrShares == 0) revert ValueZero();
-    }
-
+    // Manage parameters
     function updatePnlHandler(address newValue) external onlyOwner {
         if (newValue == address(0)) revert AddressZero();
         pnlHandler = newValue;
         emit PnlHandlerUpdated(newValue);
     }
-
-    // Manage parameters
 
     function updateMaxSupplyIncreaseDailyP(uint256 newValue) external onlyAdmin {
         if (newValue > MAX_SUPPLY_INCREASE_DAILY_P) revert AboveMax();
@@ -115,187 +122,56 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault {
         emit MaxSupplyIncreaseDailyPUpdated(newValue);
     }
 
+    function setTermsAndConditionsAddress(
+        address _termsAndConditionsAddress
+    ) external onlyAdmin nonZeroAddress(_termsAndConditionsAddress) {
+        termsAndConditionsAddress = _termsAndConditionsAddress;
+
+        emit SetTermsAndConditionsAddress(_termsAndConditionsAddress);
+    }
+
+    function setJavInfoAggregator(
+        address _javInfoAggregator
+    ) external onlyAdmin nonZeroAddress(_javInfoAggregator) {
+        javInfoAggregator = _javInfoAggregator;
+
+        emit SetJavInfoAggregator(_javInfoAggregator);
+    }
+
+    function setBuyConfiguration(
+        uint32[] memory _baseFees,
+        uint32[] memory _usdThresholds
+    ) external onlyAdmin {
+        require(_baseFees.length == _usdThresholds.length, InvalidInputLength());
+
+        baseFees = _baseFees;
+        usdThresholds = _usdThresholds;
+
+        emit SetBuyConfiguration(_baseFees, _usdThresholds);
+    }
+
+    function setJavAmountConfiguration(
+        uint32[] memory _javThresholds,
+        uint32[] memory _reductionFactors
+    ) external onlyAdmin {
+        require(_javThresholds.length == _reductionFactors.length, InvalidInputLength());
+
+        javThresholds = _javThresholds;
+        reductionFactors = _reductionFactors;
+
+        emit SetJavAmountConfiguration(_javThresholds, _reductionFactors);
+    }
+
+    function setSellFees(uint32[] memory _sellFees) external onlyAdmin {
+        require(javThresholds.length == _sellFees.length, InvalidInputLength());
+        sellFees = _sellFees;
+
+        emit SetSellFees(_sellFees);
+    }
+
     function updateWithdrawEpochsLock(uint256 _newValue) external onlyOwner {
         withdrawEpochsLock = _newValue;
         emit UpdateWithdrawEpochsLock(_newValue);
-    }
-
-    // View helper functions
-    function maxAccPnlPerToken() public view returns (uint256) {
-        // PRECISION_18
-        return PRECISION_18 + accRewardsPerToken;
-    }
-
-    function collateralizationP() external view returns (uint256) {
-        // PRECISION_18 (%)
-        uint256 _maxAccPnlPerToken = maxAccPnlPerToken();
-        return (_maxAccPnlPerToken * 100 * PRECISION_18) / _maxAccPnlPerToken;
-    }
-
-    function totalSharesBeingWithdrawn(address owner) public view returns (uint256 shares) {
-        uint256 currentEpoch = getCurrentEpoch();
-        for (uint256 i = currentEpoch; i <= currentEpoch + withdrawEpochsLock; ++i) {
-            shares += withdrawRequests[owner][i];
-        }
-    }
-
-    // external helper functions
-    function tryUpdateCurrentMaxSupply() public {
-        if (block.timestamp - lastMaxSupplyUpdate >= 24 hours) {
-            currentMaxSupply =
-                (totalSupply() * (PRECISION_18 * 100 + maxSupplyIncreaseDailyP)) /
-                (PRECISION_18 * 100);
-            lastMaxSupplyUpdate = block.timestamp;
-
-            emit CurrentMaxSupplyUpdated(currentMaxSupply);
-        }
-    }
-
-    function tryResetDailyAccPnlDelta() public {
-        if (block.timestamp - lastDailyAccPnlDeltaReset >= 24 hours) {
-            dailyAccPnlDelta = 0;
-            lastDailyAccPnlDeltaReset = block.timestamp;
-
-            emit DailyAccPnlDeltaReset();
-        }
-    }
-
-    // Private helper functions
-    function updateShareToAssetsPrice() private {
-        shareToAssetsPrice = maxAccPnlPerToken(); // PRECISION_18
-        emit ShareToAssetsPriceUpdated(shareToAssetsPrice);
-    }
-
-    function _assetIERC20() private view returns (IERC20) {
-        return IERC20(asset());
-    }
-
-    // Override ERC-20 functions (prevent sending to address that is withdrawing)
-    function transfer(
-        address to,
-        uint256 amount
-    ) public override(ERC20Upgradeable, IERC20) returns (bool) {
-        address sender = _msgSender();
-        if (totalSharesBeingWithdrawn(sender) > balanceOf(sender) - amount)
-            revert PendingWithdrawal();
-
-        _transfer(sender, to, amount);
-        return true;
-    }
-
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) public override(ERC20Upgradeable, IERC20) returns (bool) {
-        if (totalSharesBeingWithdrawn(from) > balanceOf(from) - amount) revert PendingWithdrawal();
-
-        _spendAllowance(from, _msgSender(), amount);
-        _transfer(from, to, amount);
-        return true;
-    }
-
-    // Override ERC-4626 view functions
-    function decimals() public view override(ERC4626Upgradeable) returns (uint8) {
-        return ERC4626Upgradeable.decimals();
-    }
-
-    function _convertToShares(
-        uint256 assets,
-        Math.Rounding rounding
-    ) internal view override returns (uint256 shares) {
-        return assets.mulDiv(PRECISION_18, shareToAssetsPrice, rounding);
-    }
-
-    function _convertToAssets(
-        uint256 shares,
-        Math.Rounding rounding
-    ) internal view override returns (uint256 assets) {
-        // Prevent overflow when called from maxDeposit with maxMint = uint256.max
-        if (shares == type(uint256).max && shareToAssetsPrice >= PRECISION_18) {
-            return shares;
-        }
-        return shares.mulDiv(shareToAssetsPrice, PRECISION_18, rounding);
-    }
-
-    function maxMint(address) public view override returns (uint256) {
-        return
-            currentMaxSupply > 0
-                ? currentMaxSupply - Math.min(currentMaxSupply, totalSupply())
-                : type(uint256).max;
-    }
-
-    function maxDeposit(address owner) public view override returns (uint256) {
-        return _convertToAssets(maxMint(owner), Math.Rounding.Floor);
-    }
-
-    function maxWithdraw(address owner) public view override returns (uint256) {
-        return _convertToAssets(maxRedeem(owner), Math.Rounding.Floor);
-    }
-
-    // Override ERC-4626 interactions (call scaleVariables on every deposit / withdrawal)
-    function deposit(
-        uint256 assets,
-        address receiver
-    ) public override checks(assets) returns (uint256) {
-        if (assets > maxDeposit(receiver))
-            revert ERC4626ExceededMaxDeposit(receiver, maxDeposit(receiver), assets);
-
-        uint256 shares = previewDeposit(assets);
-        scaleVariables(shares, assets, true);
-
-        _deposit(_msgSender(), receiver, assets, shares);
-        return shares;
-    }
-
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    ) public override checks(assets) returns (uint256) {
-        if (assets > maxWithdraw(owner))
-            revert ERC4626ExceededMaxWithdraw(receiver, maxWithdraw(owner), assets);
-
-        uint256 shares = previewWithdraw(assets);
-        withdrawRequests[owner][getCurrentEpoch()] -= shares;
-
-        scaleVariables(shares, assets, false);
-
-        _withdraw(_msgSender(), receiver, owner, assets, shares);
-        return shares;
-    }
-
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner
-    ) public override checks(shares) returns (uint256) {
-        if (shares > maxRedeem(owner))
-            revert ERC4626ExceededMaxRedeem(owner, shares, maxRedeem(owner));
-
-        withdrawRequests[owner][getCurrentEpoch()] -= shares;
-
-        uint256 assets = previewRedeem(shares);
-        scaleVariables(shares, assets, false);
-
-        _withdraw(_msgSender(), receiver, owner, assets, shares);
-        return assets;
-    }
-
-    function scaleVariables(uint256 shares, uint256 assets, bool isDeposit) private {
-        uint256 supply = totalSupply();
-
-        if (accPnlPerToken < 0) {
-            accPnlPerToken =
-                (accPnlPerToken * int256(supply)) /
-                (isDeposit ? int256(supply + shares) : int256(supply - shares));
-        } else if (accPnlPerToken > 0) {
-            totalLiability +=
-                ((int256(shares) * totalLiability) / int256(supply)) *
-                (isDeposit ? int256(1) : int256(-1));
-        }
-
-        totalDeposited = isDeposit ? totalDeposited + assets : totalDeposited - assets;
     }
 
     function makeWithdrawRequest(uint256 shares, address owner) external {
@@ -395,11 +271,248 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault {
         emit AssetsReceived(sender, user, assets, assets);
     }
 
+    function collateralizationP() external view returns (uint256) {
+        // PRECISION_18 (%)
+        uint256 _maxAccPnlPerToken = maxAccPnlPerToken();
+        return (_maxAccPnlPerToken * 100 * PRECISION_18) / _maxAccPnlPerToken;
+    }
+
     function tvl() external view returns (uint256) {
         return (maxAccPnlPerToken() * totalSupply()) / PRECISION_18;
     }
 
+    // external helper functions
+    function tryUpdateCurrentMaxSupply() public {
+        if (block.timestamp - lastMaxSupplyUpdate >= 24 hours) {
+            currentMaxSupply =
+                (totalSupply() * (PRECISION_18 * 100 + maxSupplyIncreaseDailyP)) /
+                (PRECISION_18 * 100);
+            lastMaxSupplyUpdate = block.timestamp;
+
+            emit CurrentMaxSupplyUpdated(currentMaxSupply);
+        }
+    }
+
+    function tryResetDailyAccPnlDelta() public {
+        if (block.timestamp - lastDailyAccPnlDeltaReset >= 24 hours) {
+            dailyAccPnlDelta = 0;
+            lastDailyAccPnlDeltaReset = block.timestamp;
+
+            emit DailyAccPnlDeltaReset();
+        }
+    }
+
+    // Override ERC-20 functions (prevent sending to address that is withdrawing)
+    function transfer(
+        address to,
+        uint256 amount
+    ) public override(ERC20Upgradeable, IERC20) returns (bool) {
+        address sender = _msgSender();
+        if (totalSharesBeingWithdrawn(sender) > balanceOf(sender) - amount)
+            revert PendingWithdrawal();
+
+        _transfer(sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) public override(ERC20Upgradeable, IERC20) returns (bool) {
+        if (totalSharesBeingWithdrawn(from) > balanceOf(from) - amount) revert PendingWithdrawal();
+
+        _spendAllowance(from, _msgSender(), amount);
+        _transfer(from, to, amount);
+        return true;
+    }
+
+    // Override ERC-4626 interactions (call scaleVariables on every deposit / withdrawal)
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) public override checks(assets) onlyAgreeToTerms(termsAndConditionsAddress) returns (uint256) {
+        uint256 javPriceUsd = IJavInfoAggregator(javInfoAggregator).getJavPrice(18);
+        uint256 inputAmountUsd = (assets * javPriceUsd) / PRECISION_18;
+
+        uint256 feeP = _calculateFeeP(inputAmountUsd, _msgSender(), true);
+        uint256 fee = (assets * feeP) / 1e4;
+        uint256 clearAssets = assets - fee;
+
+        if (clearAssets > maxDeposit(receiver)) {
+            revert ERC4626ExceededMaxDeposit(receiver, maxDeposit(receiver), clearAssets);
+        }
+
+        uint256 shares = previewDeposit(clearAssets);
+        scaleVariables(shares, clearAssets, true);
+
+        _deposit(_msgSender(), receiver, clearAssets, shares);
+        IERC20Extended(asset()).burn(fee);
+        return shares;
+    }
+
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address owner
+    ) public override checks(assets) onlyAgreeToTerms(termsAndConditionsAddress) returns (uint256) {
+        uint256 javPriceUsd = IJavInfoAggregator(javInfoAggregator).getJavPrice(18);
+        uint256 inputAmountUsd = (assets * javPriceUsd) / PRECISION_18;
+
+        uint256 feeP = _calculateFeeP(inputAmountUsd, _msgSender(), false);
+        uint256 fee = (assets * feeP) / 1e4;
+        uint256 clearAssets = assets - fee;
+
+        if (clearAssets > maxWithdraw(owner)) {
+            revert ERC4626ExceededMaxWithdraw(receiver, maxWithdraw(owner), clearAssets);
+        }
+
+        uint256 shares = previewWithdraw(clearAssets);
+        withdrawRequests[owner][getCurrentEpoch()] -= shares;
+
+        scaleVariables(shares, clearAssets, false);
+
+        _withdraw(_msgSender(), receiver, owner, clearAssets, shares);
+        IERC20Extended(asset()).burn(fee);
+        return shares;
+    }
+
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner
+    ) public override checks(shares) returns (uint256) {
+        if (shares > maxRedeem(owner))
+            revert ERC4626ExceededMaxRedeem(owner, shares, maxRedeem(owner));
+
+        withdrawRequests[owner][getCurrentEpoch()] -= shares;
+
+        uint256 assets = previewRedeem(shares);
+        scaleVariables(shares, assets, false);
+
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+        return assets;
+    }
+
+    // View helper functions
     function getCurrentEpoch() public view returns (uint256) {
         return (block.timestamp - commencementTimestamp) / epochDuration;
+    }
+
+    function maxAccPnlPerToken() public view returns (uint256) {
+        // PRECISION_18
+        return PRECISION_18 + accRewardsPerToken;
+    }
+
+    function totalSharesBeingWithdrawn(address owner) public view returns (uint256 shares) {
+        uint256 currentEpoch = getCurrentEpoch();
+        for (uint256 i = currentEpoch; i <= currentEpoch + withdrawEpochsLock; ++i) {
+            shares += withdrawRequests[owner][i];
+        }
+    }
+
+    // Override ERC-4626 view functions
+    function decimals() public view override(ERC4626Upgradeable) returns (uint8) {
+        return ERC4626Upgradeable.decimals();
+    }
+
+    function maxMint(address) public view override returns (uint256) {
+        return
+            currentMaxSupply > 0
+                ? currentMaxSupply - Math.min(currentMaxSupply, totalSupply())
+                : type(uint256).max;
+    }
+
+    function maxDeposit(address owner) public view override returns (uint256) {
+        return _convertToAssets(maxMint(owner), Math.Rounding.Floor);
+    }
+
+    function maxWithdraw(address owner) public view override returns (uint256) {
+        return _convertToAssets(maxRedeem(owner), Math.Rounding.Floor);
+    }
+
+    function _convertToShares(
+        uint256 assets,
+        Math.Rounding rounding
+    ) internal view override returns (uint256 shares) {
+        return assets.mulDiv(PRECISION_18, shareToAssetsPrice, rounding);
+    }
+
+    function _convertToAssets(
+        uint256 shares,
+        Math.Rounding rounding
+    ) internal view override returns (uint256 assets) {
+        // Prevent overflow when called from maxDeposit with maxMint = uint256.max
+        if (shares == type(uint256).max && shareToAssetsPrice >= PRECISION_18) {
+            return shares;
+        }
+        return shares.mulDiv(shareToAssetsPrice, PRECISION_18, rounding);
+    }
+
+    // Private helper functions
+    function updateShareToAssetsPrice() private {
+        shareToAssetsPrice = maxAccPnlPerToken(); // PRECISION_18
+        emit ShareToAssetsPriceUpdated(shareToAssetsPrice);
+    }
+
+    function scaleVariables(uint256 shares, uint256 assets, bool isDeposit) private {
+        uint256 supply = totalSupply();
+
+        if (accPnlPerToken < 0) {
+            accPnlPerToken =
+                (accPnlPerToken * int256(supply)) /
+                (isDeposit ? int256(supply + shares) : int256(supply - shares));
+        } else if (accPnlPerToken > 0) {
+            totalLiability +=
+                ((int256(shares) * totalLiability) / int256(supply)) *
+                (isDeposit ? int256(1) : int256(-1));
+        }
+
+        totalDeposited = isDeposit ? totalDeposited + assets : totalDeposited - assets;
+    }
+
+    function _calculateFeeP(
+        uint256 _usdAmount,
+        address _user,
+        bool _isDeposit
+    ) private view returns (uint256) {
+        uint256 _javFreezerAmount = IJavInfoAggregator(javInfoAggregator).getJavFreezerAmount(
+            _user
+        );
+        uint32 baseFee;
+        uint32 reductionFactor;
+
+        if (!_isDeposit) {
+            for (uint8 i = uint8(javThresholds.length); i > 0; --i) {
+                if (_javFreezerAmount >= javThresholds[i - 1] * PRECISION_18) {
+                    return sellFees[i - 1];
+                }
+            }
+        }
+
+        for (uint8 i = uint8(usdThresholds.length); i > 0; --i) {
+            if (_usdAmount >= usdThresholds[i - 1] * PRECISION_18) {
+                baseFee = baseFees[i - 1];
+                break;
+            }
+        }
+
+        for (uint8 i = uint8(javThresholds.length); i > 0; --i) {
+            if (_javFreezerAmount >= javThresholds[i - 1] * PRECISION_18) {
+                reductionFactor = reductionFactors[i - 1];
+                break;
+            }
+        }
+
+        return (baseFee * reductionFactor) / 1e4;
+    }
+
+    function _checks(uint256 assetsOrShares) private view {
+        if (shareToAssetsPrice == 0) revert PriceZero();
+        if (assetsOrShares == 0) revert ValueZero();
+    }
+
+    function _assetIERC20() private view returns (IERC20) {
+        return IERC20(asset());
     }
 }

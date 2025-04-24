@@ -14,7 +14,7 @@ import "./ConstantsUtils.sol";
  * @dev JavPairsStorage facet internal library
  */
 library PairsStorageUtils {
-    uint256 private constant MIN_LEVERAGE = 1.1e3; // 1.1x (1e3 precision)
+    uint256 private constant MIN_LEVERAGE = 1e3; // 1x (1e3 precision)
     uint256 private constant MAX_LEVERAGE = 1000e3; // 1000x (1e3 precision)
 
     function initializeGroupLiquidationParams(
