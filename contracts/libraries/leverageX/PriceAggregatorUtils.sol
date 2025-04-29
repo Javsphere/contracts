@@ -139,7 +139,7 @@ library PriceAggregatorUtils {
         }
         //  send unused eth back to user
         if (msg.value > _totalFee) {
-            (bool success,) = _user.call{value: msg.value - _totalFee}("");
+            (bool success, ) = _user.call{value: msg.value - _totalFee}("");
             require(success, "JavPriceAggregator: Refund failed");
         }
     }
@@ -183,7 +183,7 @@ library PriceAggregatorUtils {
     ) internal view returns (uint256) {
         return
             (_collateralValue *
-            _getCollateralPrecisionDelta(_collateralIndex) *
+                _getCollateralPrecisionDelta(_collateralIndex) *
                 getCollateralPriceUsd(_collateralIndex)) / 1e8;
     }
 
@@ -223,9 +223,9 @@ library PriceAggregatorUtils {
      * @dev Returns storage pointer for storage struct in diamond contract, at defined slot
      */
     function _getStorage()
-    internal
-    pure
-    returns (IPriceAggregator.PriceAggregatorStorage storage s)
+        internal
+        pure
+        returns (IPriceAggregator.PriceAggregatorStorage storage s)
     {
         uint256 storageSlot = _getSlot();
         assembly {

@@ -63,6 +63,8 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
     uint32[] public reductionFactors; //1e4
     uint32[] public sellFees; //1e4
 
+    uint256 public lastUpdateEpoch;
+
     modifier checks(uint256 assetsOrShares) {
         _checks(assetsOrShares);
         _;
@@ -174,7 +176,17 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         emit UpdateWithdrawEpochsLock(_newValue);
     }
 
+    function updateEpochDuration(uint256 _newValue) external onlyOwner {
+        lastUpdateEpoch = getCurrentEpoch();
+        epochDuration = _newValue;
+
+        emit UpdateEpochDuration(_newValue);
+    }
+
     function makeWithdrawRequest(uint256 shares, address owner) external {
+        if (shares > maxRedeem(owner))
+            revert ERC4626ExceededMaxWithdraw(owner, shares, maxRedeem(owner));
+
         uint256 currentEpoch = getCurrentEpoch();
 
         address sender = _msgSender();
@@ -190,16 +202,18 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         emit WithdrawRequested(sender, owner, shares, currentEpoch, unlockEpoch);
     }
 
-    function cancelWithdrawRequest(uint256 shares, address owner, uint256 unlockEpoch) external {
+    function cancelWithdrawRequest(address owner, uint256 unlockEpoch) external {
         uint256 currentEpoch = getCurrentEpoch();
-        if (shares > withdrawRequests[owner][unlockEpoch]) revert AboveMax();
+        require(withdrawRequests[owner][unlockEpoch] > 0, ZeroValue());
+
+        uint256 shares = withdrawRequests[owner][unlockEpoch];
 
         address sender = _msgSender();
         uint256 allowance = allowance(owner, sender);
 
         if (sender != owner && (allowance == 0 || allowance < shares)) revert NotAllowed();
 
-        withdrawRequests[owner][unlockEpoch] -= shares;
+        withdrawRequests[owner][unlockEpoch] = 0;
 
         emit WithdrawCanceled(sender, owner, shares, currentEpoch, unlockEpoch);
     }
@@ -224,7 +238,6 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
     function sendAssets(uint8 __, uint256 assets, address receiver) external {
         address sender = _msgSender();
         if (sender != pnlHandler) revert OnlyTradingPnlHandler();
-
         int256 accPnlDelta = int256(
             assets.mulDiv(
                 collateralConfig.precisionDelta * collateralConfig.precision,
@@ -269,12 +282,6 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         tryUpdateCurrentMaxSupply();
 
         emit AssetsReceived(sender, user, assets, assets);
-    }
-
-    function collateralizationP() external view returns (uint256) {
-        // PRECISION_18 (%)
-        uint256 _maxAccPnlPerToken = maxAccPnlPerToken();
-        return (_maxAccPnlPerToken * 100 * PRECISION_18) / _maxAccPnlPerToken;
     }
 
     function tvl() external view returns (uint256) {
@@ -334,11 +341,9 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
     ) public override checks(assets) onlyAgreeToTerms(termsAndConditionsAddress) returns (uint256) {
         uint256 javPriceUsd = IJavInfoAggregator(javInfoAggregator).getJavPrice(18);
         uint256 inputAmountUsd = (assets * javPriceUsd) / PRECISION_18;
-
         uint256 feeP = _calculateFeeP(inputAmountUsd, _msgSender(), true);
         uint256 fee = (assets * feeP) / 1e4;
         uint256 clearAssets = assets - fee;
-
         if (clearAssets > maxDeposit(receiver)) {
             revert ERC4626ExceededMaxDeposit(receiver, maxDeposit(receiver), clearAssets);
         }
@@ -347,15 +352,23 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         scaleVariables(shares, clearAssets, true);
 
         _deposit(_msgSender(), receiver, clearAssets, shares);
-        IERC20Extended(asset()).burn(fee);
+
+        IERC20Extended(asset()).burnFrom(_msgSender(), fee); //check
+
         return shares;
     }
 
     function withdraw(
-        uint256 assets,
+        uint256 epoch,
         address receiver,
         address owner
-    ) public override checks(assets) onlyAgreeToTerms(termsAndConditionsAddress) returns (uint256) {
+    ) public override onlyAgreeToTerms(termsAndConditionsAddress) returns (uint256) {
+        require(epoch <= getCurrentEpoch(), WrongIndex());
+        require(withdrawRequests[owner][epoch] > 0, ZeroValue());
+
+        uint256 shares = withdrawRequests[owner][epoch];
+        uint256 assets = previewRedeem(shares);
+
         uint256 javPriceUsd = IJavInfoAggregator(javInfoAggregator).getJavPrice(18);
         uint256 inputAmountUsd = (assets * javPriceUsd) / PRECISION_18;
 
@@ -363,42 +376,18 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         uint256 fee = (assets * feeP) / 1e4;
         uint256 clearAssets = assets - fee;
 
-        if (clearAssets > maxWithdraw(owner)) {
-            revert ERC4626ExceededMaxWithdraw(receiver, maxWithdraw(owner), clearAssets);
-        }
+        withdrawRequests[owner][epoch] = 0;
 
-        uint256 shares = previewWithdraw(clearAssets);
-        withdrawRequests[owner][getCurrentEpoch()] -= shares;
-
-        scaleVariables(shares, clearAssets, false);
-
+        scaleVariables(shares, assets, false);
         _withdraw(_msgSender(), receiver, owner, clearAssets, shares);
         IERC20Extended(asset()).burn(fee);
         return shares;
     }
 
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner
-    ) public override checks(shares) returns (uint256) {
-        if (shares > maxRedeem(owner))
-            revert ERC4626ExceededMaxRedeem(owner, shares, maxRedeem(owner));
-
-        withdrawRequests[owner][getCurrentEpoch()] -= shares;
-
-        uint256 assets = previewRedeem(shares);
-        scaleVariables(shares, assets, false);
-
-        _withdraw(_msgSender(), receiver, owner, assets, shares);
-        return assets;
-    }
-
     // View helper functions
     function getCurrentEpoch() public view returns (uint256) {
-        return (block.timestamp - commencementTimestamp) / epochDuration;
+        return lastUpdateEpoch + (block.timestamp - commencementTimestamp) / epochDuration;
     }
-
     function maxAccPnlPerToken() public view returns (uint256) {
         // PRECISION_18
         return PRECISION_18 + accRewardsPerToken;
@@ -427,10 +416,6 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         return _convertToAssets(maxMint(owner), Math.Rounding.Floor);
     }
 
-    function maxWithdraw(address owner) public view override returns (uint256) {
-        return _convertToAssets(maxRedeem(owner), Math.Rounding.Floor);
-    }
-
     function _convertToShares(
         uint256 assets,
         Math.Rounding rounding
@@ -442,7 +427,6 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         uint256 shares,
         Math.Rounding rounding
     ) internal view override returns (uint256 assets) {
-        // Prevent overflow when called from maxDeposit with maxMint = uint256.max
         if (shares == type(uint256).max && shareToAssetsPrice >= PRECISION_18) {
             return shares;
         }
@@ -457,7 +441,6 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
 
     function scaleVariables(uint256 shares, uint256 assets, bool isDeposit) private {
         uint256 supply = totalSupply();
-
         if (accPnlPerToken < 0) {
             accPnlPerToken =
                 (accPnlPerToken * int256(supply)) /
@@ -467,7 +450,6 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
                 ((int256(shares) * totalLiability) / int256(supply)) *
                 (isDeposit ? int256(1) : int256(-1));
         }
-
         totalDeposited = isDeposit ? totalDeposited + assets : totalDeposited - assets;
     }
 

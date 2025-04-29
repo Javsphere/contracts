@@ -27,4 +27,9 @@ contract ERC20Mock is ERC20 {
     function decimals() public view override returns (uint8) {
         return _decimals;
     }
+
+    function burnFrom(address account, uint256 value) public virtual {
+        _spendAllowance(account, _msgSender(), value);
+        _burn(account, value);
+    }
 }
