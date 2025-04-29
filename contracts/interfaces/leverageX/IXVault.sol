@@ -30,6 +30,7 @@ interface IXVault {
     event DailyAccPnlDeltaReset();
     event ShareToAssetsPriceUpdated(uint256 newValue);
     event UpdateWithdrawEpochsLock(uint256 newValue);
+    event UpdateEpochDuration(uint256 newValue);
     event WithdrawRequested(
         address indexed sender,
         address indexed owner,
