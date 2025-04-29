@@ -388,6 +388,11 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
     function getCurrentEpoch() public view returns (uint256) {
         return lastUpdateEpoch + (block.timestamp - commencementTimestamp) / epochDuration;
     }
+
+    function clearEpochNumber() external view returns (uint256) {
+        return (block.timestamp - commencementTimestamp) / epochDuration;
+    }
+
     function maxAccPnlPerToken() public view returns (uint256) {
         // PRECISION_18
         return PRECISION_18 + accRewardsPerToken;
