@@ -221,6 +221,7 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
     // @param __: a placeholder to match the function selector
     function distributeReward(uint8 __, uint256 assets) external {
         address sender = _msgSender();
+        if (sender != pnlHandler) revert OnlyTradingPnlHandler();
         _assetIERC20().safeTransferFrom(sender, address(this), assets);
 
         accRewardsPerToken +=
