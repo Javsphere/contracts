@@ -256,6 +256,7 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         totalLiability += int256(assets);
         totalClosedPnl += int256(assets);
 
+        updateShareToAssetsPrice();
         tryUpdateCurrentMaxSupply();
 
         SafeERC20.safeTransfer(_assetIERC20(), receiver, assets);
@@ -279,6 +280,7 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         totalLiability -= int256(assets);
         totalClosedPnl -= int256(assets);
 
+        updateShareToAssetsPrice();
         tryUpdateCurrentMaxSupply();
 
         emit AssetsReceived(sender, user, assets, assets);
@@ -353,9 +355,19 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
 
         _deposit(_msgSender(), receiver, clearAssets, shares);
 
-        IERC20Extended(asset()).burnFrom(_msgSender(), fee); //check
+        IERC20Extended(asset()).burnFrom(_msgSender(), fee);
 
         return shares;
+    }
+
+    function fillVault(
+        uint256 assets,
+        address receiver
+    ) external checks(assets) onlyAdmin returns (uint256) {
+        uint256 shares = previewDeposit(assets);
+
+        scaleVariables(shares, assets, true);
+        _deposit(_msgSender(), receiver, assets, shares);
     }
 
     function withdraw(
@@ -380,6 +392,7 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
 
         scaleVariables(shares, assets, false);
         _withdraw(_msgSender(), receiver, owner, clearAssets, shares);
+
         IERC20Extended(asset()).burn(fee);
         return shares;
     }
@@ -412,7 +425,7 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
 
     function maxMint(address) public view override returns (uint256) {
         return
-            currentMaxSupply > 0
+            accPnlPerToken > 0
                 ? currentMaxSupply - Math.min(currentMaxSupply, totalSupply())
                 : type(uint256).max;
     }
@@ -440,7 +453,9 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
 
     // Private helper functions
     function updateShareToAssetsPrice() private {
-        shareToAssetsPrice = maxAccPnlPerToken(); // PRECISION_18
+        shareToAssetsPrice =
+            maxAccPnlPerToken() -
+            (accPnlPerToken > 0 ? uint256(accPnlPerToken) : uint256(0)); // PRECISION_18
         emit ShareToAssetsPriceUpdated(shareToAssetsPrice);
     }
 
