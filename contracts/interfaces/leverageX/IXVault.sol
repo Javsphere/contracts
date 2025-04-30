@@ -45,6 +45,14 @@ interface IXVault {
         uint256 currEpoch,
         uint256 indexed unlockEpoch
     );
+    event Withdraw(
+        address indexed sender,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares,
+        uint256 unlockEpoch
+    );
 
     event RewardDistributed(address indexed sender, uint256 assets);
 

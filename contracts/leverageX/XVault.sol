@@ -395,6 +395,9 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         _withdraw(_msgSender(), receiver, owner, clearAssets, shares);
 
         IERC20Extended(asset()).burn(fee);
+
+        emit Withdraw(_msgSender(), receiver, owner, clearAssets, shares, epoch);
+
         return shares;
     }
 
