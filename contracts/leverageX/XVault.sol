@@ -360,6 +360,16 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         return shares;
     }
 
+    function fillVault(
+        uint256 assets,
+        address receiver
+    ) external checks(assets) onlyAdmin returns (uint256) {
+        uint256 shares = previewDeposit(assets);
+
+        scaleVariables(shares, assets, true);
+        _deposit(_msgSender(), receiver, assets, shares);
+    }
+
     function withdraw(
         uint256 epoch,
         address receiver,
