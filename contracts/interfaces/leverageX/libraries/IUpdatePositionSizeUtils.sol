@@ -28,6 +28,7 @@ interface IUpdatePositionSizeUtils is IUpdatePositionSize {
         uint256 indexed pairIndex,
         uint256 index,
         uint256 marketPrice,
+        uint256 collateralPriceUsd,
         uint256 collateralDelta,
         uint256 leverageDelta,
         IUpdatePositionSize.IncreasePositionSizeValues values
@@ -51,6 +52,7 @@ interface IUpdatePositionSizeUtils is IUpdatePositionSize {
         uint256 indexed pairIndex,
         uint256 index,
         uint256 marketPrice,
+        uint256 collateralPriceUsd,
         uint256 collateralDelta,
         uint256 leverageDelta,
         IUpdatePositionSize.DecreasePositionSizeValues values

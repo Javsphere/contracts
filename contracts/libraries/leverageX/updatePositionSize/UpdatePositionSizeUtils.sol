@@ -80,6 +80,7 @@ library UpdatePositionSizeUtils {
             trade.pairIndex,
             trade.index,
             price,
+            _getMultiCollatDiamond().getCollateralPriceUsd(trade.collateralIndex),
             _input.collateralDelta,
             _input.leverageDelta,
             values
@@ -142,6 +143,7 @@ library UpdatePositionSizeUtils {
             trade.pairIndex,
             trade.index,
             price,
+            _getMultiCollatDiamond().getCollateralPriceUsd(trade.collateralIndex),
             _input.collateralDelta,
             _input.leverageDelta,
             values
