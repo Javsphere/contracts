@@ -117,4 +117,9 @@ contract JavPriceAggregator is JavAddressStore, IPriceAggregatorUtils {
     function getRewardsTokenPriceUsd() external view returns (uint256) {
         return PriceAggregatorUtils.getRewardsTokenPriceUsd();
     }
+
+    /// @inheritdoc IPriceAggregatorUtils
+    function isCollateralAlternativeOracle(uint8 _collateralIndex) external view returns (bool) {
+        return PriceAggregatorUtils.isCollateralAlternativeOracle(_collateralIndex);
+    }
 }

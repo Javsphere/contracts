@@ -105,6 +105,11 @@ interface IPriceAggregatorUtils is IPriceAggregator {
     function getRewardsTokenPriceUsd() external view returns (uint256);
 
     /**
+     * @dev Returns if collateral use alternative oracle
+     */
+    function isCollateralAlternativeOracle(uint8 _collateralIndex) external view returns (bool);
+
+    /**
      * @dev Emitted when collateral/USD price feed is updated
      * @param collateralIndex collateral index
      * @param value new value

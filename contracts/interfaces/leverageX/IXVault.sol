@@ -30,6 +30,7 @@ interface IXVault {
     event DailyAccPnlDeltaReset();
     event ShareToAssetsPriceUpdated(uint256 newValue);
     event UpdateWithdrawEpochsLock(uint256 newValue);
+    event UpdateEpochDuration(uint256 newValue);
     event WithdrawRequested(
         address indexed sender,
         address indexed owner,
@@ -44,6 +45,14 @@ interface IXVault {
         uint256 currEpoch,
         uint256 indexed unlockEpoch
     );
+    event Withdraw(
+        address indexed sender,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares,
+        uint256 unlockEpoch
+    );
 
     event RewardDistributed(address indexed sender, uint256 assets);
 
@@ -55,6 +64,11 @@ interface IXVault {
         uint256 assetsLessDeplete
     );
 
+    event SetJavInfoAggregator(address indexed _address);
+    event SetSellFees(uint32[] sellFees);
+    event SetBuyConfiguration(uint32[] baseFees, uint32[] usdThresholds);
+    event SetJavAmountConfiguration(uint32[] javThresholds, uint32[] reductionFactors);
+
     error OnlyTradingPnlHandler();
     error PriceZero();
     error ValueZero();
@@ -63,7 +77,6 @@ interface IXVault {
     error WrongValues();
     error PendingWithdrawal();
     error EndOfEpoch();
-    error NotAllowed();
     error NotEnoughAssets();
     error MaxDailyPnl();
 }
