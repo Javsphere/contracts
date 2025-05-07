@@ -93,6 +93,10 @@ library PriceAggregatorUtils {
         return _getStorage().priceLifetime;
     }
 
+    function isCollateralAlternativeOracle(uint8 _collateralIndex) internal view returns (bool) {
+        return _getStorage().isCollateralAlternativeOracle[_collateralIndex];
+    }
+
     /**
      * @dev Check IPriceAggregatorUtils interface for documentation
      */
