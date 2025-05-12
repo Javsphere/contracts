@@ -83,19 +83,21 @@ contract JavBurner is IJavBurner, IGeneralErrors, BaseUpgradable {
     function swapAndBurn(address _token, uint256 _swapAmount) external onlyAllowedAddresses {
         require(IERC20(_token).balanceOf(address(this)) >= _swapAmount, InvalidAmount());
 
-        IRouter.Route[] memory route = swapRoute[_token];
-        require(route.length != 0, ZeroValue());
+        if (_token != javAddress) {
+            IRouter.Route[] memory route = swapRoute[_token];
+            require(route.length != 0, ZeroValue());
 
-        IERC20(_token).safeDecreaseAllowance(address(swapRouter), 0);
-        IERC20(_token).safeIncreaseAllowance(address(swapRouter), _swapAmount);
+            IERC20(_token).safeDecreaseAllowance(address(swapRouter), 0);
+            IERC20(_token).safeIncreaseAllowance(address(swapRouter), _swapAmount);
 
-        swapRouter.swapExactTokensForTokens(
-            _swapAmount,
-            0,
-            route,
-            address(this),
-            block.timestamp + 1
-        );
+            swapRouter.swapExactTokensForTokens(
+                _swapAmount,
+                0,
+                route,
+                address(this),
+                block.timestamp + 1
+            );
+        }
 
         uint256 _burnAmount = IERC20(javAddress).balanceOf(address(this));
         IERC20Extended(javAddress).burn(_burnAmount);
