@@ -11,6 +11,7 @@ describe("JavEscrow contract", () => {
     const NOT_ALLOWED_ERROR = "NotAllowed";
     const INVALID_ADDRESSES_ERROR = "InvalidAddresses";
     const DOES_NOT_EXIST_ERROR = "DoesntExist";
+    const ADDRESS_ZERO_ERROR = "ZeroAddress";
 
     const INIT_PLACE_ORDER_FEE = 1n * 10n ** 4n;
     const UPDATED_PLACE_ORDER_FEE = 1n * 10n ** 3n; //10%
@@ -18,6 +19,8 @@ describe("JavEscrow contract", () => {
 
     const TOKEN_INITIAL_SUPPLY = parseUnits("100", 18);
     const TOKEN_TO_MARKET = parseUnits("25", 18);
+
+    const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
 
     let hhJavEscrow;
     let admin;
@@ -144,6 +147,7 @@ describe("JavEscrow contract", () => {
                 token0: erc20token0.target,
                 token1: erc20token1.target,
                 seller: seller.address,
+                buyer: buyer.address,
                 token0Amount: TOKEN_TO_MARKET,
                 token1Amount: TOKEN_TO_MARKET,
                 isActive: true,
@@ -159,6 +163,7 @@ describe("JavEscrow contract", () => {
                 token0: erc20token0.target,
                 token1: erc20token1.target,
                 seller: seller.address,
+                buyer: buyer.address,
                 token0Amount: TOKEN_TO_MARKET,
                 token1Amount: TOKEN_TO_MARKET,
                 isActive: false,
@@ -174,6 +179,7 @@ describe("JavEscrow contract", () => {
                 token0: erc20token0.target,
                 token1: erc20token1.target,
                 seller: seller.address,
+                buyer: buyer.address,
                 token0Amount: TOKEN_TO_MARKET,
                 token1Amount: TOKEN_TO_MARKET,
                 isActive: true,
@@ -183,12 +189,29 @@ describe("JavEscrow contract", () => {
             ).to.be.revertedWithCustomError(hhJavEscrow, NOT_ALLOWED_ERROR);
         });
 
+        it("Should revert when zero buyer address", async () => {
+            const order = {
+                orderId: 0,
+                token0: erc20token0.target,
+                token1: erc20token1.target,
+                seller: seller.address,
+                buyer: ADDRESS_ZERO,
+                token0Amount: TOKEN_TO_MARKET,
+                token1Amount: TOKEN_TO_MARKET,
+                isActive: true,
+            };
+            await expect(
+                hhJavEscrow.connect(seller).placeOrder(order),
+            ).to.be.revertedWithCustomError(hhJavEscrow, ADDRESS_ZERO_ERROR);
+        });
+
         it("Should revert when incorrect token addresses", async () => {
             const order = {
                 orderId: 0,
                 token0: erc20token0.target,
                 token1: erc20token1.target,
                 seller: seller.address,
+                buyer: buyer.address,
                 token0Amount: TOKEN_TO_MARKET,
                 token1Amount: TOKEN_TO_MARKET,
                 isActive: true,
@@ -212,6 +235,7 @@ describe("JavEscrow contract", () => {
                 token0: erc20token0.target,
                 token1: erc20token1.target,
                 seller: seller.address,
+                buyer: buyer.address,
                 token0Amount: TOKEN_TO_MARKET,
                 token1Amount: TOKEN_TO_MARKET,
                 isActive: true,
@@ -283,6 +307,7 @@ describe("JavEscrow contract", () => {
             expect(updatedScBalance).to.be.equal(predictedScBalance);
             expect(updatedSellerBalance).to.be.equal(predictedSellerBalance);
         });
+
         //2nd order init, same context
         it("Should emit AcceptOrder and acceptOrder", async () => {
             const feeAmount =
@@ -309,6 +334,7 @@ describe("JavEscrow contract", () => {
                 token0: erc20token0.target,
                 token1: erc20token1.target,
                 seller: seller.address,
+                buyer: buyer.address,
                 token0Amount: TOKEN_TO_MARKET,
                 token1Amount: TOKEN_TO_MARKET,
                 isActive: true,
@@ -375,6 +401,25 @@ describe("JavEscrow contract", () => {
                 hhJavEscrow.connect(buyer).acceptOrder(orderId),
             ).to.be.revertedWithCustomError(hhJavEscrow, DOES_NOT_EXIST_ERROR);
         });
+
+        it("Should revert when acceptOrder from wrong buyer", async () => {
+            const order = {
+                orderId: 2,
+                token0: erc20token0.target,
+                token1: erc20token1.target,
+                seller: seller.address,
+                buyer: buyer.address,
+                token0Amount: TOKEN_TO_MARKET,
+                token1Amount: TOKEN_TO_MARKET,
+                isActive: true,
+            };
+
+            await hhJavEscrow.connect(seller).placeOrder(order);
+
+            await expect(
+                hhJavEscrow.connect(randomUser).acceptOrder(2),
+            ).to.be.revertedWithCustomError(hhJavEscrow, NOT_ALLOWED_ERROR);
+        });
     });
 
     describe("Claims", () => {
@@ -385,21 +430,50 @@ describe("JavEscrow contract", () => {
             const currentClaimerBalanceToken0 = await erc20token0.balanceOf(claimer.address);
             const currentScBalanceToken0 = await erc20token0.balanceOf(hhJavEscrow.target);
             const expectedClaimerBalanceToken0 = 0;
-            const expectedScBalanceToken0 = 2n * feeAmount;
+            const expectedScBalanceToken0 = 3n * feeAmount + TOKEN_TO_MARKET;
             expect(currentClaimerBalanceToken0).to.be.equal(expectedClaimerBalanceToken0);
             expect(currentScBalanceToken0).to.be.equal(expectedScBalanceToken0); //2 places occured
 
             await expect(hhJavEscrow.connect(admin).claimFee(erc20token0.target, claimer.address))
                 .to.emit(hhJavEscrow, "ClaimFee")
-                .withArgs(claimer.address, 2n * feeAmount);
+                .withArgs(claimer.address, 3n * feeAmount);
 
             const token0FeesValue = await hhJavEscrow.fees(erc20token0.target);
             expect(token0FeesValue).to.be.equal(0);
 
             const updatedClaimerBalanceToken0 = await erc20token0.balanceOf(claimer.address);
             const updatedScBalanceToken0 = await erc20token0.balanceOf(hhJavEscrow.target);
-            expect(updatedClaimerBalanceToken0).to.be.equal(2n * feeAmount);
-            expect(updatedScBalanceToken0).to.be.equal(0);
+            expect(updatedClaimerBalanceToken0).to.be.equal(3n * feeAmount);
+            expect(updatedScBalanceToken0).to.be.equal(TOKEN_TO_MARKET);
+        });
+    });
+
+    describe("View functions", () => {
+        it("Should return all active orders for buyer", async () => {
+            const orders = await hhJavEscrow.connect(buyer).getIncomingOrders(0, 5);
+            expect(orders.length).to.be.eq(3);
+            expect(orders[1][1]).to.be.eq(ADDRESS_ZERO);
+            expect(orders[2][1]).to.be.eq(ADDRESS_ZERO);
+        });
+
+        it("Should return all active orders for buyer with offset", async () => {
+            const orders = await hhJavEscrow.connect(buyer).getIncomingOrders(2, 5);
+            expect(orders.length).to.be.eq(1);
+        });
+
+        it("Should return all active orders for buyer with 0 limit", async () => {
+            const orders = await hhJavEscrow.connect(buyer).getIncomingOrders(2, 0);
+            expect(orders.length).to.be.eq(1);
+        });
+
+        it("Should return all active orders for buyer with limit increasing lastIndex", async () => {
+            const orders = await hhJavEscrow.connect(buyer).getIncomingOrders(2, 10);
+            expect(orders.length).to.be.eq(1);
+        });
+
+        it("Should return all active orders for buyer with limit == lastIndex", async () => {
+            const orders = await hhJavEscrow.connect(buyer).getIncomingOrders(2, 3);
+            expect(orders.length).to.be.eq(1);
         });
     });
 });
