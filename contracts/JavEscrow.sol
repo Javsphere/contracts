@@ -71,6 +71,7 @@ contract JavEscrow is IJavEscrow, IGeneralErrors, BaseUpgradable {
         require(_order.orderId == lastOrderId, IGeneralErrors.WrongIndex());
         require(_order.isActive, IGeneralErrors.WrongParams());
         require(_order.seller == _msgSender(), IGeneralErrors.NotAllowed());
+        require(_order.buyer != address(0), IGeneralErrors.ZeroAddress());
         require(
             _availableTokens.contains(_order.token0) && _availableTokens.contains(_order.token1),
             IGeneralErrors.InvalidAddresses()
@@ -106,6 +107,7 @@ contract JavEscrow is IJavEscrow, IGeneralErrors, BaseUpgradable {
     function acceptOrder(uint256 _orderId) external {
         Order memory _order = orders[_orderId];
         require(_order.isActive, IGeneralErrors.DoesntExist());
+        require(_msgSender() == _order.buyer, IGeneralErrors.NotAllowed());
 
         IERC20(_order.token0).safeTransfer(_msgSender(), _order.token0Amount);
         IERC20(_order.token1).safeTransferFrom(_msgSender(), _order.seller, _order.token1Amount);
@@ -114,5 +116,25 @@ contract JavEscrow is IJavEscrow, IGeneralErrors, BaseUpgradable {
         orders[_orderId] = _order;
 
         emit AcceptOrder(_orderId, _order);
+    }
+
+    function getIncomingOrders(uint32 _offset, uint32 _limit) public view returns (Order[] memory) {
+        address buyer = _msgSender();
+
+        uint256 lastIndex = lastOrderId - 1;
+        _limit = _limit == 0 || _limit > lastIndex ? uint32(lastIndex) : _limit;
+
+        Order[] memory incomingOrders = new Order[](_limit - _offset + 1);
+
+        uint32 currentIndex;
+        for (uint32 i = _offset; i <= _limit; ++i) {
+            Order memory order = orders[i];
+
+            if (order.isActive && order.buyer == buyer) {
+                incomingOrders[currentIndex++] = order;
+            }
+        }
+
+        return incomingOrders;
     }
 }
