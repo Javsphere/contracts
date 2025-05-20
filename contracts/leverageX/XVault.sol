@@ -83,7 +83,14 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         uint256 _maxSupplyIncreaseDailyP,
         uint256 _commencementTimestamp,
         uint256 _epochDuration,
-        uint256 _withdrawEpochsLock
+        uint256 _withdrawEpochsLock,
+        address _termsAndConditionsAddress,
+        address _javInfoAggregator,
+        uint32[] memory _baseFees,
+        uint32[] memory _usdThresholds,
+        uint32[] memory _javThresholds,
+        uint32[] memory _reductionFactors,
+        uint32[] memory _sellFees
     ) external initializer {
         if (
             !(_contractAddresses.asset != address(0) &&
@@ -93,6 +100,9 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         ) {
             revert WrongValues();
         }
+        require(_baseFees.length == _usdThresholds.length, InvalidInputLength());
+        require(_javThresholds.length == _reductionFactors.length, InvalidInputLength());
+        require(_javThresholds.length == _sellFees.length, InvalidInputLength());
 
         pnlHandler = _contractAddresses.pnlHandler;
 
@@ -101,6 +111,14 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
 
         commencementTimestamp = _commencementTimestamp;
         epochDuration = _epochDuration;
+
+        termsAndConditionsAddress = _termsAndConditionsAddress;
+        javInfoAggregator = _javInfoAggregator;
+        baseFees = _baseFees;
+        usdThresholds = _usdThresholds;
+        javThresholds = _javThresholds;
+        reductionFactors = _reductionFactors;
+        sellFees = _sellFees;
 
         shareToAssetsPrice = PRECISION_18;
         withdrawEpochsLock = _withdrawEpochsLock;
