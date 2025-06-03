@@ -5,14 +5,19 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../libraries/leverageX/CollateralUtils.sol";
-import "../interfaces/leverageX/IXVault.sol";
+import "../interfaces/leverageX/IXVaultV2.sol";
 import "../base/BaseUpgradable.sol";
 
 import "../abstract/TearmsAndCondUtils.sol";
-import "../interfaces/helpers/IJavInfoAggregator.sol";
 import "../interfaces/helpers/IGeneralErrors.sol";
 
-contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtils, IGeneralErrors {
+contract XVaultV2 is
+    ERC4626Upgradeable,
+    BaseUpgradable,
+    IXVaultV2,
+    TermsAndCondUtils,
+    IGeneralErrors
+{
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -55,13 +60,10 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
     int256 public totalLiability; // collateralConfig.precision (assets)
 
     address public termsAndConditionsAddress;
-    address public javInfoAggregator;
 
     uint32[] public baseFees; //1e4
     uint32[] public usdThresholds; // clear
-    uint32[] public javThresholds; // clear
-    uint32[] public reductionFactors; //1e4
-    uint32[] public sellFees; //1e4
+    uint32 public sellFeeP; //1e4
 
     uint256 public lastUpdateEpoch;
 
@@ -85,12 +87,9 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         uint256 _epochDuration,
         uint256 _withdrawEpochsLock,
         address _termsAndConditionsAddress,
-        address _javInfoAggregator,
         uint32[] memory _baseFees,
         uint32[] memory _usdThresholds,
-        uint32[] memory _javThresholds,
-        uint32[] memory _reductionFactors,
-        uint32[] memory _sellFees
+        uint32 _sellFeeP
     ) external initializer {
         if (
             !(_contractAddresses.asset != address(0) &&
@@ -101,8 +100,6 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
             revert WrongValues();
         }
         require(_baseFees.length == _usdThresholds.length, InvalidInputLength());
-        require(_javThresholds.length == _reductionFactors.length, InvalidInputLength());
-        require(_javThresholds.length == _sellFees.length, InvalidInputLength());
 
         pnlHandler = _contractAddresses.pnlHandler;
 
@@ -113,12 +110,9 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         epochDuration = _epochDuration;
 
         termsAndConditionsAddress = _termsAndConditionsAddress;
-        javInfoAggregator = _javInfoAggregator;
         baseFees = _baseFees;
         usdThresholds = _usdThresholds;
-        javThresholds = _javThresholds;
-        reductionFactors = _reductionFactors;
-        sellFees = _sellFees;
+        sellFeeP = _sellFeeP;
 
         shareToAssetsPrice = PRECISION_18;
         withdrawEpochsLock = _withdrawEpochsLock;
@@ -150,14 +144,6 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         emit SetTermsAndConditionsAddress(_termsAndConditionsAddress);
     }
 
-    function setJavInfoAggregator(
-        address _javInfoAggregator
-    ) external onlyAdmin nonZeroAddress(_javInfoAggregator) {
-        javInfoAggregator = _javInfoAggregator;
-
-        emit SetJavInfoAggregator(_javInfoAggregator);
-    }
-
     function setBuyConfiguration(
         uint32[] memory _baseFees,
         uint32[] memory _usdThresholds
@@ -170,23 +156,10 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         emit SetBuyConfiguration(_baseFees, _usdThresholds);
     }
 
-    function setJavAmountConfiguration(
-        uint32[] memory _javThresholds,
-        uint32[] memory _reductionFactors
-    ) external onlyAdmin {
-        require(_javThresholds.length == _reductionFactors.length, InvalidInputLength());
+    function setSellFee(uint32 _sellFeeP) external onlyAdmin {
+        sellFeeP = _sellFeeP;
 
-        javThresholds = _javThresholds;
-        reductionFactors = _reductionFactors;
-
-        emit SetJavAmountConfiguration(_javThresholds, _reductionFactors);
-    }
-
-    function setSellFees(uint32[] memory _sellFees) external onlyAdmin {
-        require(javThresholds.length == _sellFees.length, InvalidInputLength());
-        sellFees = _sellFees;
-
-        emit SetSellFees(_sellFees);
+        emit SetSellFeeP(_sellFeeP);
     }
 
     function updateWithdrawEpochsLock(uint256 _newValue) external onlyOwner {
@@ -360,9 +333,7 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         uint256 assets,
         address receiver
     ) public override checks(assets) onlyAgreeToTerms(termsAndConditionsAddress) returns (uint256) {
-        uint256 javPriceUsd = IJavInfoAggregator(javInfoAggregator).getJavPrice(18);
-        uint256 inputAmountUsd = (assets * javPriceUsd) / PRECISION_18;
-        uint256 feeP = _calculateFeeP(inputAmountUsd, _msgSender(), true);
+        uint256 feeP = _calculateFeeP(assets, true);
         uint256 fee = (assets * feeP) / 1e4;
         uint256 clearAssets = assets - fee;
         if (clearAssets > maxDeposit(receiver)) {
@@ -400,10 +371,7 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         uint256 shares = withdrawRequests[owner][epoch];
         uint256 assets = previewRedeem(shares);
 
-        uint256 javPriceUsd = IJavInfoAggregator(javInfoAggregator).getJavPrice(18);
-        uint256 inputAmountUsd = (assets * javPriceUsd) / PRECISION_18;
-
-        uint256 feeP = _calculateFeeP(inputAmountUsd, _msgSender(), false);
+        uint256 feeP = _calculateFeeP(assets, false);
         uint256 fee = (assets * feeP) / 1e4;
         uint256 clearAssets = assets - fee;
 
@@ -495,40 +463,16 @@ contract XVault is ERC4626Upgradeable, BaseUpgradable, IXVault, TermsAndCondUtil
         totalDeposited = isDeposit ? totalDeposited + assets : totalDeposited - assets;
     }
 
-    function _calculateFeeP(
-        uint256 _usdAmount,
-        address _user,
-        bool _isDeposit
-    ) private view returns (uint256) {
-        uint256 _javFreezerAmount = IJavInfoAggregator(javInfoAggregator).getJavFreezerAmount(
-            _user
-        );
-        uint32 baseFee;
-        uint32 reductionFactor;
-
+    function _calculateFeeP(uint256 _assets, bool _isDeposit) private view returns (uint256) {
         if (!_isDeposit) {
-            for (uint8 i = uint8(javThresholds.length); i > 0; --i) {
-                if (_javFreezerAmount >= javThresholds[i - 1] * PRECISION_18) {
-                    return sellFees[i - 1];
-                }
-            }
+            return sellFeeP;
         }
 
         for (uint8 i = uint8(usdThresholds.length); i > 0; --i) {
-            if (_usdAmount >= usdThresholds[i - 1] * PRECISION_18) {
-                baseFee = baseFees[i - 1];
-                break;
+            if (_assets >= usdThresholds[i - 1] * PRECISION_18) {
+                return baseFees[i - 1];
             }
         }
-
-        for (uint8 i = uint8(javThresholds.length); i > 0; --i) {
-            if (_javFreezerAmount >= javThresholds[i - 1] * PRECISION_18) {
-                reductionFactor = reductionFactors[i - 1];
-                break;
-            }
-        }
-
-        return (baseFee * reductionFactor) / 1e4;
     }
 
     function _checks(uint256 assetsOrShares) private view {

@@ -8,6 +8,7 @@ interface IJavEscrow {
         address token0;
         address token1;
         address seller;
+        address buyer;
         uint256 token0Amount; //token precision
         uint256 token1Amount; //token precision
         bool isActive;

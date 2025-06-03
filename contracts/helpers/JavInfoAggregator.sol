@@ -7,6 +7,7 @@ import "../interfaces/ITokenVesting.sol";
 import "../interfaces/IJavStakeX.sol";
 import "../interfaces/IJavFreezer.sol";
 import "../interfaces/IPool.sol";
+import "../interfaces/IUniswapV2Pair.sol";
 import "../interfaces/IJavPriceAggregator.sol";
 import "../libraries/PriceUtils.sol";
 import "../interfaces/helpers/IJavInfoAggregator.sol";
@@ -20,6 +21,11 @@ contract JavInfoAggregator is IJavInfoAggregator, BaseUpgradable {
     IJavPriceAggregator public priceAggregator;
 
     mapping(address => bytes32) public priceFeeds;
+
+    address public javlisAddress;
+    address public javlisVirtualPool;
+    address public ethAddress;
+    address public virtualEthPool;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -57,10 +63,38 @@ contract JavInfoAggregator is IJavInfoAggregator, BaseUpgradable {
         return _getJavPrice(_targetDecimals);
     }
 
+    function getJavlisPrice(uint8 _targetDecimals) external view returns (uint256) {
+        return _getJavlisPrice(_targetDecimals);
+    }
+
     function setPriceFeed(address _token, bytes32 _feedId) external onlyAdmin {
         priceFeeds[_token] = _feedId;
 
         emit SetPriceFeed(_token, _feedId);
+    }
+
+    function setJavlisAddress(address _javlisAddress) external onlyAdmin {
+        javlisAddress = _javlisAddress;
+
+        emit SetJavlisAddress(_javlisAddress);
+    }
+
+    function setJavlisVirtualPool(address _javlisVirtualPool) external onlyAdmin {
+        javlisVirtualPool = _javlisVirtualPool;
+
+        emit SetJavlisVirtualPool(_javlisVirtualPool);
+    }
+
+    function setEthAddress(address _ethAddress) external onlyAdmin {
+        ethAddress = _ethAddress;
+
+        emit SetEthAddress(_ethAddress);
+    }
+
+    function setVirtualEthPool(address _virtualEthPool) external onlyAdmin {
+        virtualEthPool = _virtualEthPool;
+
+        emit SetVirtualEthPool(_virtualEthPool);
     }
 
     function _getJavPrice(uint8 _targetDecimals) private view returns (uint256) {
@@ -76,6 +110,38 @@ contract JavInfoAggregator is IJavInfoAggregator, BaseUpgradable {
         uint256 ethPrice = _getUsdPrice(priceFeeds[ethToken], _targetDecimals);
 
         return (javEthPrice * ethPrice) / precision;
+    }
+
+    function _getJavlisPrice(uint8 _targetDecimals) private view returns (uint256) {
+        uint256 precision = 10 ** _targetDecimals;
+        uint256 javlisVirtualPrice;
+        uint256 virtualEthPrice;
+
+        IUniswapV2Pair _javlisVirtualPool = IUniswapV2Pair(javlisVirtualPool);
+
+        (uint112 javlisVirtualRes0, uint112 javlisVirtualRes1, ) = _javlisVirtualPool.getReserves();
+
+        if (_javlisVirtualPool.token0() == javlisAddress) {
+            javlisVirtualPrice = (javlisVirtualRes1 * precision) / javlisVirtualRes0;
+        } else {
+            javlisVirtualPrice = (javlisVirtualRes0 * precision) / javlisVirtualRes1;
+        }
+
+        IUniswapV2Pair _virtualEthPool = IUniswapV2Pair(virtualEthPool);
+
+        (uint112 virtualEthRes0, uint112 virtualEthRes1, ) = _virtualEthPool.getReserves();
+
+        if (_virtualEthPool.token0() == ethAddress) {
+            virtualEthPrice = (virtualEthRes0 * precision) / virtualEthRes1;
+        } else {
+            virtualEthPrice = (virtualEthRes1 * precision) / virtualEthRes0;
+        }
+
+        uint256 javlisEthPrice = (javlisVirtualPrice * virtualEthPrice) / precision;
+
+        uint256 ethPrice = _getUsdPrice(priceFeeds[ethAddress], _targetDecimals);
+
+        return (javlisEthPrice * ethPrice) / precision;
     }
 
     function _getTotalJavAmount(address _user) private view returns (uint256 _totalAmount) {
